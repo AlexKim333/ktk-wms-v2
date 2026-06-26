@@ -3,7 +3,7 @@
     <div class="login-card">
       <div class="login-brand">
        
-        <img src="../assets/lady_polo_logo.WEBP" alt="LADY POLO" class="custom-logo" />
+        <img src="../assets/lady_polo_logo.webp" alt="LADY POLO" class="custom-logo" />
         <p class="login-subtitle">작업자 로그인</p>
       </div>
 
