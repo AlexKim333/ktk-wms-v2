@@ -1,0 +1,23 @@
+[중요 공지: 프로젝트 아키텍처 및 백엔드 전면 교체]
+
+현재 우리 프로젝트(LADY POLO WMS)의 인프라가 완전히 변경되었습니다. 앞으로 코드를 작성하거나 제안할 때 아래의 새로운 규칙을 무조건, 엄격하게 따라야 합니다.
+
+1. 금지 사항 (Supabase 완전 폐기)
+- Supabase, supabase-js, app_members 테이블과 관련된 어떠한 코드도 절대 생성하지 마세요.
+- Authorization 헤더에 Bearer 토큰을 넣는 코드를 작성하지 마세요.
+
+2. 새로운 기술 스택 및 통신 환경
+- 백엔드: Frappe Cloud (ERPNext 기반)
+- 프론트엔드: Vue 3 (Vite), Pinia, Vue Router
+- 통신 엔진: Axios (`src/api/frappe.js`에 설정된 인스턴스 사용)
+- CORS 처리: `vite.config.js`의 프록시(`/api` -> Frappe Cloud)를 사용하므로 API 호출 시 Base URL 없이 상대 경로(`/api/...`)를 사용합니다.
+
+3. 인증 및 데이터베이스 (Frappe 기준)
+- 로그인: `/api/method/login`으로 POST 요청 (파라미터: `usr`, `pwd`)
+- 세션 관리: Frappe가 구워주는 HttpOnly Session Cookie를 사용하므로, 프론트엔드(Pinia)에서는 유저 아이디 상태만 관리합니다.
+- 데이터 조회/조작: Frappe REST API 표준 규격(`/api/resource/Doctype명`)을 사용합니다.
+
+4. 개발 환경 주의사항
+- Vercel(리눅스 환경) 배포를 전제로 하므로, 파일 경로 및 확장자(예: .vue, .webp 등)의 대소문자를 절대적으로 엄격하게 맞춰서 코드를 제안하세요.
+
+위 내용을 완벽하게 숙지했다면 "확인했습니다. 프라페(Frappe) 환경에 맞춰 코딩을 지원하겠습니다."라고 짧게 대답하고 대기해 줘.
