@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://ktkinventario.v.frappe.cloud/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
