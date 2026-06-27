@@ -1,43 +1,41 @@
 <template>
-  <div class="login-page">
+  <div class="login-container">
     <div class="login-card">
-      <div class="login-brand">
-       
-        <img src="../assets/lady_polo_logo.webp" alt="LADY POLO" class="custom-logo" />
-        <p class="login-subtitle">작업자 로그인</p>
+      <div class="brand-logo">
+        <img src="../assets/lady_polo_logo.webp" alt="LADY POLO" class="main-logo" />
+        <p>WMS Operator Login</p>
       </div>
 
-      <form class="login-form" @submit.prevent="handleLogin">
-        <label class="login-field">
-          <span>아이디 (member_name)</span>
-          <input
-            ref="memberNameInputRef"
-            v-model="memberName"
-            type="text"
-            autocomplete="username"
-            placeholder="작업자 ID"
-            :disabled="auth.isLoading"
-          />
-        </label>
+      <form @submit.prevent="handleLogin" class="login-form">
+        <div class="input-group">
+          <label>User ID</label>
+          <input v-model="username" type="text" required placeholder="Frappe Email or ID" autofocus />
+        </div>
 
-        <label class="login-field">
-          <span>비밀번호</span>
-          <input
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="비밀번호"
-            :disabled="auth.isLoading"
-            @keydown.enter.prevent="handleLogin"
-          />
-        </label>
+        <div class="input-group">
+          <label>Password</label>
+          <div class="password-wrapper">
+            <input 
+              v-model="password" 
+              :type="showPassword ? 'text' : 'password'" 
+              required 
+              placeholder="Enter Password" 
+            />
+            <button type="button" class="btn-eye" @click="togglePassword" tabindex="-1">
+              {{ showPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
 
-        <p v-if="localError || auth.errorMessage" class="login-error">
-          {{ localError || auth.errorMessage }}
-        </p>
+        <div class="options-group">
+          <label class="remember-me">
+            <input type="checkbox" v-model="rememberMe" />
+            <span>Remember Me</span>
+          </label>
+        </div>
 
-        <button type="submit" class="login-btn" :disabled="auth.isLoading">
-          {{ auth.isLoading ? '로그인 중…' : 'Iniciar sesión / 로그인' }}
+        <button type="submit" class="btn-login" :disabled="isLoading">
+          {{ isLoading ? 'Authenticating...' : 'Login' }}
         </button>
       </form>
     </div>
@@ -46,138 +44,106 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import axios from 'axios'
 
-const auth = useAuthStore()
 const router = useRouter()
-const route = useRoute()
+const authStore = useAuthStore()
 
-const memberName = ref('')
+const username = ref('')
 const password = ref('')
-const localError = ref('')
-const memberNameInputRef = ref(null)
+const rememberMe = ref(false)
+const showPassword = ref(false)
+const isLoading = ref(false)
 
-const handleLogin = async () => {
-  localError.value = ''
-  const result = await auth.login(memberName.value, password.value)
-  if (result.success) {
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    router.replace(redirect)
-  }
-}
+const frappeApi = axios.create({
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true 
+})
 
 onMounted(() => {
-  memberNameInputRef.value?.focus()
+  const savedUsr = localStorage.getItem('lady_polo_usr')
+  const savedPwd = localStorage.getItem('lady_polo_pwd')
+  if (savedUsr && savedPwd) {
+    username.value = savedUsr
+    password.value = savedPwd
+    rememberMe.value = true
+  }
 })
+
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
+
+const handleLogin = async () => {
+  if (isLoading.value) return
+  isLoading.value = true
+
+  try {
+    const response = await frappeApi.post('/api/method/login', {
+      usr: username.value,
+      pwd: password.value
+    })
+
+    if (response.status === 200) {
+      if (rememberMe.value) {
+        localStorage.setItem('lady_polo_usr', username.value)
+        localStorage.setItem('lady_polo_pwd', password.value)
+      } else {
+        localStorage.removeItem('lady_polo_usr')
+        localStorage.removeItem('lady_polo_pwd')
+      }
+
+      authStore.user = { 
+        member_name: username.value, 
+        access_level: 'Admin',
+        branch_name: 'Centro'
+      }
+      
+      router.push('/pos')
+    }
+  } catch (error) {
+    console.error('Login Error:', error)
+    alert('Login failed: Please check your ID and Password, or Frappe server status.')
+  } finally {
+    isLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #134e4a 100%);
-  padding: 24px;
-}
+.login-container { display: grid; place-items: center; min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); font-family: sans-serif; }
+.login-card { background: white; padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.brand-logo { text-align: center; margin-bottom: 30px; }
 
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  background: white;
-  border-radius: 12px;
-  padding: 36px 32px 32px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-}
+/* 🌟 새로 추가된 로고 이미지 스타일 */
+.main-logo { max-width: 220px; height: auto; margin-bottom: 8px; display: block; margin-left: auto; margin-right: auto; }
 
-.login-brand {
-  text-align: center;
-  margin-bottom: 28px;
-}
+.brand-logo p { margin: 5px 0 0; color: #64748b; font-size: 14px; font-weight: 500; }
+.login-form { display: flex; flex-direction: column; gap: 20px; }
+.input-group { display: flex; flex-direction: column; gap: 6px; }
+.input-group label { font-size: 12px; font-weight: bold; color: #475569; }
 
-.login-logo {
-  font-size: 26px;
-  font-weight: bold;
-  color: #00a896;
-}
+.password-wrapper { position: relative; display: flex; align-items: center; }
+.password-wrapper input { width: 100%; padding: 12px; padding-right: 45px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; box-sizing: border-box; }
+.password-wrapper input:focus { border-color: #00a896; }
 
-.custom-logo {
-  display: block;
-  margin: 0 auto 15px;
-  max-width: 180px; /* 🌟 바로 이 숫자를 조절하시면 됩니다! */
-  height: auto;
-}
+.btn-eye { position: absolute; right: 10px; background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b; padding: 0; display: flex; align-items: center; justify-content: center; }
+.btn-eye:hover { opacity: 0.7; }
 
-.login-subtitle {
-  margin: 8px 0 0;
-  font-size: 14px;
-  color: #64748b;
-}
+.input-group > input { padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; box-sizing: border-box; }
+.input-group > input:focus { border-color: #00a896; }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+.options-group { margin-top: -5px; }
+.remember-me { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.remember-me span { font-size: 13px; color: #475569; }
+.remember-me input { width: 15px; height: 15px; accent-color: #00a896; cursor: pointer; }
 
-.login-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: bold;
-  color: #64748b;
-}
-
-.login-field input {
-  padding: 12px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 15px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.login-field input:focus {
-  border-color: #00a896;
-  box-shadow: 0 0 0 3px rgba(0, 168, 150, 0.15);
-}
-
-.login-field input:disabled {
-  background: #f1f5f9;
-  cursor: not-allowed;
-}
-
-.login-error {
-  margin: 0;
-  padding: 10px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
-  color: #dc2626;
-  font-size: 13px;
-}
-
-.login-btn {
-  margin-top: 4px;
-  padding: 14px;
-  background: #00a896;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.login-btn:hover:not(:disabled) {
-  background: #008f7f;
-}
-
-.login-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+.btn-login { background: #00a896; color: white; border: none; padding: 14px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+.btn-login:hover { background: #008f80; }
+.btn-login:disabled { background: #94a3b8; cursor: not-allowed; }
 </style>
