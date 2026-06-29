@@ -261,7 +261,7 @@ const saveProduct = async () => {
     const gridGroupId = itemName
 
     const itemPayload = {
-      item_code: `${itemName}-${color}`,
+      item_code: `${itemName}-${color}-${boxPackagingQty}`,
       item_name: itemName,
       item_group: 'Products',
       custom_color: color,

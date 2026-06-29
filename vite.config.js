@@ -15,7 +15,7 @@ export default defineConfig({
     proxy: {
       // 🌟 로컬에서 /api로 시작하는 모든 요청을 프라페 클라우드로 안전하게 토스합니다.
       '/api': {
-        target: 'https://ktkinventario.v.frappe.cloud',
+        target: 'https://ktkpos.frappe.cloud',
         changeOrigin: true,
         secure: false
       }

@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ktkinventario.v.frappe.cloud/api/:path*"
+      "destination": "https://ktkpos.frappe.cloud/api/:path*"
     },
     {
       "source": "/(.*)",
