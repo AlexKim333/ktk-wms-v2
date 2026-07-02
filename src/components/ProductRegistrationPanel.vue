@@ -2,7 +2,7 @@
   <div class="product-registration-zone">
     <header class="product-reg-header">
       <h2>📦 Product Registration</h2>
-      <p class="product-reg-subtitle">Composite Key Validation · Auto Extract No. · Hotkeys (F8: Save / F4: Toggle Grid / F9: Reset)</p>
+      <p class="product-reg-subtitle">Stock & Accounting Integration · Valuation & Pricing (F8: Save / F4: Grid / F9: Reset)</p>
     </header>
 
     <form class="product-reg-form" @submit.prevent="saveProduct">
@@ -27,25 +27,39 @@
             <button type="button" class="btn-new-brand" @click="openBrandDialog">+ New</button>
           </div>
         </label>
-        
+
         <label class="form-field barcode-field">
           <span>Barcode / QR</span>
-          <input ref="barcodeInputRef" v-model="form.barcode" type="text" placeholder="Scanner Input (Enter to Save)" @keydown.enter.prevent="saveProduct" />
+          <input ref="barcodeInputRef" v-model="form.barcode" type="text" placeholder="Scanner Input" @keydown.enter.prevent="saveProduct" />
         </label>
         
+        <!-- 🌟 물류/회계 통합 입력 영역 -->
+        <label class="form-field">
+          <span>Opening Warehouse *</span>
+          <select v-model="form.opening_warehouse" required>
+            <option value="" disabled>Select Warehouse</option>
+            <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name || wh.name }}</option>
+          </select>
+        </label>
+
+        <label class="form-field">
+          <span>Opening Qty (Units) *</span>
+          <input v-model.number="form.opening_qty" type="number" min="0" required placeholder="0" />
+        </label>
+
+        <label class="form-field">
+          <span>Valuation Rate (Cost) *</span>
+          <input v-model.number="form.valuation_rate" type="number" step="0.01" min="0" required placeholder="e.g., 17.00" />
+        </label>
+
+        <label class="form-field">
+          <span>Selling Price (Standard) *</span>
+          <input v-model.number="form.selling_price" type="number" step="0.01" min="0" required placeholder="e.g., 20.00" />
+        </label>
+
         <label class="form-field">
           <span>Pack Qty *</span>
-          <input v-model.number="form.box_packaging_qty" type="number" min="1" required placeholder="50" />
-        </label>
-        
-        <label class="form-field">
-          <span>Initial Stock (Boxes)</span>
-          <input v-model.number="form.initial_stock_boxes" type="number" min="0" placeholder="0" />
-        </label>
-        
-        <label class="form-field">
-          <span>Initial Stock (Units)</span>
-          <input v-model.number="form.initial_stock_units" type="number" min="0" placeholder="0" />
+          <input v-model.number="form.box_packaging_qty" type="number" min="1" required placeholder="10" />
         </label>
         
         <label class="form-field checkbox-field">
@@ -59,7 +73,7 @@
 
       <div class="form-actions">
         <button type="submit" class="btn-save" :disabled="isSaving">
-          {{ isSaving ? 'Saving...' : 'Save Product (F8)' }}
+          {{ isSaving ? 'Saving 3-Step Process...' : 'Save Product (F8)' }}
         </button>
         <button type="button" class="btn-reset" @click="resetForm">Reset Form (F9)</button>
       </div>
@@ -68,7 +82,7 @@
     <section class="product-list-section">
       <div class="list-header">
         <h3>Registered Products Monitor</h3>
-        <button type="button" class="btn-refresh" @click="loadItems" :disabled="itemsLoading">Refresh</button>
+        <button type="button" class="btn-refresh" @click="loadData" :disabled="itemsLoading">🔄 Refresh</button>
       </div>
 
       <div v-if="itemsLoading" class="list-empty">Loading list...</div>
@@ -79,11 +93,8 @@
           <tr>
             <th>Item Code</th>
             <th>Item Name</th>
-            <th>Extracted No.</th>
             <th>Color</th>
             <th>Pack Qty</th>
-            <th>Box Stock</th>
-            <th>Unit Stock</th>
             <th>Grid</th>
           </tr>
         </thead>
@@ -91,11 +102,8 @@
           <tr v-for="item in registeredItems" :key="item.name">
             <td class="mono">{{ item.item_code ?? '—' }}</td>
             <td>{{ item.item_name }}</td>
-            <td class="mono text-blue">{{ item.custom_name_number ?? 0 }}</td>
             <td>{{ item.custom_color ?? '—' }}</td>
             <td>{{ item.custom_pack_qty ?? '—' }}</td>
-            <td>{{ item.custom_initial_stock_boxes ?? 0 }}</td>
-            <td>{{ item.custom_initial_stock_units ?? 0 }}</td>
             <td class="grid-icon-cell">
               <span class="grid-badge" :class="item.custom_is_grid_item ? 'grid-yes' : 'grid-no'">
                 {{ item.custom_is_grid_item ? '🌐 Grid' : '📦 Single' }}
@@ -111,7 +119,7 @@
       {{ snackbar.message }}
     </div>
 
-    <!-- 🌟 순수 CSS 팝업창 (Modal) -->
+    <!-- 🌟 브랜드 추가 팝업 (Modal) -->
     <div v-if="brandDialog" class="modal-overlay" @click.self="closeBrandDialog">
       <div class="modal-content">
         <h3 class="modal-title">+ Create New Brand</h3>
@@ -136,27 +144,24 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import axios from 'axios'
+import frappeApi from '@/api/frappe.js'
 
-const frappeApi = axios.create({
-  headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-  withCredentials: true 
-})
-
-const DUPLICATE_MSG = 'Duplicate composite key [Item Name - Color - Pack Qty].'
-
+// --- States ---
 const form = ref({
   item_name: '', color: '', brand_id: '', barcode: '', box_packaging_qty: null,
-  initial_stock_boxes: 0, initial_stock_units: 0, is_grid: false
+  opening_warehouse: '', opening_qty: 0, valuation_rate: 0, selling_price: 0,
+  is_grid: false
 })
 
 const brands = ref([])
+const warehouseList = ref([])
 const registeredItems = ref([])
+
 const brandsLoading = ref(false)
 const itemsLoading = ref(false)
 const isSaving = ref(false)
-const barcodeInputRef = ref(null)
 
+const barcodeInputRef = ref(null)
 const brandDialog = ref(false)
 const newBrandName = ref('')
 const isBrandSaving = ref(false)
@@ -165,6 +170,7 @@ const brandNameInputRef = ref(null)
 const snackbar = ref({ show: false, message: '', color: 'error' })
 let snackbarTimer = null
 
+// --- Helpers ---
 const showSnackbar = (message, color = 'error') => { 
   snackbar.value = { show: true, message, color }
   if (snackbarTimer) clearTimeout(snackbarTimer)
@@ -176,13 +182,15 @@ const focusBarcode = () => { nextTick(() => barcodeInputRef.value?.focus()) }
 const resetForm = () => {
   form.value = {
     item_name: '', color: '', brand_id: form.value.brand_id, barcode: '', box_packaging_qty: null,
-    initial_stock_boxes: 0, initial_stock_units: 0, is_grid: false
+    opening_warehouse: form.value.opening_warehouse, opening_qty: 0, valuation_rate: 0, selling_price: 0,
+    is_grid: false
   }
   focusBarcode()
 }
 
+// --- Hotkeys ---
 const handleGlobalKeydown = (e) => {
-  if (brandDialog.value) return // 팝업 열려있을 땐 단축키 무시
+  if (brandDialog.value) return 
   if (e.key === 'F8') { e.preventDefault(); saveProduct() }
   else if (e.key === 'F4') { 
     e.preventDefault(); 
@@ -192,15 +200,31 @@ const handleGlobalKeydown = (e) => {
   else if (e.key === 'F9') { e.preventDefault(); resetForm(); showSnackbar('Form reset.', 'info') }
 }
 
-const loadBrands = async (selectBrandName = null) => {
+// --- Data Fetching (Brand, Warehouse, Items) ---
+const loadData = async (selectBrandName = null) => {
   brandsLoading.value = true
+  itemsLoading.value = true
   try {
-    const { data } = await frappeApi.get('/api/resource/Brand', { params: { fields: JSON.stringify(['name', 'brand']), limit_page_length: 0 } })
-    brands.value = data.data ?? []
+    const [bRes, wRes, iRes] = await Promise.all([
+      frappeApi.get('/api/resource/Brand?fields=["name","brand"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Warehouse?filters=[["is_group","=",0],["company","=","kecon"]]&fields=["name","warehouse_name"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Item?fields=["name","item_code","item_name","custom_color","custom_pack_qty","custom_is_grid_item"]&order_by=creation desc&limit_page_length=50')
+    ])
+    brands.value = bRes.data?.data ?? []
+    warehouseList.value = wRes.data?.data ?? []
+    registeredItems.value = iRes.data?.data ?? []
+    
     if (selectBrandName) form.value.brand_id = selectBrandName
-  } catch (err) { console.error('Brand Load Error:', err) } finally { brandsLoading.value = false }
+  } catch (err) { 
+    console.error('Data Load Error:', err)
+    showSnackbar('Failed to load initial data.') 
+  } finally { 
+    brandsLoading.value = false
+    itemsLoading.value = false
+  }
 }
 
+// --- Brand Modal Logic ---
 const openBrandDialog = () => { newBrandName.value = ''; brandDialog.value = true; nextTick(() => brandNameInputRef.value?.focus()) }
 const closeBrandDialog = () => { brandDialog.value = false; newBrandName.value = '' }
 
@@ -210,29 +234,13 @@ const saveNewBrand = async () => {
   try {
     const { data } = await frappeApi.post('/api/resource/Brand', { brand: newBrandName.value.trim() })
     closeBrandDialog()
-    await loadBrands(data.data.name)
+    await loadData(data.data.name)
     showSnackbar(`Brand successfully registered.`, 'success')
-  } catch (err) { showSnackbar(`Failed to save Brand.`) } finally { isBrandSaving.value = false }
+  } catch (err) { showSnackbar(`Failed to save Brand.`) } 
+  finally { isBrandSaving.value = false }
 }
 
-const loadItems = async () => {
-  itemsLoading.value = true
-  try {
-    const { data } = await frappeApi.get('/api/resource/Item', {
-      params: {
-        fields: JSON.stringify([
-          'name', 'item_code', 'item_name', 'custom_name_number', 'custom_color', 
-          'custom_pack_qty', 'custom_initial_stock_boxes', 
-          'custom_initial_stock_units', 'custom_is_grid_item'
-        ]),
-        order_by: 'creation desc',
-        limit_page_length: 50
-      }
-    })
-    registeredItems.value = data.data ?? []
-  } catch (err) { showSnackbar(`Failed to load list.`) } finally { itemsLoading.value = false }
-}
-
+// --- Validation ---
 const checkCompositeDuplicate = async (itemName, color, boxPackagingQty) => {
   try {
     const { data } = await frappeApi.get('/api/resource/Item', {
@@ -242,49 +250,98 @@ const checkCompositeDuplicate = async (itemName, color, boxPackagingQty) => {
   } catch (err) { return false }
 }
 
+// 🚀 --- The 3-Step Orchestration Logic ---
 const saveProduct = async () => {
-  const itemName = form.value.item_name.trim()
-  const color = form.value.color.trim()
-  const boxPackagingQty = Number(form.value.box_packaging_qty)
-
-  if (!itemName || !color || !form.value.brand_id || !Number.isFinite(boxPackagingQty) || boxPackagingQty < 1) {
-    showSnackbar('Item Name, Color, Brand, and Pack Qty (min 1) are required.')
-    return
-  }
-
   isSaving.value = true
+
   try {
-    const isDuplicate = await checkCompositeDuplicate(itemName, color, boxPackagingQty)
-    if (isDuplicate) { showSnackbar(DUPLICATE_MSG); isSaving.value = false; return }
+    const itemName = form.value.item_name.trim()
+    const color = form.value.color.trim()
+    const brand = form.value.brand_id
+    const boxPackagingQty = Number(form.value.box_packaging_qty)
 
-    const extractedNumber = parseInt(itemName.replace(/[^0-9]/g, ''), 10) || 0
-    const gridGroupId = itemName
-
-    const itemPayload = {
-      item_code: `${itemName}-${color}-${boxPackagingQty}`,
-      item_name: itemName,
-      item_group: 'Products',
-      custom_color: color,
-      brand: form.value.brand_id,
-      barcode: form.value.barcode.trim() || null,
-      custom_pack_qty: boxPackagingQty,
-      custom_initial_stock_boxes: Number(form.value.initial_stock_boxes) || 0,
-      custom_initial_stock_units: Number(form.value.initial_stock_units) || 0,
-      custom_is_grid_item: form.value.is_grid ? 1 : 0, 
-      custom_grid_group_id: gridGroupId, 
-      custom_name_number: extractedNumber, 
-      is_stock_item: 1,
-      stock_uom: 'Nos'
+    if (!itemName || !brand) {
+      throw new Error('상품 코드(Item Code)와 브랜드(Brand)는 필수 입력입니다.')
+    }
+    if (!color) {
+      throw new Error('색상(Color)은 필수 입력입니다.')
+    }
+    if (!Number.isFinite(boxPackagingQty) || boxPackagingQty < 1) {
+      throw new Error('팩 수량(Box Qty)은 1 이상이어야 합니다.')
     }
 
-    await frappeApi.post('/api/resource/Item', itemPayload)
+    const isDuplicate = await checkCompositeDuplicate(itemName, color, boxPackagingQty)
+    if (isDuplicate) {
+      throw new Error('동일한 상품 조합이 이미 등록되어 있습니다.')
+    }
 
-    showSnackbar(`Saved successfully! (Extracted No: ${extractedNumber})`, 'success')
+    let finalItemCode = itemName
+    if (color) finalItemCode += `-${color}`
+    if (boxPackagingQty > 1) finalItemCode += `-${boxPackagingQty}`
+
+    const extractedNumber = parseInt(itemName.replace(/[^0-9]/g, ''), 10) || 0
+
+    // Step 1: 상품 마스터(Item) 생성
+    await frappeApi.post('/api/resource/Item', {
+      item_code: finalItemCode,
+      item_name: itemName,
+      item_group: 'Products',
+      brand,
+      stock_uom: 'Nos',
+      is_stock_item: 1,
+      has_variants: 0,
+      custom_color: color,
+      barcode: form.value.barcode.trim() || null,
+      custom_pack_qty: boxPackagingQty,
+      custom_is_grid_item: form.value.is_grid ? 1 : 0,
+      custom_grid_group_id: itemName,
+      custom_name_number: extractedNumber
+    })
+
+    // Step 2: 판매 가격표(Item Price) 등록
+    if (Number(form.value.selling_price) > 0) {
+      await frappeApi.post('/api/resource/Item Price', {
+        item_code: finalItemCode,
+        price_list: 'Standard Selling',
+        price_list_rate: Number(form.value.selling_price)
+      })
+    }
+
+    // Step 3: 기초재고 등록 (Material Receipt)
+    if (Number(form.value.opening_qty) > 0) {
+      if (!form.value.opening_warehouse) {
+        throw new Error('재고 수량을 입력하려면 창고(Warehouse)를 반드시 선택해야 합니다.')
+      }
+      if (Number(form.value.valuation_rate) <= 0) {
+        throw new Error('재고 수량이 있는 경우 원가(Valuation Rate)는 0보다 커야 합니다.')
+      }
+
+      const stockEntryPayload = {
+        stock_entry_type: 'Material Receipt',
+        company: 'kecon',
+        items: [{
+          item_code: finalItemCode,
+          t_warehouse: form.value.opening_warehouse,
+          qty: Number(form.value.opening_qty),
+          basic_rate: Number(form.value.valuation_rate)
+        }]
+      }
+
+      const stockEntryRes = await frappeApi.post('/api/resource/Stock Entry', stockEntryPayload)
+      const stockEntryName = stockEntryRes.data.data.name
+
+      await frappeApi.put(`/api/resource/Stock Entry/${stockEntryName}`, {
+        docstatus: 1
+      })
+    }
+
+    showSnackbar(`성공! [${finalItemCode}] 등록 완료`, 'success')
     resetForm()
-    await loadItems()
-  } catch (err) {
-    showSnackbar(`Save failed: Check server response`)
-    console.error(err)
+    await loadData()
+  } catch (error) {
+    console.error('Registration Error:', error)
+    const serverError = error.response?.data?.exception || error.message
+    showSnackbar(`등록 실패: ${serverError}`)
   } finally {
     isSaving.value = false
     focusBarcode()
@@ -293,7 +350,7 @@ const saveProduct = async () => {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  await Promise.all([loadBrands(), loadItems()])
+  await loadData()
   focusBarcode()
 })
 
@@ -305,7 +362,10 @@ onUnmounted(() => { window.removeEventListener('keydown', handleGlobalKeydown) }
 .product-reg-header h2 { margin: 0 0 4px; font-size: 20px; color: #1e293b; }
 .product-reg-subtitle { margin: 0 0 20px; font-size: 13px; color: #64748b; }
 .product-reg-form { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* 🌟 입력창을 예쁘게 4열로 정렬합니다 */
+.form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
 .form-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: bold; color: #64748b; }
 .form-field input, .form-field select { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: white; }
 .form-field input:focus, .form-field select:focus { border-color: #00a896; box-shadow: 0 0 0 2px rgba(0, 168, 150, 0.15); }
@@ -324,13 +384,12 @@ onUnmounted(() => { window.removeEventListener('keydown', handleGlobalKeydown) }
 .product-list-section { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px 20px; }
 .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .list-header h3 { margin: 0; font-size: 15px; color: #334155; }
-.btn-refresh { background: none; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; color: #64748b; }
+.btn-refresh { background: none; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; color: #64748b; font-weight: bold;}
 .list-empty { padding: 32px; text-align: center; color: #94a3b8; font-style: italic; }
 .product-monitor-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .product-monitor-table th, .product-monitor-table td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: center; }
 .product-monitor-table th { background: #f8fafc; font-weight: bold; color: #475569; }
 .product-monitor-table td.mono { font-family: monospace; font-size: 12px; }
-.text-blue { color: #2563eb; font-weight: bold; }
 .grid-icon-cell { white-space: nowrap; }
 .grid-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: bold; }
 .grid-badge.grid-yes { background: #ccfbf1; color: #0f766e; }

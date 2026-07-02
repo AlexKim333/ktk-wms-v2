@@ -80,12 +80,15 @@
 
         <!-- ✨ Multi-Address Input Area -->
         <div class="form-field">
-          <span>Addresses <span class="optional-text">(Optional)</span></span>
-          <div v-for="(addr, index) in form.addresses" :key="addr.id" class="dynamic-row">
-            <input v-model="addr.val" type="text" placeholder="Detailed address..." />
-            <button v-if="form.addresses.length > 1" type="button" class="btn-remove-row" @click="removeRegisterAddress(index)">❌</button>
+         <span>Addresses <span class="optional-text">(Optional)</span></span>
+          <div v-for="(addr, index) in form.addresses" :key="addr.id" class="dynamic-row address-group">
+            <input v-model="addr.city" type="text" placeholder="City (e.g., Monterrey)" class="city-input" />
+            <input v-model="addr.val" type="text" placeholder="Detailed address..." class="addr-input" />
+            <button v-if="form.addresses.length > 1" type="button" class="btn-remove-row" @click="removeRegisterAddress(index)">🗑️</button>
           </div>
-          <button type="button" class="btn-add-row" @click="addRegisterAddress">➕ Add Another Address</button>
+          <button type="button" class="btn-add-row" @click="addRegisterAddress">
+            <span class="plus-icon">➕</span> Add Another Address
+          </button>
         </div>
       </div>
 
@@ -142,7 +145,7 @@
       </div>
     </div>
 
-    <!-- ✏️ EDIT MODAL (Fully Upgraded) -->
+    <!-- ✏️ EDIT MODAL (Fully Upgraded with City) -->
     <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal-content">
         <h3>✏️ Edit {{ editForm.type }}</h3>
@@ -161,14 +164,17 @@
           <!-- Edit Addresses Area -->
           <div class="form-field">
             <span>Manage Addresses</span>
-            <div v-for="(addr, index) in editForm.addresses" :key="addr.id" class="dynamic-row">
-              <input v-model="addr.val" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" />
+            <div v-for="(addr, index) in editForm.addresses" :key="addr.id" class="dynamic-row address-group">
+              <input v-model="addr.city" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" placeholder="City" class="city-input" />
+              <input v-model="addr.val" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" placeholder="Detailed address..." class="addr-input" />
               
               <!-- Toggle Restore/Delete -->
               <button v-if="!addr.isDeleted" type="button" class="btn-remove-row" @click="addr.isDeleted = true">🗑️</button>
               <button v-else type="button" class="btn-restore-row" @click="addr.isDeleted = false">↩️</button>
             </div>
-            <button type="button" class="btn-add-row" @click="addEditAddress">➕ Add New Address</button>
+            <button type="button" class="btn-add-row" @click="addEditAddress">
+              <span class="plus-icon">➕</span> Add New Address
+            </button>
           </div>
         </div>
 
@@ -190,18 +196,18 @@ const frappeApi = axios.create({
   withCredentials: true 
 })
 
-// Global States
+// 📦 Global States
 const currentView = ref('register')
 const isSaving = ref(false)
 const form = ref({ 
   node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', 
-  addresses: [{ id: Date.now(), val: '' }] 
+  addresses: [{ id: Date.now(), val: '', city: '' }]
 })
 const nodeList = ref([])
 const searchQuery = ref('')
 const listFilterType = ref('All')
 
-// Modal States
+// 📦 Modal States
 const isEditModalOpen = ref(false)
 const editForm = ref({ id: '', type: '', name: '', phone: '', addresses: [] })
 
@@ -227,12 +233,10 @@ const disassembleHangul = (str) => {
   return result
 }
 
-// 🚀 Dynamic Rows Logic (Register)
-const addRegisterAddress = () => form.value.addresses.push({ id: Date.now(), val: '' })
+// 🚀 Dynamic Rows Logic (중복 선언 제거 완벽 해결!)
+const addRegisterAddress = () => form.value.addresses.push({ id: Date.now(), val: '', city: '' })
 const removeRegisterAddress = (index) => form.value.addresses.splice(index, 1)
-
-// 🚀 Dynamic Rows Logic (Edit)
-const addEditAddress = () => editForm.value.addresses.push({ id: Date.now(), val: '', isNew: true, isDeleted: false })
+const addEditAddress = () => editForm.value.addresses.push({ id: Date.now(), val: '', city: '', isNew: true, isDeleted: false })
 
 // 🚀 API Load
 const fetchNodeList = async () => {
@@ -285,6 +289,7 @@ const filteredNodes = computed(() => {
 })
 
 // 🚀 Save New Node
+// 🚀 Save New Node
 const saveNode = async () => {
   isSaving.value = true
   try {
@@ -294,7 +299,20 @@ const saveNode = async () => {
     const finalNodeName = form.value.node_type === 'Warehouse' && form.value.prefix
       ? `${form.value.prefix}${form.value.name}` : form.value.name;
 
-    // Attach generic phone field (Map this to your actual Frappe field if different)
+    // 🚨 [핵심 기능] 강력한 중복 등록 방지 시스템!
+    // 현재 불러와져 있는 nodeList에서 이름과 타입이 똑같은 녀석이 있는지 검사합니다.
+    const isDuplicate = nodeList.value.some(
+      node => node.name.toLowerCase() === finalNodeName.toLowerCase() && node.type === form.value.node_type
+    );
+
+    if (isDuplicate) {
+      // 중복일 경우 강력한 영어 경고창을 날리고 함수를 강제 종료합니다.
+      alert(`⚠️ STOP! DUPLICATE NODE DETECTED!\n\nThe node "${finalNodeName}" already exists as a ${form.value.node_type}.\n\nIf you want to add an address or update information, please switch to the [📋 Manage] tab and use the [✏️ Edit] button.\n\nYou cannot re-register an existing node here.`);
+      isSaving.value = false;
+      return; // 서버로 데이터가 넘어가지 못하게 여기서 컷!
+    }
+
+    // Attach generic phone field
     if (form.value.node_type === 'Warehouse') {
       apiEndpoint = '/api/resource/Warehouse'
       payload = { warehouse_name: finalNodeName, company: 'kecon', is_group: 0, phone_no: form.value.phone } 
@@ -316,13 +334,14 @@ const saveNode = async () => {
           address_title: finalNodeName,
           address_type: form.value.node_type === 'Warehouse' ? 'Warehouse' : 'Billing',
           address_line1: addr.val.trim(),
+          city: addr.city ? addr.city.trim() : 'Unknown City', 
           links: [{ link_doctype: form.value.node_type, link_name: createdName }]
         })
       }
     }
 
     alert(`✅ Success: ${finalNodeName} registered!`)
-    form.value = { node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', addresses: [{ id: Date.now(), val: '' }] }
+    form.value = { node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', addresses: [{ id: Date.now(), val: '', city: '' }] }
     await fetchNodeList()
     
   } catch (error) {
@@ -333,7 +352,6 @@ const saveNode = async () => {
     isSaving.value = false
   }
 }
-
 const handleCrossRegister = async (match, targetType) => {
   if (!confirm(`Cross-register "${match.name}" as ${targetType}?`)) return;
   try {
@@ -349,26 +367,26 @@ const handleCrossRegister = async (match, targetType) => {
   finally { isSaving.value = false }
 }
 
-// ✏️ Open Edit Modal & Fetch Data
+// ✏️ Open Edit Modal & Fetch REAL Data
 const openEditModal = async (node) => {
   editForm.value = { id: node.id, type: node.type, name: node.name, phone: '', addresses: [] }
   isEditModalOpen.value = true
 
-  // Let's pretend to load addresses linked to this node. 
-  // (In real Frappe, you might need a specific REST query. Simulated here for UI layout).
   try {
-    // Example fetch (Adjust fieldnames to your Frappe DB)
-    // const res = await frappeApi.get(`/api/resource/Address?filters=[["Dynamic Link","link_name","=","${node.id}"]]&fields=["name","address_line1"]`)
-    
-    // Simulating fetched data for the modal UI functionality:
-    const simulatedResponse = [
-      { name: 'ADDR-001', address_line1: 'Existing Address 1' }
-    ]
-    
-    editForm.value.addresses = simulatedResponse.map(a => ({
-      id: a.name, val: a.address_line1, isNew: false, isDeleted: false
-    }))
-  } catch (e) { console.error(e) }
+    // ✨ City 필드를 포함하여 진짜 DB 호출
+    const res = await frappeApi.get(`/api/resource/Address?filters=[["Dynamic Link","link_name","=","${node.id}"]]&fields=["name","address_line1","city"]`)
+    if (res.data && res.data.data) {
+      editForm.value.addresses = res.data.data.map(a => ({
+        id: a.name,
+        val: a.address_line1,
+        city: a.city || '', 
+        isNew: false,
+        isDeleted: false
+      }))
+    }
+  } catch (e) { 
+    console.error('실제 주소를 불러오는데 실패했습니다:', e) 
+  }
 }
 
 const closeEditModal = () => isEditModalOpen.value = false
@@ -390,19 +408,20 @@ const updateNode = async () => {
     // 2. Loop & Update Addresses
     for (const addr of editForm.value.addresses) {
       if (addr.isDeleted && !addr.isNew) {
-        // DELETE Old Address
         await frappeApi.delete(`/api/resource/Address/${addr.id}`)
       } else if (addr.isNew && !addr.isDeleted && addr.val.trim() !== '') {
-        // POST New Address
         await frappeApi.post('/api/resource/Address', {
           address_title: editForm.value.name,
           address_type: docType === 'Warehouse' ? 'Warehouse' : 'Billing',
           address_line1: addr.val.trim(),
+          city: addr.city ? addr.city.trim() : 'Unknown City', // ✨ City 데이터 전송
           links: [{ link_doctype: docType, link_name: docName }]
         })
       } else if (!addr.isNew && !addr.isDeleted) {
-        // PUT Edited Address
-        await frappeApi.put(`/api/resource/Address/${addr.id}`, { address_line1: addr.val.trim() })
+        await frappeApi.put(`/api/resource/Address/${addr.id}`, { 
+          address_line1: addr.val.trim(),
+          city: addr.city ? addr.city.trim() : 'Unknown City' // ✨ City 데이터 전송
+        })
       }
     }
     
@@ -410,7 +429,19 @@ const updateNode = async () => {
     isEditModalOpen.value = false
     await fetchNodeList()
   } catch (error) {
-    alert('Update failed. Check Frappe permissions/fields.')
+    console.error('Update Error:', error);
+    let detailMsg = 'Update failed. Check Frappe permissions/fields.';
+    if (error.response?.data?._server_messages) {
+      try {
+        const msgs = JSON.parse(error.response.data._server_messages);
+        detailMsg = msgs.map(m => JSON.parse(m).message).join('\n');
+      } catch (e) {
+        detailMsg = 'Error parsing server response.';
+      }
+    } else if (error.response?.data?.exception) {
+      detailMsg = error.response.data.exception;
+    }
+    alert(`❌ Update failed!\n\n[Reason]\n${detailMsg}`);
   } finally {
     isSaving.value = false
   }
@@ -433,16 +464,26 @@ const deleteNode = (node) => alert(`Delete action triggered for ${node.name}`)
 .form-grid { display: grid; gap: 15px; }
 .form-field { display: flex; flex-direction: column; gap: 5px; font-weight: bold; font-size: 13px; color: #334155;}
 .form-field input, .form-field select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
-.form-field input:focus { border-color: #00a896; box-shadow: 0 0 0 2px rgba(0,168,150,0.1); }
+.form-field input:focus, .form-field select:focus { border-color: #00a896; box-shadow: 0 0 0 2px rgba(0,168,150,0.1); }
 .optional-text { color: #94a3b8; font-weight: normal; font-size: 11px; }
 
 .name-input-group, .dynamic-row { display: flex; gap: 5px; margin-bottom: 5px;}
 .prefix-select { width: 90px; }
 .name-input-group input, .dynamic-row input { flex: 1; }
-.btn-add-row { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 8px; border-radius: 6px; cursor: pointer; color: #475569; font-weight: bold; transition: 0.2s;}
-.btn-add-row:hover { background: #f1f5f9; border-color: #94a3b8; }
-.btn-remove-row { background: #fee2e2; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; }
-.btn-restore-row { background: #e0f2fe; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; }
+
+/* 🌟 주소 입력칸 가로 분할 및 예쁜 디자인 적용 */
+.address-group { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
+.city-input { width: 35%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+.addr-input { width: 65%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+.city-input:focus, .addr-input:focus { border-color: #00a896; box-shadow: 0 0 0 2px rgba(0, 168, 150, 0.1); }
+
+/* 🌟 버튼 디자인 (핑크 휴지통 & 점선 추가 버튼) */
+.btn-add-row { background: #f8fafc; border: 1px dashed #94a3b8; padding: 12px; border-radius: 6px; cursor: pointer; color: #475569; font-weight: 600; font-size: 13px; transition: background 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px;}
+.btn-add-row:hover { background: #f1f5f9; border-color: #64748b; }
+.plus-icon { color: #6b21a8; font-size: 14px; }
+.btn-remove-row { background: #fce8e8; border: 1px solid #f8d7d7; padding: 0 12px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; display: flex; justify-content: center; align-items: center; }
+.btn-remove-row:hover { background: #fca5a5; }
+.btn-restore-row { background: #e0f2fe; border: 1px solid #bae6fd; padding: 0 12px; border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
 .deleted-input { text-decoration: line-through; opacity: 0.5; background: #f1f5f9; }
 
 .form-actions { margin-top: 20px; text-align: right; }
