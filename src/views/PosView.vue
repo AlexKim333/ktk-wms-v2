@@ -11,7 +11,22 @@
         <a href="#" class="nav-item" :class="{ active: activeNav === 'outbound' }" @click.prevent="setTransactionMode('outbound')">📤 출고입력</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'inbound' }" @click.prevent="setTransactionMode('inbound')">📥 입고입력</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'move' }" @click.prevent="activeNav = 'move'">🔄 재고 이동</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 상품등록</a>
+        
+        <!-- 🌟 신규 상품 관리 메뉴 그룹 -->
+        <div class="nav-group">
+          <a href="#" class="nav-item group-title" @click.prevent="isProductMenuOpen = !isProductMenuOpen">
+            📦 상품 관리 {{ isProductMenuOpen ? '▴' : '▾' }}
+          </a>
+          <div v-show="isProductMenuOpen" class="nav-sub-menu">
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-list' }" @click.prevent="setActiveNav('product-list')">📋 상품 리스트</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-move' }" @click.prevent="setActiveNav('product-move')">🔄 재고 이동</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-adj' }" @click.prevent="setActiveNav('product-adj')">⚖️ 재고 조정</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-reg' }" @click.prevent="setActiveNav('product-reg')">➕ 상품 등록 (New)</a>
+          </div>
+        </div>
+
+        <!-- 기존 상품등록 (보존용) -->
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 상품등록 (Old)</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 Node Management</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 리포트</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 담당자 (입출고)</a>
@@ -23,7 +38,12 @@
     </aside>
 
     <main class="main-content-zone">
-      <ProductRegistrationPanel v-if="activeNav === 'product'" />
+      <!-- 🌟 신규 추가된 컴포넌트들 -->
+      <ProductListView v-if="activeNav === 'product-list'" />
+      <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
+      
+      <!-- 보존된 기존 컴포넌트 -->
+      <ProductRegistrationPanel v-else-if="activeNav === 'product'" />
 
       <NodeManagement v-else-if="activeNav === 'node'" />
 
@@ -175,6 +195,8 @@ import { useAuthStore } from '../stores/auth.js'
 import axios from 'axios' // 🌟 Frappe 통신을 위한 Axios 엔진
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
 import NodeManagement from '../components/NodeManagement.vue'
+import ProductListView from './ProductListView.vue' // 신규 리스트 뷰
+import StockReconciliationMain from './StockReconciliationMain.vue' // 신규 재고조정 메인 뷰
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -202,6 +224,7 @@ const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
 const activeNav = ref('outbound')
 const transactionMode = ref('outbound')
+const isProductMenuOpen = ref(false) // 🌟 상품관리 서브메뉴 상태
 
 // 🌟 Frappe에서 가져올 실시간 데이터 그릇
 const singleHotkeys = ref([])
@@ -433,8 +456,12 @@ const submitToFrappe = async () => {
 .nav-menu::-webkit-scrollbar-track { background: #334155; border-radius: 4px; }
 .nav-menu::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
 .nav-menu::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-.nav-item { color: #cbd5e1; text-decoration: none; padding: 12px 15px; border-radius: 6px; font-size: 14px; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
+.nav-item { display: flex; justify-content: space-between; color: #cbd5e1; text-decoration: none; padding: 12px 15px; border-radius: 6px; font-size: 14px; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
 .nav-item:hover, .nav-item.active { background: #334155; color: white; font-weight: bold; }
+.nav-group { display: flex; flex-direction: column; }
+.nav-sub-menu { display: flex; flex-direction: column; background: #0f172a; padding: 4px 8px; border-radius: 6px; margin-top: 4px; }
+.sub-item { padding: 10px 15px 10px 30px; font-size: 13px; color: #94a3b8; }
+.sub-item:hover, .sub-item.active { background: #1e293b; color: #38bdf8; }
 .nav-logout-btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; margin-top: 8px; color: #fca5a5 !important; }
 .nav-logout-btn:hover { background: #450a0a !important; color: white !important; }
 
