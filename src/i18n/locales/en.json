@@ -1,0 +1,31 @@
+{
+  "login": {
+    "subtitle": "Worker Login",
+    "id_label": "ID (member_name)",
+    "id_placeholder": "Worker ID",
+    "pwd_label": "Password",
+    "pwd_placeholder": "Password",
+    "remember_me": "Remember me",
+    "authenticating": "Authenticating...",
+    "login_btn": "Login"
+  },
+  "nav": {
+    "home": "Home",
+    "outbound": "Outbound",
+    "inbound": "Inbound",
+    "move": "Stock Move",
+    "product_management": "Product Mgmt",
+    "product_list": "Product List",
+    "product_move": "Stock Move",
+    "product_adj": "Stock Adjust",
+    "product_reg": "New Product",
+    "product_old": "Product (Old)",
+    "node": "Node Management",
+    "report": "Reports",
+    "manager": "Manager",
+    "search_edit": "Search/Edit",
+    "reservation": "Reservations",
+    "settings": "Settings",
+    "logout": "Logout"
+  }
+}

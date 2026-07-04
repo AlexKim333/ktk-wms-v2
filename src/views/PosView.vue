@@ -6,34 +6,37 @@
         <span class="nav-user-name">{{ authStore.user.member_name || authStore.user.full_name }}</span>
         <span class="nav-user-meta">{{ authStore.user.branch_name ?? '본부' }} · {{ authStore.user.access_level || '관리자' }}</span>
       </div>
+      <div class="nav-lang-switcher" style="padding: 0 12px; margin-bottom: 12px;">
+        <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
+      </div>
       <nav class="nav-menu">
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'home' }" @click.prevent="activeNav = 'home'">🏠 시작</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'outbound' }" @click.prevent="setTransactionMode('outbound')">📤 출고입력</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'inbound' }" @click.prevent="setTransactionMode('inbound')">📥 입고입력</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'move' }" @click.prevent="activeNav = 'move'">🔄 재고 이동</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'home' }" @click.prevent="activeNav = 'home'">🏠 {{ $t('nav.home') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'outbound' }" @click.prevent="setTransactionMode('outbound')">📤 {{ $t('nav.outbound') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'inbound' }" @click.prevent="setTransactionMode('inbound')">📥 {{ $t('nav.inbound') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'move' }" @click.prevent="activeNav = 'move'">🔄 {{ $t('nav.move') }}</a>
         
         <!-- 🌟 신규 상품 관리 메뉴 그룹 -->
         <div class="nav-group">
           <a href="#" class="nav-item group-title" @click.prevent="isProductMenuOpen = !isProductMenuOpen">
-            📦 상품 관리 {{ isProductMenuOpen ? '▴' : '▾' }}
+            📦 {{ $t('nav.product_management') }} {{ isProductMenuOpen ? '▴' : '▾' }}
           </a>
           <div v-show="isProductMenuOpen" class="nav-sub-menu">
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-list' }" @click.prevent="setActiveNav('product-list')">📋 상품 리스트</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-move' }" @click.prevent="setActiveNav('product-move')">🔄 재고 이동</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-adj' }" @click.prevent="setActiveNav('product-adj')">⚖️ 재고 조정</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-reg' }" @click.prevent="setActiveNav('product-reg')">➕ 상품 등록 (New)</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-list' }" @click.prevent="setActiveNav('product-list')">📋 {{ $t('nav.product_list') }}</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-move' }" @click.prevent="setActiveNav('product-move')">🔄 {{ $t('nav.product_move') }}</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-adj' }" @click.prevent="setActiveNav('product-adj')">⚖️ {{ $t('nav.product_adj') }}</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-reg' }" @click.prevent="setActiveNav('product-reg')">➕ {{ $t('nav.product_reg') }}</a>
           </div>
         </div>
 
         <!-- 기존 상품등록 (보존용) -->
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 상품등록 (Old)</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 Node Management</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 리포트</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 담당자 (입출고)</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="activeNav = 'search-edit'">🔍 입출고검색수정</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'reservation' }" @click.prevent="activeNav = 'reservation'">📅 예약상황</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ 설정</a>
-        <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 로그아웃</button>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 {{ $t('nav.node') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 {{ $t('nav.report') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 {{ $t('nav.manager') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="activeNav = 'search-edit'">🔍 {{ $t('nav.search_edit') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'reservation' }" @click.prevent="activeNav = 'reservation'">📅 {{ $t('nav.reservation') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
+        <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 {{ $t('nav.logout') }}</button>
       </nav>
     </aside>
 
@@ -193,6 +196,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import axios from 'axios' // 🌟 Frappe 통신을 위한 Axios 엔진
+import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
 import NodeManagement from '../components/NodeManagement.vue'
 import ProductListView from './ProductListView.vue' // 신규 리스트 뷰
@@ -410,9 +414,9 @@ const submitToFrappe = async () => {
   align-items: flex-start;
   width: 100%;
   min-width: 1024px;
-  min-height: 100vh;
+  height: 100vh;
   margin: 0 auto;
-  overflow: auto;
+  overflow: hidden;
   font-family: sans-serif;
   background: #f4f6f9;
   box-sizing: border-box;
@@ -465,7 +469,7 @@ const submitToFrappe = async () => {
 .nav-logout-btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; margin-top: 8px; color: #fca5a5 !important; }
 .nav-logout-btn:hover { background: #450a0a !important; color: white !important; }
 
-.main-content-zone { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
+.main-content-zone { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; height: 100vh; }
 .workspace-body { display: flex; flex: 1; overflow: hidden; padding: 15px; gap: 15px; }
 .workspace-left { flex: 1.1; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
 .workspace-right { flex: 0.9; background: white; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }

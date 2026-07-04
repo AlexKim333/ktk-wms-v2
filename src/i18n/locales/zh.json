@@ -1,0 +1,31 @@
+{
+  "login": {
+    "subtitle": "操作员登录",
+    "id_label": "账号 (member_name)",
+    "id_placeholder": "操作员 ID",
+    "pwd_label": "密码",
+    "pwd_placeholder": "密码",
+    "remember_me": "保持登录",
+    "authenticating": "认证中...",
+    "login_btn": "登录"
+  },
+  "nav": {
+    "home": "首页",
+    "outbound": "出库",
+    "inbound": "入库",
+    "move": "库存移动",
+    "product_management": "商品管理",
+    "product_list": "商品列表",
+    "product_move": "库存移动",
+    "product_adj": "库存调整",
+    "product_reg": "商品注册",
+    "product_old": "商品注册 (旧)",
+    "node": "节点管理",
+    "report": "报表",
+    "manager": "负责人",
+    "search_edit": "搜索/编辑",
+    "reservation": "预约",
+    "settings": "设置",
+    "logout": "注销"
+  }
+}

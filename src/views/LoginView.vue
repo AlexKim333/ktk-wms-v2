@@ -1,27 +1,30 @@
 <template>
   <div class="login-container">
+    <div class="lang-switcher-wrapper">
+      <LanguageSwitcher />
+    </div>
     <div class="login-card">
       <div class="brand-logo">
         <div class="logo-wrapper">
           <img src="../assets/lady_polo_logo.webp" alt="LADY POLO" class="main-logo" />
         </div>
-        <p class="subtitle">작업자 로그인</p>
+        <p class="subtitle">{{ $t('login.subtitle') }}</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <label>아이디 (member_name)</label>
-          <input v-model="username" type="text" required placeholder="작업자 ID" autofocus />
+          <label>{{ $t('login.id_label') }}</label>
+          <input v-model="username" type="text" required :placeholder="$t('login.id_placeholder')" autofocus />
         </div>
 
         <div class="input-group">
-          <label>비밀번호</label>
+          <label>{{ $t('login.pwd_label') }}</label>
           <div class="password-wrapper">
             <input 
               v-model="password" 
               :type="showPassword ? 'text' : 'password'" 
               required 
-              placeholder="비밀번호" 
+              :placeholder="$t('login.pwd_placeholder')" 
             />
             <button type="button" class="btn-eye" @click="togglePassword" tabindex="-1">
               {{ showPassword ? '🙈' : '👁️' }}
@@ -32,12 +35,12 @@
         <div class="options-group">
           <label class="remember-me">
             <input type="checkbox" v-model="rememberMe" />
-            <span>로그인 유지</span>
+            <span>{{ $t('login.remember_me') }}</span>
           </label>
         </div>
 
         <button type="submit" class="btn-login" :disabled="isLoading">
-          {{ isLoading ? 'Authenticating...' : 'Iniciar sesión / 로그인' }}
+          {{ isLoading ? $t('login.authenticating') : $t('login.login_btn') }}
         </button>
       </form>
     </div>
@@ -49,6 +52,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import axios from 'axios'
+import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -118,6 +122,11 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
+.lang-switcher-wrapper {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
 /* 전체 화면 배경은 전역(style.css) 변수를 따름 */
 .login-container { 
   display: grid; 

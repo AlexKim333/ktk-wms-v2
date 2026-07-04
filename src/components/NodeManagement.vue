@@ -115,6 +115,7 @@
           class="filter-input" 
         />
         <button class="btn-refresh" @click="fetchNodeList">🔄 Refresh</button>
+        <button class="btn-new-node-action" @click="currentView = 'register'">➕ New Node</button>
       </div>
 
       <div class="table-container">
@@ -343,6 +344,7 @@ const saveNode = async () => {
     alert(`✅ Success: ${finalNodeName} registered!`)
     form.value = { node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', addresses: [{ id: Date.now(), val: '', city: '' }] }
     await fetchNodeList()
+    currentView.value = 'list'
     
   } catch (error) {
     let detailMsg = 'Unknown Error.'
@@ -453,14 +455,15 @@ const deleteNode = (node) => alert(`Delete action triggered for ${node.name}`)
 </script>
 
 <style scoped>
-.node-management-zone { padding: 20px; background: #f4f6f9; height: 100%; font-family: -apple-system, sans-serif; }
+.node-management-zone { padding: 20px; background: #f4f6f9; height: 100%; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; }
+.node-header { flex-shrink: 0; }
 .node-header h2 { margin: 0 0 5px 0; color: #1e293b; }
 .node-header p { margin: 0 0 20px 0; color: #64748b; font-size: 14px; }
 .tab-controller { display: flex; gap: 10px; margin-bottom: 20px; }
 .tab-btn { background: white; border: 1px solid #cbd5e1; padding: 10px 20px; cursor: pointer; border-radius: 6px; font-weight: bold; color: #475569;}
 .tab-btn.active { background: #00a896; color: white; border-color: #00a896; }
 
-.node-form { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+.node-form { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow-y: auto; flex: 1; min-height: 0; }
 .form-grid { display: grid; gap: 15px; }
 .form-field { display: flex; flex-direction: column; gap: 5px; font-weight: bold; font-size: 13px; color: #334155;}
 .form-field input, .form-field select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
@@ -502,9 +505,12 @@ const deleteNode = (node) => alert(`Delete action triggered for ${node.name}`)
 .filter-select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-weight: bold;}
 .filter-input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
 .btn-refresh { background: #334155; color: white; padding: 0 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;}
-.table-container { overflow-x: auto; }
+.btn-new-node-action { background: #00a896; color: white; padding: 0 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 5px; transition: background 0.2s; }
+.btn-new-node-action:hover { background: #008f7f; }
+.node-list-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.table-container { overflow: auto; flex: 1; min-height: 0; }
 .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
-.data-table th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; text-align: left; }
+.data-table th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; text-align: left; position: sticky; top: 0; z-index: 10; }
 .data-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
 .type-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase;}
 .type-badge.warehouse { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }

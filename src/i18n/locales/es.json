@@ -1,0 +1,31 @@
+{
+  "login": {
+    "subtitle": "Inicio de sesión",
+    "id_label": "Usuario (member_name)",
+    "id_placeholder": "ID del trabajador",
+    "pwd_label": "Contraseña",
+    "pwd_placeholder": "Contraseña",
+    "remember_me": "Mantener sesión iniciada",
+    "authenticating": "Autenticando...",
+    "login_btn": "Iniciar sesión"
+  },
+  "nav": {
+    "home": "Inicio",
+    "outbound": "Salida",
+    "inbound": "Entrada",
+    "move": "Mover inventario",
+    "product_management": "Gestión Prod",
+    "product_list": "Lista Prod",
+    "product_move": "Mover inventario",
+    "product_adj": "Ajuste Inv",
+    "product_reg": "Nuevo Prod",
+    "product_old": "Producto (Antiguo)",
+    "node": "Gestión Node",
+    "report": "Reportes",
+    "manager": "Encargado",
+    "search_edit": "Buscar/Editar",
+    "reservation": "Reservas",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión"
+  }
+}

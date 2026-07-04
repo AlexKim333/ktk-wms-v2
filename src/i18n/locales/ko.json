@@ -1,0 +1,31 @@
+{
+  "login": {
+    "subtitle": "작업자 로그인",
+    "id_label": "아이디 (member_name)",
+    "id_placeholder": "작업자 ID",
+    "pwd_label": "비밀번호",
+    "pwd_placeholder": "비밀번호",
+    "remember_me": "로그인 유지",
+    "authenticating": "인증 중...",
+    "login_btn": "로그인"
+  },
+  "nav": {
+    "home": "시작",
+    "outbound": "출고입력",
+    "inbound": "입고입력",
+    "move": "재고 이동",
+    "product_management": "상품 관리",
+    "product_list": "상품 리스트",
+    "product_move": "재고 이동",
+    "product_adj": "재고 조정",
+    "product_reg": "상품 등록 (New)",
+    "product_old": "상품등록 (Old)",
+    "node": "Node Management",
+    "report": "리포트",
+    "manager": "담당자 (입출고)",
+    "search_edit": "입출고검색수정",
+    "reservation": "예약상황",
+    "settings": "설정",
+    "logout": "로그아웃"
+  }
+}
