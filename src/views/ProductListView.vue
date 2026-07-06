@@ -28,6 +28,19 @@
             class="search-input" 
           />
         </div>
+        
+        <div class="warehouse-filter-wrapper">
+          <select v-model="selectedWarehouse" class="warehouse-select">
+            <option value="All">전체 창고 (All Warehouses)</option>
+            <option v-for="wh in availableWarehouses" :key="wh.name" :value="wh.name">
+              {{ wh.warehouse_name }}
+            </option>
+          </select>
+          <button class="btn-action outline icon-only" @click="isExcludeModalOpen = true" title="제외 창고 설정">
+            ⚙️
+          </button>
+        </div>
+
         <button class="btn-refresh" @click="loadProducts" :disabled="isLoading">🔄 Refresh</button>
       </div>
 
@@ -62,7 +75,7 @@
               <td>{{ item.custom_pack_qty || 1 }}</td>
               <td class="align-right font-bold text-teal">{{ calculateStock(item).boxes }} Box</td>
               <td class="align-right font-bold text-teal">{{ calculateStock(item).eaches }} Pcs</td>
-              <td class="align-right font-bold bg-light">{{ item.actual_qty || 0 }} Pcs</td>
+              <td class="align-right font-bold bg-light">{{ getDisplayStock(item) }} Pcs</td>
             </tr>
           </tbody>
         </table>
@@ -74,6 +87,27 @@
 
     <!-- Product Registration Modal -->
     <ProductRegistrationModal v-if="isRegModalOpen" @close="isRegModalOpen = false" @saved="loadProducts" />
+
+    <!-- Exclude Warehouses Modal -->
+    <div class="modal-overlay" v-if="isExcludeModalOpen">
+      <div class="modal-content exclude-modal">
+        <div class="modal-header">
+          <h3>⚙️ 검색 제외 창고 설정</h3>
+        </div>
+        <div class="modal-body">
+          <p class="text-sm text-gray mb-3">체크된 창고는 전체 재고 합산 및 창고 드롭다운 목록에서 제외됩니다.</p>
+          <div class="warehouse-checklist">
+            <label v-for="wh in rawWarehouses" :key="wh.name" class="check-label">
+              <input type="checkbox" :value="wh.name" v-model="excludedWarehouses" @change="saveExcluded" />
+              {{ wh.warehouse_name }}
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-action primary" @click="isExcludeModalOpen = false">완료</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Hidden CSV File Input -->
     <input type="file" ref="fileInputRef" accept=".csv" style="display: none" @change="processCsvFile" />
@@ -98,12 +132,32 @@ const selectedItems = ref([])
 
 const isBarcodeModalOpen = ref(false)
 const isRegModalOpen = ref(false)
+const isExcludeModalOpen = ref(false)
+
+const rawItems = ref([])
+const rawBins = ref([])
+const rawWarehouses = ref([])
+
+const selectedWarehouse = ref('All')
+const excludedWarehouses = ref(JSON.parse(localStorage.getItem('wms_excluded_warehouses') || '[]'))
+
+const saveExcluded = () => {
+  localStorage.setItem('wms_excluded_warehouses', JSON.stringify(excludedWarehouses.value))
+  // 제외 창고가 변경되었을 때 선택된 창고가 제외 목록에 들어갔다면 All로 변경
+  if (selectedWarehouse.value !== 'All' && excludedWarehouses.value.includes(selectedWarehouse.value)) {
+    selectedWarehouse.value = 'All'
+  }
+}
+
+const availableWarehouses = computed(() => {
+  return rawWarehouses.value.filter(wh => !excludedWarehouses.value.includes(wh.name))
+})
 
 const loadProducts = async () => {
   isLoading.value = true
   selectedItems.value = []
   try {
-    const [itemRes, binRes] = await Promise.all([
+    const [itemRes, binRes, whRes] = await Promise.all([
       frappeApi.get('/api/resource/Item', {
         params: { 
           fields: JSON.stringify(['name', 'item_code', 'item_name', 'brand', 'custom_color', 'custom_pack_qty']),
@@ -113,28 +167,22 @@ const loadProducts = async () => {
       }),
       frappeApi.get('/api/resource/Bin', {
         params: { 
-          fields: JSON.stringify(['item_code', 'actual_qty']),
+          fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
+          limit_page_length: 0 
+        }
+      }),
+      frappeApi.get('/api/resource/Warehouse', {
+        params: { 
+          fields: JSON.stringify(['name', 'warehouse_name']),
           limit_page_length: 0 
         }
       })
     ])
     
-    const stockMap = {}
-    if (binRes.data && binRes.data.data) {
-      binRes.data.data.forEach(bin => {
-        if (!stockMap[bin.item_code]) stockMap[bin.item_code] = 0
-        stockMap[bin.item_code] += (Number(bin.actual_qty) || 0)
-      })
-    }
+    rawItems.value = itemRes.data.data || []
+    rawBins.value = binRes.data.data || []
+    rawWarehouses.value = whRes.data.data || []
     
-    const items = itemRes.data.data.map(item => {
-      return {
-        ...item,
-        actual_qty: stockMap[item.item_code] || 0
-      }
-    })
-    
-    products.value = items
   } catch (err) {
     console.error('Error loading products:', err)
     alert('Failed to load product data.')
@@ -147,8 +195,22 @@ onMounted(() => {
   loadProducts()
 })
 
+const getDisplayStock = (item) => {
+  let total = 0
+  const itemBins = rawBins.value.filter(b => b.item_code === item.name)
+  
+  itemBins.forEach(bin => {
+    if (excludedWarehouses.value.includes(bin.warehouse)) return; // 제외된 창고 재고 무시
+    
+    if (selectedWarehouse.value === 'All' || selectedWarehouse.value === bin.warehouse) {
+      total += (Number(bin.actual_qty) || 0)
+    }
+  })
+  return total
+}
+
 const calculateStock = (item) => {
-  const total = item.actual_qty || 0
+  const total = getDisplayStock(item)
   const packQty = item.custom_pack_qty || 1
   return {
     boxes: Math.floor(total / packQty),
@@ -157,14 +219,17 @@ const calculateStock = (item) => {
 }
 
 const filteredProducts = computed(() => {
-  if (!searchQuery.value) return products.value
-  const q = searchQuery.value.toLowerCase()
-  return products.value.filter(p => 
-    (p.item_name && p.item_name.toLowerCase().includes(q)) || 
-    (p.custom_color && p.custom_color.toLowerCase().includes(q)) ||
-    (p.brand && p.brand.toLowerCase().includes(q)) ||
-    (p.item_code && p.item_code.toLowerCase().includes(q))
-  )
+  let list = rawItems.value
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(p => 
+      (p.item_name && p.item_name.toLowerCase().includes(q)) || 
+      (p.custom_color && p.custom_color.toLowerCase().includes(q)) ||
+      (p.brand && p.brand.toLowerCase().includes(q)) ||
+      (p.item_code && p.item_code.toLowerCase().includes(q))
+    )
+  }
+  return list
 })
 
 const isAllSelected = computed(() => {
@@ -249,7 +314,7 @@ const processCsvFile = (e) => {
 }
 
 const exportCSV = () => {
-  if (products.value.length === 0) {
+  if (filteredProducts.value.length === 0) {
     alert("No data to export.")
     return
   }
@@ -266,7 +331,7 @@ const exportCSV = () => {
     const color = `"${p.custom_color ? p.custom_color.replace(/"/g, '""') : 'Standard'}"`
     const brand = `"${p.brand ? p.brand.replace(/"/g, '""') : ''}"`
     const packQty = p.custom_pack_qty || 1
-    const totalQty = p.actual_qty || 0
+    const totalQty = getDisplayStock(p)
     
     csvContent += `${name},${color},${brand},${packQty},${totalQty}\n`
   })
@@ -446,5 +511,61 @@ const exportCSV = () => {
   text-align: center !important;
   color: #94a3b8;
   font-size: 14px;
+}
+
+.warehouse-filter-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.warehouse-select {
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  min-width: 200px;
+  background: white;
+}
+.warehouse-select:focus {
+  border-color: #00a896;
+}
+.icon-only {
+  padding: 10px;
+  font-size: 16px;
+}
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 9999;
+}
+.modal-content.exclude-modal {
+  background: white; width: 400px; padding: 25px; border-radius: 8px;
+}
+.modal-header h3 { margin: 0 0 10px 0; font-size: 18px; color: #1e293b; }
+.text-sm { font-size: 13px; }
+.text-gray { color: #64748b; }
+.mb-3 { margin-bottom: 15px; }
+.warehouse-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  border-radius: 6px;
+}
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.modal-footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

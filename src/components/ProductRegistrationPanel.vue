@@ -281,6 +281,38 @@ const saveProduct = async () => {
 
     const extractedNumber = parseInt(itemName.replace(/[^0-9]/g, ''), 10) || 0
 
+    // 🌟 추가 로직: 동일한 item_name을 가진 기존 형제 상품(Sibling) 찾기
+    const siblingRes = await frappeApi.get('/api/resource/Item', {
+      params: { 
+        filters: JSON.stringify([['item_name', '=', itemName]]), 
+        fields: JSON.stringify(['name', 'custom_is_grid_item']),
+        limit_page_length: 100 
+      }
+    });
+    
+    const siblings = siblingRes.data.data || [];
+    
+    // 만약 기존 형제가 하나라도 있다면(즉, 이번이 2번째 이상 컬러 등록이라면),
+    // 현재 상품은 무조건 Grid(1)가 되며, 기존 형제들도 모두 Grid(1)로 업데이트해야 함
+    let isGridFinal = form.value.is_grid ? 1 : 0;
+    
+    if (siblings.length > 0) {
+      isGridFinal = 1; // 형제가 있으므로 강제로 그리드 취급
+      
+      // 기존 형제들 중 is_grid가 0(No)인 것들을 백엔드에서 1(Yes)로 업데이트 (소급 적용)
+      for (const sibling of siblings) {
+        if (sibling.custom_is_grid_item === 0) {
+          try {
+            await frappeApi.put(`/api/resource/Item/${sibling.name}`, {
+              custom_is_grid_item: 1
+            });
+          } catch (e) {
+            console.error(`Failed to update sibling ${sibling.name} to grid:`, e);
+          }
+        }
+      }
+    }
+
     // Step 1: 상품 마스터(Item) 생성
     await frappeApi.post('/api/resource/Item', {
       item_code: finalItemCode,
@@ -293,7 +325,7 @@ const saveProduct = async () => {
       custom_color: color,
       barcode: form.value.barcode.trim() || null,
       custom_pack_qty: boxPackagingQty,
-      custom_is_grid_item: form.value.is_grid ? 1 : 0,
+      custom_is_grid_item: isGridFinal,
       custom_grid_group_id: itemName,
       custom_name_number: extractedNumber
     })

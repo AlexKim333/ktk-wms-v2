@@ -60,12 +60,22 @@
           <div class="hotkey-block">
             <div class="block-header"><h3>⚡ Quick Pick (단일 베스트)</h3></div>
             <div class="grid-3x4">
-              <div v-for="prod in singleHotkeys" :key="prod.name" class="hotkey-card">
-                <button class="hotkey-btn-core" @click="addSingleHotkeyToCart(prod)">
-                  <div class="line-1">{{ prod.item_name }}</div>
-                  <div class="line-2">({{ prod.custom_color || '단일' }} · {{ prod.custom_pack_qty || 1 }}入)</div>
-                </button>
-                <button class="hotkey-sub-edit-btn" @click="openInlineEdit('single', prod)">⚙️ edit</button>
+              <div v-for="(slot, idx) in 8" :key="'slot-'+idx" class="hotkey-card">
+                <template v-if="quickPickSlots[idx]">
+                  <button class="hotkey-btn-core" @click="addSingleHotkeyToCart(quickPickSlots[idx])">
+                    <div class="line-1">{{ quickPickSlots[idx].item_name }}</div>
+                    <div class="line-2">({{ quickPickSlots[idx].custom_color || '단일' }} · {{ quickPickSlots[idx].custom_pack_qty || 1 }}入)</div>
+                    <div class="line-3 stock-info">{{ getFormattedStockFor(quickPickSlots[idx]) }}</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙️ edit</button>
+                </template>
+                <template v-else>
+                  <button class="hotkey-btn-core empty-slot" @click="openSlotEdit(idx)">
+                    <span class="empty-icon">➕</span>
+                    <div class="line-2">상품 지정</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙️ edit</button>
+                </template>
               </div>
             </div>
           </div>
@@ -73,12 +83,21 @@
           <div class="hotkey-block">
             <div class="block-header"><h3>🌐 Grid Quick Pick (묶음 품목)</h3></div>
             <div class="grid-3x4">
-              <div v-for="group in gridHotkeys" :key="group.id" class="hotkey-card">
-                <button class="hotkey-btn-core grid-style" @click="openGridModal(group)">
-                  <div class="line-1">{{ group.group_name }}</div>
-                  <div class="line-2 text-teal">({{ group.variants.length }}가지 컬러)</div>
-                </button>
-                <button class="hotkey-sub-edit-btn" @click="openInlineEdit('grid', group)">⚙️ edit</button>
+              <div v-for="(slot, idx) in 8" :key="'g-slot-'+idx" class="hotkey-card">
+                <template v-if="gridPickSlots[idx]">
+                  <button class="hotkey-btn-core grid-style" @click="openGridModal(gridPickSlots[idx])">
+                    <div class="line-1">{{ gridPickSlots[idx].group_name }}</div>
+                    <div class="line-2 text-teal">({{ gridPickSlots[idx].variants.length }}가지 컬러)</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙️ edit</button>
+                </template>
+                <template v-else>
+                  <button class="hotkey-btn-core empty-slot" @click="openGridSlotEdit(idx)">
+                    <span class="empty-icon">➕</span>
+                    <div class="line-2">상품 지정</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙️ edit</button>
+                </template>
               </div>
             </div>
           </div>
@@ -106,24 +125,42 @@
 
           <div class="tab-body-content" v-if="currentTab">
             <div class="tab-internal-master-header" :class="{ locked: !canEditMasterFields }">
-              <div class="master-lock-group">
-                <label>🏢 입출고 대상 (창고/업체):</label>
-                <select v-model="currentTab.selectedWarehouse" :disabled="!canEditMasterFields">
-                  <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">
-                    {{ wh.warehouse_name }}
-                  </option>
-                </select>
+              <div class="master-input-row">
+                <div class="master-lock-group">
+                  <label>📍 소스 (출발):</label>
+                  <select v-model="currentTab.selectedSource" :disabled="!canEditMasterFields" class="master-select">
+                    <option value="">선택</option>
+                    <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
+                  </select>
+                </div>
+                <div class="master-lock-group">
+                  <label>🎯 타겟 (도착):</label>
+                  <select v-model="currentTab.selectedTarget" :disabled="!canEditMasterFields" class="master-select">
+                    <option value="">선택</option>
+                    <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
+                  </select>
+                </div>
+                <div class="master-lock-group">
+                  <label>🏢 담당 지점:</label>
+                  <input type="text" v-model="currentTab.selectedBranch" :disabled="!canEditMasterFields" class="master-input"/>
+                </div>
               </div>
-              <div class="master-lock-group">
-                <label>👤 입력 담당자:</label>
-                <input type="text" v-model="currentTab.selectedManager" :disabled="!canEditMasterFields" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;"/>
+              <div class="master-input-row" style="margin-top: 10px;">
+                <div class="master-lock-group">
+                  <label>👤 작성자:</label>
+                  <input type="text" v-model="currentTab.selectedCreator" :disabled="!canEditMasterFields" class="master-input"/>
+                </div>
+                <div class="master-lock-group">
+                  <label>🗣️ 응대자:</label>
+                  <input type="text" v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-input"/>
+                </div>
               </div>
             </div>
 
             <table class="pos-cart-table">
               <thead>
-                <tr><th>품명(컬러)</th><th colspan="2">수량 입력</th><th>총 수량</th></tr>
-                <tr class="sub-th"><th></th><th>Caja (박스)</th><th>Pza (낱장)</th><th></th></tr>
+                <tr><th>품명(컬러)</th><th colspan="2">수량 입력</th><th>총 수량</th><th style="width: 40px;"></th></tr>
+                <tr class="sub-th"><th></th><th>Caja (박스)</th><th>Pza (낱장)</th><th></th><th></th></tr>
               </thead>
               <tbody>
                 <tr v-for="item in currentTab.cartItems" :key="item.name">
@@ -138,9 +175,12 @@
                     <input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="item.input_each" placeholder="0" />
                   </td>
                   <td class="total-qty-cell"><strong>{{ (item.input_box * (item.custom_pack_qty || 1)) + item.input_each }}</strong> 개</td>
+                  <td class="delete-cell">
+                    <button class="btn-delete-row" @click="removeFromCart(item.name)" title="삭제">🗑️</button>
+                  </td>
                 </tr>
                 <tr v-if="currentTab.cartItems.length === 0">
-                  <td colspan="4" class="empty-cart-msg">핫키를 누르거나 검색하여 상품을 추가하세요.</td>
+                  <td colspan="5" class="empty-cart-msg">핫키를 누르거나 검색하여 상품을 추가하세요.</td>
                 </tr>
               </tbody>
             </table>
@@ -174,7 +214,7 @@
         </div>
         <table class="grid-table">
           <thead>
-            <tr><th>컬러</th><th colspan="2">수량 입력</th><th>선택 총 수량</th></tr>
+            <tr><th>컬러</th><th colspan="2">수량 입력</th><th>선택 총 수량</th><th>현재 재고</th></tr>
           </thead>
           <tbody>
             <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
@@ -182,10 +222,96 @@
               <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
               <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
               <td class="calc-total-qty">{{ ((v.input_box || 0) * activeGroup.pack_qty) + (v.input_each || 0) }}개</td>
+              <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
             </tr>
           </tbody>
         </table>
         <button class="close-text-btn" @click="isGridModalOpen = false">창 닫기</button>
+      </div>
+    </div>
+    <!-- 🌟 단일 버튼 상품 지정 모달 -->
+    <div class="modal-overlay" v-if="isSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">단축키 상품 지정 (슬롯 {{ editSlotIndex + 1 }})</h3>
+          <button class="close-text-btn" @click="isSlotEditModalOpen = false" style="margin:0;">닫기</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px;">
+          <input type="text" v-model="slotSearchQuery" placeholder="검색 (이름, 색상, 코드)" class="search-bar" />
+        </div>
+        <div class="slot-item-list">
+          <div v-for="item in filteredSlotItems" :key="item.name" class="slot-list-item" @click="assignSlotItem(item)">
+            <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || '기본' }})</div>
+            <div class="item-stock">{{ getFormattedStockFor(item) }}</div>
+          </div>
+          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색 결과가 없습니다.</div>
+        </div>
+        <button class="btn-clear-slot" @click="clearSlot">선택 해제 (비우기)</button>
+      </div>
+    </div>
+
+    <!-- 🌟 그리드 묶음 상품 지정 모달 -->
+    <div class="modal-overlay" v-if="isGridSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">묶음품목(Grid) 지정 (슬롯 {{ editGridSlotIndex + 1 }})</h3>
+          <button class="close-text-btn" @click="isGridSlotEditModalOpen = false" style="margin:0;">닫기</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px;">
+          <input type="text" v-model="gridSlotSearchQuery" placeholder="검색 (품명)" class="search-bar" />
+        </div>
+        <div class="slot-item-list">
+          <div v-for="group in filteredGridSlotItems" :key="group.id" class="slot-list-item" @click="assignGridSlotItem(group)">
+            <div class="item-desc"><strong>{{ group.group_name }}</strong> ({{ group.variants.length }} color)</div>
+          </div>
+          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색 결과가 없습니다.</div>
+        </div>
+        <button class="btn-clear-slot" @click="clearGridSlot">선택 해제 (비우기)</button>
+      </div>
+    </div>
+
+    <!-- 🌟 퀵 재고조정 모달 (Quick Stock Adjustment) -->
+    <div class="modal-overlay" v-if="isQuickAdjustModalOpen">
+      <div class="modal-content" style="max-width: 450px; padding: 24px; border-radius: 8px;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0; color:#ef4444;">⚠️ 전산 재고 부족 (0개)</h3>
+          <button class="close-text-btn" @click="isQuickAdjustModalOpen = false" style="margin:0;">닫기</button>
+        </div>
+        
+        <div class="modal-body" style="margin-top: 15px;">
+          <p style="font-size: 14px; color: #334155; line-height: 1.5;">
+            <strong>{{ quickAdjustItem?.item_name }} ({{ quickAdjustItem?.custom_color || '기본' }})</strong> 상품의 출고 가능 재고가 없습니다.<br/>
+            실제 창고에 물건이 있다면 수량을 입력하여 즉시 채울 수 있습니다.
+          </p>
+
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <div style="flex:1;">
+              <label style="font-size:12px; font-weight:bold; color:#64748b;">📦 박스 수량 ({{ quickAdjustItem?.custom_pack_qty || 1 }}입)</label>
+              <input type="number" v-model.number="quickAdjustForm.input_box" class="search-bar" placeholder="0" min="0" style="margin-top:5px; padding: 10px;"/>
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:12px; font-weight:bold; color:#64748b;">🔢 낱개 수량</label>
+              <input type="number" v-model.number="quickAdjustForm.input_each" class="search-bar" placeholder="0" min="0" style="margin-top:5px; padding: 10px;"/>
+            </div>
+          </div>
+
+          <div v-if="!quickAdjustItem?.valuation_rate" style="margin-top:15px; background: #fffbeb; padding: 12px; border-radius:6px; border: 1px solid #fde68a;">
+            <label style="font-size:12px; font-weight:bold; color:#b45309;">💰 입고 원가 (Valuation Rate) 입력 필요</label>
+            <p style="font-size: 11px; color:#b45309; margin:4px 0;">이 상품은 등록된 원가가 없습니다. 강제 입고를 위해 원가를 입력해주세요.</p>
+            <input type="number" v-model.number="quickAdjustForm.valuation_rate" class="search-bar" placeholder="0보다 큰 숫자 입력" style="margin-top:5px; border-color:#fcd34d; padding: 10px;" />
+          </div>
+          <div v-else style="margin-top:15px; text-align:right;">
+            <span style="font-size:12px; color:#64748b; font-weight:bold;">✅ 기존 등록 원가 적용됨: {{ quickAdjustItem.valuation_rate }}</span>
+          </div>
+
+        </div>
+        
+        <div class="modal-footer" style="margin-top: 25px; display:flex; justify-content:flex-end; gap:10px;">
+          <button style="padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="isQuickAdjustModalOpen = false" :disabled="isAdjusting">취소</button>
+          <button style="padding:10px 20px; background:#00a896; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="submitQuickAdjust" :disabled="isAdjusting">
+            {{ isAdjusting ? '재고 반영 중...' : '⚡ 재고 채우고 장바구니 담기' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -231,34 +357,237 @@ const transactionMode = ref('outbound')
 const isProductMenuOpen = ref(false) // 🌟 상품관리 서브메뉴 상태
 
 // 🌟 Frappe에서 가져올 실시간 데이터 그릇
-const singleHotkeys = ref([])
+const rawSingleItems = ref([])
 const gridHotkeys = ref([])
 const warehouseList = ref([])
+const binData = ref([]) // 실시간 재고 저장소
+
+// 🌟 퀵 재고조정(Quick Stock Adjustment) 상태
+const isQuickAdjustModalOpen = ref(false)
+const quickAdjustItem = ref(null)
+const quickAdjustForm = ref({ input_box: 0, input_each: 0, valuation_rate: 0 })
+const isAdjusting = ref(false)
+const pendingCartAction = ref(null)
+
+// 로컬스토리지 키를 사용자별로 고유하게 생성
+const userKey = authStore.user?.name || authStore.user?.email || 'default_user'
+const singleStorageKey = `wms_quick_pick_slots_${userKey}`
+const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
+
+// 고정 슬롯 8개 데이터 로드
+const quickPickSlotNames = ref(JSON.parse(localStorage.getItem(singleStorageKey)) || new Array(8).fill(null))
+
+const quickPickSlots = computed(() => {
+  return quickPickSlotNames.value.map(name => {
+    if (!name) return null;
+    return rawSingleItems.value.find(i => i.name === name) || null;
+  })
+})
+
+const getFormattedStockFor = (item) => {
+  if (!item) return '';
+  const warehouse = transactionMode.value === 'outbound' 
+    ? currentTab.value?.selectedSource 
+    : currentTab.value?.selectedTarget;
+  let total = 0;
+  binData.value.forEach(bin => {
+    if (bin.item_code === item.name) {
+      // 선택된 창고가 없으면 전체 합산, 있으면 해당 창고 재고만 합산
+      if (!warehouse || bin.warehouse === warehouse) {
+        total += (Number(bin.actual_qty) || 0);
+      }
+    }
+  });
+  
+  const packQty = item.custom_pack_qty || 1;
+  const boxes = Math.floor(total / packQty);
+  const eaches = total % packQty;
+  
+  return `📦 ${boxes}박스 / 낱개 ${eaches}개`;
+}
+
+// 모달 관련 상태
+const isSlotEditModalOpen = ref(false)
+const editSlotIndex = ref(-1)
+const slotSearchQuery = ref('')
+
+const filteredSlotItems = computed(() => {
+  // 이미 다른 슬롯에 지정된 상품은 목록에서 제외 (중복 지정 방지)
+  const currentAssigned = new Set(quickPickSlotNames.value.filter(n => n !== null))
+  const baseItems = rawSingleItems.value.filter(item => !currentAssigned.has(item.name))
+
+  if (!slotSearchQuery.value) return baseItems
+  const q = slotSearchQuery.value.toLowerCase()
+  return baseItems.filter(item => 
+    (item.item_name && item.item_name.toLowerCase().includes(q)) ||
+    (item.custom_color && item.custom_color.toLowerCase().includes(q)) ||
+    (item.name && item.name.toLowerCase().includes(q))
+  )
+})
+
+const openSlotEdit = (idx) => {
+  editSlotIndex.value = idx
+  slotSearchQuery.value = ''
+  isSlotEditModalOpen.value = true
+}
+
+const assignSlotItem = (item) => {
+  const newArr = [...quickPickSlotNames.value]
+  newArr[editSlotIndex.value] = item.name
+  quickPickSlotNames.value = newArr
+  localStorage.setItem(singleStorageKey, JSON.stringify(newArr))
+  isSlotEditModalOpen.value = false
+}
+
+const clearSlot = () => {
+  const newArr = [...quickPickSlotNames.value]
+  newArr[editSlotIndex.value] = null
+  quickPickSlotNames.value = newArr
+  localStorage.setItem(singleStorageKey, JSON.stringify(newArr))
+  isSlotEditModalOpen.value = false
+}
+
+// 🌟 그리드 모달 관련 상태
+const isGridSlotEditModalOpen = ref(false)
+const editGridSlotIndex = ref(-1)
+const gridSlotSearchQuery = ref('')
+
+const gridPickSlotNames = ref(JSON.parse(localStorage.getItem(gridStorageKey)) || new Array(8).fill(null))
+
+const gridPickSlots = computed(() => {
+  return gridPickSlotNames.value.map(id => {
+    if (!id) return null;
+    return gridHotkeys.value.find(g => g.id === id) || null;
+  })
+})
+
+const filteredGridSlotItems = computed(() => {
+  // 이미 다른 슬롯에 지정된 그리드 묶음은 목록에서 제외
+  const currentAssigned = new Set(gridPickSlotNames.value.filter(id => id !== null))
+  const baseItems = gridHotkeys.value.filter(group => !currentAssigned.has(group.id))
+
+  if (!gridSlotSearchQuery.value) return baseItems
+  const q = gridSlotSearchQuery.value.toLowerCase()
+  return baseItems.filter(group => 
+    (group.group_name && group.group_name.toLowerCase().includes(q)) ||
+    (group.id && group.id.toLowerCase().includes(q))
+  )
+})
+
+const openGridSlotEdit = (idx) => {
+  editGridSlotIndex.value = idx
+  gridSlotSearchQuery.value = ''
+  isGridSlotEditModalOpen.value = true
+}
+
+const assignGridSlotItem = (group) => {
+  const newArr = [...gridPickSlotNames.value]
+  newArr[editGridSlotIndex.value] = group.id
+  gridPickSlotNames.value = newArr
+  localStorage.setItem(gridStorageKey, JSON.stringify(newArr))
+  isGridSlotEditModalOpen.value = false
+}
+
+const clearGridSlot = () => {
+  const newArr = [...gridPickSlotNames.value]
+  newArr[editGridSlotIndex.value] = null
+  gridPickSlotNames.value = newArr
+  localStorage.setItem(gridStorageKey, JSON.stringify(newArr))
+  isGridSlotEditModalOpen.value = false
+}
 
 // Frappe API 호출 로직 (컴포넌트 로드 시 자동 실행)
 const fetchFrappeItems = async () => {
   try {
-    // 1. 창고 목록 가져오기
-    const whRes = await frappeApi.get('/api/resource/Warehouse', {
-      params: { fields: JSON.stringify(['name', 'warehouse_name']) }
-    })
-    warehouseList.value = whRes.data.data
+    // 1. 다중 API 병렬 호출 (창고, 품목, 재고)
+    const [whRes, itemRes, binRes] = await Promise.all([
+      frappeApi.get('/api/resource/Warehouse', {
+        params: { fields: JSON.stringify(['name', 'warehouse_name']) }
+      }),
+      frappeApi.get('/api/resource/Item', {
+        params: {
+          fields: JSON.stringify([
+            'name', 'item_name', 'item_group', 
+            'custom_color', 'custom_pack_qty',
+            'custom_is_grid_item', 'custom_grid_group_id', 'custom_name_number',
+            'valuation_rate'
+          ]),
+          limit_page_length: 500 // 넉넉하게 로드
+        }
+      }),
+      frappeApi.get('/api/resource/Bin', {
+        params: {
+          fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
+          limit_page_length: 0 // 전체 재고 로드
+        }
+      })
+    ]);
 
-    // 2. 품목(Item) 마스터 가져오기
-    // 실제 프라페에 custom_color, custom_pack_qty 필드가 생성되어 있다고 가정하고 불러옵니다.
-    const itemRes = await frappeApi.get('/api/resource/Item', {
-      params: {
-        fields: JSON.stringify(['name', 'item_name', 'item_group', 'custom_color', 'custom_pack_qty']),
-        limit_page_length: 50
-      }
-    })
+    warehouseList.value = whRes.data.data
+    binData.value = binRes.data.data || []
     
-    // 가져온 데이터를 핫키 리스트에 주입
-    singleHotkeys.value = itemRes.data.data.map(item => ({
-      ...item,
-      input_box: 0,
-      input_each: 0
-    }))
+    // 3. 단일 품목(Single)과 묶음 품목(Grid) 자동 분류 로직
+    const fetchedItems = itemRes.data.data;
+    const groupedByName = {};
+    
+    fetchedItems.forEach(item => {
+      // 1순위: 명시된 그룹 ID, 2순위: 품목명
+      const groupId = item.custom_grid_group_id || item.item_name || '미분류';
+      
+      if (!groupedByName[groupId]) {
+        groupedByName[groupId] = {
+          id: groupId,
+          group_name: item.item_name || groupId,
+          pack_qty: item.custom_pack_qty || 1, // 그룹 대표 패킹 수량
+          is_explicit_grid: item.custom_is_grid_item === 1,
+          variants: []
+        };
+      } else {
+        // 이미 그룹이 존재하면 명시적 그리드 설정이 하나라도 1인지 체크
+        if (item.custom_is_grid_item === 1) {
+          groupedByName[groupId].is_explicit_grid = true;
+        }
+      }
+      
+      groupedByName[groupId].variants.push({
+        ...item,
+        input_box: 0,
+        input_each: 0
+      });
+    });
+
+    const newSingles = [];
+    const newGrids = [];
+
+    Object.values(groupedByName).forEach(group => {
+      // 명시적으로 그리드라고 체크되어 있거나, 혹은 같은 품목명의 컬러 변형이 2개 이상이면 그리드로 자동 분류
+      if (group.is_explicit_grid || group.variants.length > 1) {
+        newGrids.push(group);
+      } else {
+        newSingles.push(group.variants[0]);
+      }
+    });
+
+    rawSingleItems.value = newSingles;
+    gridHotkeys.value = newGrids;
+
+    // 만약 로컬스토리지 슬롯이 전부 비어있다면, 초기값으로 상위 8개를 자동 배정해줍니다
+    const hasAnySlot = quickPickSlotNames.value.some(name => name !== null)
+    if (!hasAnySlot) {
+      for (let i = 0; i < 8 && i < newSingles.length; i++) {
+        quickPickSlotNames.value[i] = newSingles[i].name
+      }
+      localStorage.setItem(singleStorageKey, JSON.stringify(quickPickSlotNames.value))
+    }
+    
+    // 그리드 슬롯도 동일하게 초기 자동 배정
+    const hasAnyGridSlot = gridPickSlotNames.value.some(id => id !== null)
+    if (!hasAnyGridSlot) {
+      for (let i = 0; i < 8 && i < newGrids.length; i++) {
+        gridPickSlotNames.value[i] = newGrids[i].id
+      }
+      localStorage.setItem(gridStorageKey, JSON.stringify(gridPickSlotNames.value))
+    }
     
   } catch (error) {
     console.error('Frappe 마스터 데이터 로드 실패:', error)
@@ -283,8 +612,11 @@ const tabList = ref([
   { 
     id: 'tab_1', 
     title: '주문서 1',
-    selectedWarehouse: '',
-    selectedManager: authStore.user?.member_name || '',
+    selectedSource: '',
+    selectedTarget: '',
+    selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
+    selectedBranch: authStore.user?.branch_name || '',
+    selectedResponder: '',
     cartItems: []
   }
 ])
@@ -311,8 +643,11 @@ const addNewTab = () => {
   tabList.value.push({ 
     id: newId, 
     title: `주문서 ${nextNum}`,
-    selectedWarehouse: '',
-    selectedManager: authStore.user?.member_name || '',
+    selectedSource: currentTab.value?.selectedSource || '',
+    selectedTarget: currentTab.value?.selectedTarget || '',
+    selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
+    selectedBranch: authStore.user?.branch_name || '',
+    selectedResponder: '',
     cartItems: []
   })
   activeTabId.value = newId
@@ -330,11 +665,116 @@ const closeTab = (tabId) => {
 
 const addSingleHotkeyToCart = (prod) => {
   if (!currentTab.value) return
+
+  // 🌟 출고 모드일 때 실시간 재고를 체크하여 없으면 퀵 조정 모달 호출
+  if (transactionMode.value === 'outbound') {
+    let currentStock = 0;
+    const warehouse = currentTab.value.selectedSource;
+    binData.value.forEach(bin => {
+      if (bin.item_code === prod.name && (!warehouse || bin.warehouse === warehouse)) {
+        currentStock += (Number(bin.actual_qty) || 0);
+      }
+    });
+
+    if (currentStock <= 0) {
+      quickAdjustItem.value = prod;
+      quickAdjustForm.value = {
+        input_box: 0,
+        input_each: 0,
+        valuation_rate: prod.valuation_rate || 0
+      };
+      pendingCartAction.value = () => { addSingleToCartInternal(prod) };
+      isQuickAdjustModalOpen.value = true;
+      return;
+    }
+  }
+
+  addSingleToCartInternal(prod);
+}
+
+const addSingleToCartInternal = (prod) => {
   const existing = currentTab.value.cartItems.find(item => item.name === prod.name)
   if (existing) { 
     existing.input_box += 1 
   } else { 
     currentTab.value.cartItems.push({ ...prod, input_box: 1, input_each: 0 }) 
+  }
+}
+
+const removeFromCart = (itemName) => {
+  if (!currentTab.value) return
+  currentTab.value.cartItems = currentTab.value.cartItems.filter(item => item.name !== itemName)
+}
+
+// 🌟 퀵 재고조정 실행 함수
+const submitQuickAdjust = async () => {
+  const boxQty = Number(quickAdjustForm.value.input_box) || 0;
+  const eachQty = Number(quickAdjustForm.value.input_each) || 0;
+  const packQty = quickAdjustItem.value.custom_pack_qty || 1;
+  const totalQty = (boxQty * packQty) + eachQty;
+  const valRate = Number(quickAdjustForm.value.valuation_rate);
+
+  if (totalQty <= 0) {
+    alert("입고할 수량을 1개 이상 입력해주세요.");
+    return;
+  }
+  
+  if (!quickAdjustItem.value.valuation_rate && valRate <= 0) {
+    alert("원가(Valuation Rate)가 없는 상품입니다. 강제 입고를 위해 0보다 큰 원가를 반드시 입력해주세요.");
+    return;
+  }
+
+  isAdjusting.value = true;
+  try {
+    // 퀵재고조정은 무조건 현재 지점(Source)에 물건을 채우는 것으로 가정합니다.
+    const warehouse = currentTab.value?.selectedSource || currentTab.value?.selectedTarget;
+    if (!warehouse) {
+      alert("전산 재고를 반영할 창고(소스 또는 타겟)가 탭 상단에 선택되어 있지 않습니다.");
+      isAdjusting.value = false;
+      return;
+    }
+
+    const stockEntryPayload = {
+      stock_entry_type: 'Material Receipt',
+      company: 'kecon',
+      custom_creator: currentTab.value.selectedCreator || undefined,
+      custom_branch: currentTab.value.selectedBranch || undefined,
+      items: [{
+        item_code: quickAdjustItem.value.name,
+        t_warehouse: warehouse,
+        qty: totalQty,
+        basic_rate: valRate || quickAdjustItem.value.valuation_rate
+      }]
+    };
+
+    const res = await frappeApi.post('/api/resource/Stock Entry', stockEntryPayload);
+    const docName = res.data.data.name;
+    
+    await frappeApi.put(`/api/resource/Stock Entry/${docName}`, { docstatus: 1 });
+    
+    // 프론트엔드 로컬 재고(binData) 즉각 업데이트 (새로고침 없이 반영)
+    const existingBin = binData.value.find(b => b.item_code === quickAdjustItem.value.name && b.warehouse === warehouse);
+    if (existingBin) {
+      existingBin.actual_qty = Number(existingBin.actual_qty) + totalQty;
+    } else {
+      binData.value.push({
+        item_code: quickAdjustItem.value.name,
+        warehouse: warehouse,
+        actual_qty: totalQty
+      });
+    }
+
+    isQuickAdjustModalOpen.value = false;
+
+    // 잠시 중단했던 장바구니 담기 액션 마저 실행
+    if (pendingCartAction.value) {
+      pendingCartAction.value();
+    }
+  } catch (error) {
+    console.error("Quick Adjust Error:", error);
+    alert("재고 반영 중 오류가 발생했습니다. 개발자 도구를 확인하세요.");
+  } finally {
+    isAdjusting.value = false;
   }
 }
 
@@ -345,8 +785,56 @@ const openGridModal = (group) => {
 
 const submitGridSelection = () => {
   if (!currentTab.value) return
-  activeGroup.value.variants.forEach(v => {
-    if (v.input_box > 0 || v.input_each > 0) {
+  
+  const selectedVariants = activeGroup.value.variants.filter(v => v.input_box > 0 || v.input_each > 0)
+  if (selectedVariants.length === 0) {
+    isGridModalOpen.value = false
+    return
+  }
+
+  // 🌟 출고 모드일 경우 재고가 0 이하인 항목을 찾아 퀵 재고조정 연동
+  if (transactionMode.value === 'outbound') {
+    const warehouse = currentTab.value.selectedSource;
+    let firstOutOfStock = null;
+    
+    for (const v of selectedVariants) {
+      let currentStock = 0;
+      binData.value.forEach(bin => {
+        if (bin.item_code === v.name && (!warehouse || bin.warehouse === warehouse)) {
+          currentStock += (Number(bin.actual_qty) || 0);
+        }
+      });
+      
+      if (currentStock <= 0) {
+        firstOutOfStock = v;
+        break; // 한 번에 하나씩 퀵 재고조정 모달을 띄웁니다.
+      }
+    }
+
+    if (firstOutOfStock) {
+      quickAdjustItem.value = firstOutOfStock;
+      quickAdjustForm.value = {
+        input_box: 0,
+        input_each: 0,
+        valuation_rate: firstOutOfStock.valuation_rate || 0
+      };
+      
+      // 퀵 조정을 완료하면 다시 submitGridSelection을 호출하여 남은 항목 검사 및 장바구니 담기 진행 (재귀 방식)
+      pendingCartAction.value = () => { 
+        submitGridSelection() 
+      };
+      isQuickAdjustModalOpen.value = true;
+      return; // 장바구니에 담기 전에 여기서 일시 정지
+    }
+  }
+
+  // 재고가 모두 충족되었거나 출고 모드가 아니면 장바구니에 모두 담기
+  selectedVariants.forEach(v => {
+    const existing = currentTab.value.cartItems.find(item => item.name === v.name)
+    if (existing) {
+      existing.input_box += v.input_box || 0
+      existing.input_each += v.input_each || 0
+    } else {
       currentTab.value.cartItems.push({
         name: v.name,
         item_name: activeGroup.value.group_name,
@@ -356,7 +844,12 @@ const submitGridSelection = () => {
         input_each: v.input_each || 0
       })
     }
+    
+    // 장바구니에 담은 후 입력창 초기화
+    v.input_box = 0
+    v.input_each = 0
   })
+  
   isGridModalOpen.value = false
 }
 
@@ -376,15 +869,21 @@ const submitToFrappe = async () => {
     const stockEntryPayload = {
       docstatus: 0, // 0: Draft, 1: Submit
       stock_entry_type: transactionMode.value === 'inbound' ? 'Material Receipt' : 'Material Issue',
-      to_warehouse: transactionMode.value === 'inbound' ? currentTab.value.selectedWarehouse : undefined,
-      from_warehouse: transactionMode.value === 'outbound' ? currentTab.value.selectedWarehouse : undefined,
+      // ✨ 명시적으로 Source와 Target 매핑
+      from_warehouse: currentTab.value.selectedSource || undefined,
+      to_warehouse: currentTab.value.selectedTarget || undefined,
+      
+      // ✨ 스크린샷에 명시된 2가지 핵심 커스텀 뼈대 매핑
+      custom_ordering_branch: currentTab.value.selectedBranch || undefined,
+      custom_orderer: currentTab.value.selectedResponder || currentTab.value.selectedCreator || undefined,
+      
       items: currentTab.value.cartItems.map(item => {
         const totalQty = (Number(item.input_box) * (item.custom_pack_qty || 1)) + Number(item.input_each);
         return {
           item_code: item.name,
           qty: totalQty,
-          t_warehouse: transactionMode.value === 'inbound' ? currentTab.value.selectedWarehouse : undefined,
-          s_warehouse: transactionMode.value === 'outbound' ? currentTab.value.selectedWarehouse : undefined,
+          s_warehouse: currentTab.value.selectedSource || undefined,
+          t_warehouse: currentTab.value.selectedTarget || undefined,
         }
       })
     }
@@ -421,6 +920,11 @@ const submitToFrappe = async () => {
   background: #f4f6f9;
   box-sizing: border-box;
 }
+
+.master-input-row { display: flex; gap: 15px; }
+.master-select, .master-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; min-width: 150px; background: white; }
+.master-lock-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.master-lock-group label { font-size: 12px; font-weight: bold; color: #475569; }
 
 .sidebar-nav {
   width: 220px;
@@ -508,7 +1012,7 @@ const submitToFrappe = async () => {
 
 .tab-body-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
 
-.tab-internal-master-header { display: flex; gap: 10px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
+.tab-internal-master-header { display: flex; flex-direction: column; gap: 10px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
 .tab-internal-master-header.locked { background: #f1f5f9; }
 .master-lock-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .master-lock-group label { font-size: 11px; font-weight: bold; color: #64748b; }
@@ -519,7 +1023,11 @@ const submitToFrappe = async () => {
 .pos-cart-table th, .pos-cart-table td { border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; }
 .pos-cart-table th { background: #f8fafc; font-weight: bold; }
 .sub-th th { font-size: 11px; padding: 3px; background: #f1f5f9; }
-.empty-cart-msg { padding: 40px 0; color: #94a3b8; font-style: italic; }
+.empty-cart-msg { text-align: center !important; padding: 30px !important; color: #94a3b8; font-style: italic; }
+
+.delete-cell { text-align: center; }
+.btn-delete-row { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; }
+.btn-delete-row:hover { background: #fee2e2; }
 
 .input-green { background-color: #00e676 !important; width: 52px; padding: 2px; }
 .input-green input { width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; }
@@ -541,6 +1049,23 @@ const submitToFrappe = async () => {
 .modal-content { background: white; width: 85%; max-width: 850px; padding: 25px; border-radius: 6px; }
 .grid-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
 .grid-table th, .grid-table td { border: 1px solid #aaa; padding: 8px; text-align: center; }
+.stock-info-cell { font-weight: bold; color: #0f766e; font-size: 13px; background-color: #f0fdfa; }
 .submit-btn { background: white; border: 1px solid #333; padding: 6px 20px; font-weight: bold; cursor: pointer; }
 .close-text-btn { float: right; background: none; border: none; color: #888; cursor: pointer; margin-top: 10px; font-size: 12px; }
+
+/* 🌟 고정 슬롯 및 모달 CSS 추가 */
+.slot-edit-modal { max-width: 500px; padding: 24px; }
+.slot-item-list { max-height: 350px; overflow-y: auto; margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 6px; }
+.slot-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+.slot-list-item:hover { background: #f8fafc; }
+.item-desc strong { color: #1e293b; font-size: 14px; }
+.item-desc { color: #64748b; font-size: 13px; }
+.item-stock { font-size: 13px; color: #00a896; font-weight: bold; background: #ecfdf5; padding: 4px 8px; border-radius: 4px; }
+.btn-clear-slot { margin-top: 15px; width: 100%; padding: 12px; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; border-radius: 6px; font-weight: bold; cursor: pointer; }
+.btn-clear-slot:hover { background: #fecaca; }
+.line-3.stock-info { font-size: 10.5px; color: #0f766e; margin-top: 5px; font-weight: bold; background: #ccfbf1; padding: 2px 6px; border-radius: 4px; display: inline-block;}
+.empty-slot { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; }
+.empty-icon { font-size: 20px; display: block; margin-bottom: 4px; color: #94a3b8; }
+.empty-slot .line-2 { color: #94a3b8; font-weight: bold; }
+.empty-slot:hover { background: #f1f5f9; border-color: #94a3b8; }
 </style>
