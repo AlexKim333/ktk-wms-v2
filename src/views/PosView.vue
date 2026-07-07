@@ -53,8 +53,35 @@
       <div v-else class="workspace-body">
         
         <div class="workspace-left">
-          <div class="search-section">
-            <input type="text" v-model="searchQuery" placeholder="Buscar... (상품 코드 또는 이름 검색)" class="search-bar" />
+          <div class="search-section dual-search">
+            <!-- 동적 검색 (자동완성) -->
+            <div class="search-box-wrapper">
+              <span class="search-icon">🔍</span>
+              <input type="text" v-model="searchQuery" @focus="isSearchDropdownOpen = true" @blur="isSearchDropdownOpen = false" placeholder="상품명 또는 속성 검색..." class="search-bar" />
+              <ul v-if="isSearchDropdownOpen && filteredMainSearchItems.length > 0" class="search-dropdown">
+                <li v-for="item in filteredMainSearchItems" :key="item.name" 
+                    :class="{ 
+                      'bg-light-green': gridPickSlotNames.includes(item.custom_grid_group_id || item.item_name || '미분류'),
+                      'bg-light-red': quickPickSlotNames.includes(item.name) 
+                    }"
+                    @mousedown.prevent="selectSearchItem(item)">
+                  <div style="display:flex; justify-content:space-between; width: 100%; align-items: center;">
+                    <div>
+                      <span class="item-name">{{ item.item_name }}</span> 
+                      <span class="item-color">({{ item.custom_color || '기본' }})</span>
+                      <span class="item-pack-qty"> · {{ item.custom_pack_qty || 1 }}入</span>
+                    </div>
+                    <div class="search-item-stock">{{ getFormattedStockFor(item) }}</div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            
+            <!-- 바코드 스캐너 입력 -->
+            <div class="barcode-box-wrapper">
+              <span class="search-icon">🏷️</span>
+              <input type="text" v-model="barcodeQuery" @keyup.enter="handleBarcodeScan" placeholder="바코드 스캔..." class="search-bar barcode-bar" />
+            </div>
           </div>
 
           <div class="hotkey-block">
@@ -101,6 +128,27 @@
               </div>
             </div>
           </div>
+          <div class="hotkey-block">
+            <div class="block-header"><h3>🤝 Customer Quick Pick (주요 고객)</h3></div>
+            <div class="grid-3x4">
+              <div v-for="(slot, idx) in 8" :key="'c-slot-'+idx" class="hotkey-card">
+                <template v-if="customerPickSlots[idx]">
+                  <button class="hotkey-btn-core" @click="selectCustomer(customerPickSlots[idx])" style="background-color: #f8fafc;">
+                    <div class="line-1">{{ customerPickSlots[idx].customer_name }}</div>
+                    <div class="line-2 text-teal">{{ customerPickSlots[idx].name }}</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openCustomerSlotEdit(idx)">⚙️ edit</button>
+                </template>
+                <template v-else>
+                  <button class="hotkey-btn-core empty-slot" @click="openCustomerSlotEdit(idx)">
+                    <span class="empty-icon">➕</span>
+                    <div class="line-2">고객 지정</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openCustomerSlotEdit(idx)">⚙️ edit</button>
+                </template>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="workspace-right" :class="{ 'inbound-mode': transactionMode === 'inbound' }">
@@ -134,25 +182,33 @@
                   </select>
                 </div>
                 <div class="master-lock-group">
-                  <label>🎯 타겟 (도착):</label>
-                  <select v-model="currentTab.selectedTarget" :disabled="!canEditMasterFields" class="master-select">
-                    <option value="">선택</option>
-                    <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
-                  </select>
-                </div>
-                <div class="master-lock-group">
                   <label>🏢 담당 지점:</label>
-                  <input type="text" v-model="currentTab.selectedBranch" :disabled="!canEditMasterFields" class="master-input"/>
+                  <select v-model="currentTab.selectedBranch" :disabled="!canEditMasterFields" class="master-select">
+                    <option value="">지점 선택</option>
+                    <option v-for="branch in branchList" :key="branch.name" :value="branch.name">{{ branch.warehouse_name }}</option>
+                  </select>
                 </div>
               </div>
               <div class="master-input-row" style="margin-top: 10px;">
+                <div class="master-lock-group" style="position: relative;">
+                  <label>🤝 고객 (Customer):</label>
+                  <input type="text" v-model="currentTab.selectedCustomer" @focus="isCustomerDropdownOpen = true" @blur="closeCustomerDropdown" :disabled="!canEditMasterFields" class="master-input" placeholder="고객 검색 또는 핫키 선택" autocomplete="off" />
+                  <ul v-if="isCustomerDropdownOpen && filteredCustomerSearchItems.length > 0" class="search-dropdown" style="top: 100%; max-height: 200px;">
+                    <li v-for="cust in filteredCustomerSearchItems" :key="cust.name" @mousedown.prevent="selectCustomerFromDropdown(cust.name)">
+                      <span class="item-name">{{ cust.customer_name || cust.name }}</span> <span class="item-color">({{ cust.name }})</span>
+                    </li>
+                  </ul>
+                </div>
                 <div class="master-lock-group">
                   <label>👤 작성자:</label>
                   <input type="text" v-model="currentTab.selectedCreator" :disabled="!canEditMasterFields" class="master-input"/>
                 </div>
                 <div class="master-lock-group">
-                  <label>🗣️ 응대자:</label>
-                  <input type="text" v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-input"/>
+                  <label>🗣️ 응대자 (영업사원):</label>
+                  <select v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-select">
+                    <option value="">응대자 선택</option>
+                    <option v-for="sp in filteredSalesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -214,14 +270,14 @@
         </div>
         <table class="grid-table">
           <thead>
-            <tr><th>컬러</th><th colspan="2">수량 입력</th><th>선택 총 수량</th><th>현재 재고</th></tr>
+            <tr><th>컬러 (포장수량)</th><th colspan="2">수량 입력</th><th>선택 총 수량</th><th>현재 재고</th></tr>
           </thead>
           <tbody>
             <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
-              <td class="color-name">{{ v.custom_color }}</td>
+              <td class="color-name">{{ v.custom_color || '기본' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}入)</span></td>
               <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
               <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
-              <td class="calc-total-qty">{{ ((v.input_box || 0) * activeGroup.pack_qty) + (v.input_each || 0) }}개</td>
+              <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}개</td>
               <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
             </tr>
           </tbody>
@@ -240,7 +296,13 @@
           <input type="text" v-model="slotSearchQuery" placeholder="검색 (이름, 색상, 코드)" class="search-bar" />
         </div>
         <div class="slot-item-list">
-          <div v-for="item in filteredSlotItems" :key="item.name" class="slot-list-item" @click="assignSlotItem(item)">
+          <div v-for="item in filteredSlotItems" :key="item.name" 
+               class="slot-list-item" 
+               :class="{ 
+                 'bg-light-green': gridPickSlotNames.includes(item.custom_grid_group_id || item.item_name || '미분류'),
+                 'bg-light-red': quickPickSlotNames.includes(item.name) 
+               }"
+               @click="assignSlotItem(item)">
             <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || '기본' }})</div>
             <div class="item-stock">{{ getFormattedStockFor(item) }}</div>
           </div>
@@ -261,7 +323,10 @@
           <input type="text" v-model="gridSlotSearchQuery" placeholder="검색 (품명)" class="search-bar" />
         </div>
         <div class="slot-item-list">
-          <div v-for="group in filteredGridSlotItems" :key="group.id" class="slot-list-item" @click="assignGridSlotItem(group)">
+          <div v-for="group in filteredGridSlotItems" :key="group.id" 
+               class="slot-list-item" 
+               :class="{ 'bg-light-green': gridPickSlotNames.includes(group.id) }"
+               @click="assignGridSlotItem(group)">
             <div class="item-desc"><strong>{{ group.group_name }}</strong> ({{ group.variants.length }} color)</div>
           </div>
           <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색 결과가 없습니다.</div>
@@ -314,6 +379,25 @@
         </div>
       </div>
     </div>
+    <!-- 🌟 고객 지정 모달 -->
+    <div class="modal-overlay" v-if="isCustomerSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">단축키 고객 지정 (슬롯 {{ editCustomerSlotIndex + 1 }})</h3>
+          <button class="close-text-btn" @click="isCustomerSlotEditModalOpen = false" style="margin:0;">닫기</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px;">
+          <input type="text" v-model="customerSlotSearchQuery" placeholder="고객 검색 (이름, 코드)" class="search-bar" />
+        </div>
+        <div class="slot-item-list">
+          <div v-for="cust in filteredCustomerSlotItems" :key="cust.name" class="slot-list-item" @click="assignCustomerToSlot(cust)">
+            <div class="item-desc"><strong>{{ cust.customer_name || cust.name }}</strong> ({{ cust.name }})</div>
+          </div>
+          <div v-if="filteredCustomerSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색 결과가 없습니다.</div>
+        </div>
+        <button class="btn-clear-slot" @click="clearCustomerSlot">선택 해제 (비우기)</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -321,66 +405,91 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
-import axios from 'axios' // 🌟 Frappe 통신을 위한 Axios 엔진
+import axios from 'axios'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
 import NodeManagement from '../components/NodeManagement.vue'
-import ProductListView from './ProductListView.vue' // 신규 리스트 뷰
-import StockReconciliationMain from './StockReconciliationMain.vue' // 신규 재고조정 메인 뷰
+import ProductListView from './ProductListView.vue'
+import StockReconciliationMain from './StockReconciliationMain.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-// 프라페 통신 인스턴스 (vite.config.js 프록시 활용)
 const frappeApi = axios.create({
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
-  withCredentials: true // 프라페 세션 쿠키 탑재 필수
+  withCredentials: true
 })
 
-/** admin 권한 등 마스터 제어 */
-const canEditMasterFields = computed(() => true) // 권한 연결은 추후 Auth 스토어 정밀화 후 설정
+const canEditMasterFields = computed(() => true)
 
 const handleLogout = () => {
   authStore.logout()
   router.push('/login')
 }
 
-// 상태 변수들
 const searchQuery = ref('')
 const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
 const activeNav = ref('outbound')
 const transactionMode = ref('outbound')
-const isProductMenuOpen = ref(false) // 🌟 상품관리 서브메뉴 상태
+const isProductMenuOpen = ref(false)
 
-// 🌟 Frappe에서 가져올 실시간 데이터 그릇
+const barcodeQuery = ref('')
+const isSearchDropdownOpen = ref(false)
+
 const rawSingleItems = ref([])
 const gridHotkeys = ref([])
 const warehouseList = ref([])
-const binData = ref([]) // 실시간 재고 저장소
+const binData = ref([])
+const customerList = ref([])
+const salesPersonList = ref([])
 
-// 🌟 퀵 재고조정(Quick Stock Adjustment) 상태
+const branchList = computed(() => {
+  // 프라페 트리에 등록된 하위 지점 목록 (SCURUSAL - K 하위)
+  return warehouseList.value.filter(wh => wh.parent_warehouse === 'SCURUSAL - K')
+})
+
+const filteredSalesPersonList = computed(() => {
+  if (!currentTab.value?.selectedBranch) return salesPersonList.value;
+  return salesPersonList.value.filter(sp => sp.custom_branch === currentTab.value.selectedBranch)
+})
+
 const isQuickAdjustModalOpen = ref(false)
 const quickAdjustItem = ref(null)
 const quickAdjustForm = ref({ input_box: 0, input_each: 0, valuation_rate: 0 })
 const isAdjusting = ref(false)
 const pendingCartAction = ref(null)
 
-// 로컬스토리지 키를 사용자별로 고유하게 생성
 const userKey = authStore.user?.name || authStore.user?.email || 'default_user'
 const singleStorageKey = `wms_quick_pick_slots_${userKey}`
 const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
+const customerStorageKey = `wms_customer_quick_pick_slots_${userKey}`
 
-// 고정 슬롯 8개 데이터 로드
 const quickPickSlotNames = ref(JSON.parse(localStorage.getItem(singleStorageKey)) || new Array(8).fill(null))
+const gridPickSlotNames = ref(JSON.parse(localStorage.getItem(gridStorageKey)) || new Array(8).fill(null))
+const customerPickSlotNames = ref(JSON.parse(localStorage.getItem(customerStorageKey)) || new Array(8).fill(null))
 
 const quickPickSlots = computed(() => {
   return quickPickSlotNames.value.map(name => {
     if (!name) return null;
     return rawSingleItems.value.find(i => i.name === name) || null;
+  })
+})
+
+const gridPickSlots = computed(() => {
+  return gridPickSlotNames.value.map(id => {
+    if (!id) return null;
+    return gridHotkeys.value.find(g => g.id === id) || null;
+  })
+})
+
+const customerPickSlots = computed(() => {
+  return customerPickSlotNames.value.map(name => {
+    if (!name) return null;
+    return customerList.value.find(c => c.name === name) || null;
   })
 })
 
@@ -392,7 +501,6 @@ const getFormattedStockFor = (item) => {
   let total = 0;
   binData.value.forEach(bin => {
     if (bin.item_code === item.name) {
-      // 선택된 창고가 없으면 전체 합산, 있으면 해당 창고 재고만 합산
       if (!warehouse || bin.warehouse === warehouse) {
         total += (Number(bin.actual_qty) || 0);
       }
@@ -406,16 +514,43 @@ const getFormattedStockFor = (item) => {
   return `📦 ${boxes}박스 / 낱개 ${eaches}개`;
 }
 
-// 모달 관련 상태
 const isSlotEditModalOpen = ref(false)
 const editSlotIndex = ref(-1)
 const slotSearchQuery = ref('')
 
-const filteredSlotItems = computed(() => {
-  // 이미 다른 슬롯에 지정된 상품은 목록에서 제외 (중복 지정 방지)
-  const currentAssigned = new Set(quickPickSlotNames.value.filter(n => n !== null))
-  const baseItems = rawSingleItems.value.filter(item => !currentAssigned.has(item.name))
+const filteredMainSearchItems = computed(() => {
+  if (!searchQuery.value) return []
+  const q = searchQuery.value.toLowerCase()
+  return rawSingleItems.value.filter(item => 
+    (item.item_name && item.item_name.toLowerCase().includes(q)) ||
+    (item.custom_color && item.custom_color.toLowerCase().includes(q)) ||
+    (item.name && item.name.toLowerCase().includes(q))
+  ).slice(0, 50)
+})
 
+const selectSearchItem = (item) => {
+  addSingleHotkeyToCart(item)
+  searchQuery.value = ''
+  isSearchDropdownOpen.value = false
+}
+
+const handleBarcodeScan = () => {
+  const code = barcodeQuery.value.trim()
+  if (!code) return
+  const item = rawSingleItems.value.find(i => 
+    i.name.toLowerCase() === code.toLowerCase() || 
+    (i.custom_name_number && i.custom_name_number.toLowerCase() === code.toLowerCase())
+  )
+  if (item) {
+    addSingleHotkeyToCart(item)
+  } else {
+    alert(`바코드 [${code}] 에 해당하는 상품을 찾을 수 없습니다.`)
+  }
+  barcodeQuery.value = ''
+}
+
+const filteredSlotItems = computed(() => {
+  const baseItems = rawSingleItems.value
   if (!slotSearchQuery.value) return baseItems
   const q = slotSearchQuery.value.toLowerCase()
   return baseItems.filter(item => 
@@ -447,25 +582,12 @@ const clearSlot = () => {
   isSlotEditModalOpen.value = false
 }
 
-// 🌟 그리드 모달 관련 상태
 const isGridSlotEditModalOpen = ref(false)
 const editGridSlotIndex = ref(-1)
 const gridSlotSearchQuery = ref('')
 
-const gridPickSlotNames = ref(JSON.parse(localStorage.getItem(gridStorageKey)) || new Array(8).fill(null))
-
-const gridPickSlots = computed(() => {
-  return gridPickSlotNames.value.map(id => {
-    if (!id) return null;
-    return gridHotkeys.value.find(g => g.id === id) || null;
-  })
-})
-
 const filteredGridSlotItems = computed(() => {
-  // 이미 다른 슬롯에 지정된 그리드 묶음은 목록에서 제외
-  const currentAssigned = new Set(gridPickSlotNames.value.filter(id => id !== null))
-  const baseItems = gridHotkeys.value.filter(group => !currentAssigned.has(group.id))
-
+  const baseItems = gridHotkeys.value
   if (!gridSlotSearchQuery.value) return baseItems
   const q = gridSlotSearchQuery.value.toLowerCase()
   return baseItems.filter(group => 
@@ -496,13 +618,86 @@ const clearGridSlot = () => {
   isGridSlotEditModalOpen.value = false
 }
 
+// 고객 핫키 모달 관련
+const isCustomerSlotEditModalOpen = ref(false)
+const editCustomerSlotIndex = ref(-1)
+const customerSlotSearchQuery = ref('')
+
+const filteredCustomerSlotItems = computed(() => {
+  const currentAssigned = new Set(customerPickSlotNames.value.filter(n => n !== null))
+  const q = customerSlotSearchQuery.value.toLowerCase()
+  return customerList.value.filter(cust => {
+    if (currentAssigned.has(cust.name)) return false
+    return (cust.name && cust.name.toLowerCase().includes(q)) ||
+           (cust.customer_name && cust.customer_name.toLowerCase().includes(q))
+  }).slice(0, 50)
+})
+
+const openCustomerSlotEdit = (idx) => {
+  editCustomerSlotIndex.value = idx
+  customerSlotSearchQuery.value = ''
+  isCustomerSlotEditModalOpen.value = true
+}
+
+const assignCustomerToSlot = (cust) => {
+  const newArr = [...customerPickSlotNames.value]
+  newArr[editCustomerSlotIndex.value] = cust.name
+  customerPickSlotNames.value = newArr
+  localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
+  isCustomerSlotEditModalOpen.value = false
+}
+
+const clearCustomerSlot = () => {
+  const newArr = [...customerPickSlotNames.value]
+  newArr[editCustomerSlotIndex.value] = null
+  customerPickSlotNames.value = newArr
+  localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
+  isCustomerSlotEditModalOpen.value = false
+}
+
+const selectCustomer = (cust) => {
+  if (currentTab.value) {
+    currentTab.value.selectedCustomer = cust.name
+  }
+}
+
+// 고객 마스터 입력칸 자동완성 로직
+const isCustomerDropdownOpen = ref(false)
+
+const filteredCustomerSearchItems = computed(() => {
+  if (!currentTab.value) return []
+  const q = (currentTab.value.selectedCustomer || '').toLowerCase()
+  if (!q) return customerList.value.slice(0, 50)
+  
+  return customerList.value.filter(cust => 
+    (cust.name && cust.name.toLowerCase().includes(q)) ||
+    (cust.customer_name && cust.customer_name.toLowerCase().includes(q))
+  ).slice(0, 50)
+})
+
+const selectCustomerFromDropdown = (custName) => {
+  if (currentTab.value) {
+    currentTab.value.selectedCustomer = custName
+  }
+  isCustomerDropdownOpen.value = false
+}
+
+const closeCustomerDropdown = () => {
+  setTimeout(() => {
+    isCustomerDropdownOpen.value = false
+  }, 150)
+}
+
 // Frappe API 호출 로직 (컴포넌트 로드 시 자동 실행)
 const fetchFrappeItems = async () => {
   try {
-    // 1. 다중 API 병렬 호출 (창고, 품목, 재고)
-    const [whRes, itemRes, binRes] = await Promise.all([
+    // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원)
+    const [whRes, itemRes, binRes, custRes, spRes] = await Promise.all([
       frappeApi.get('/api/resource/Warehouse', {
-        params: { fields: JSON.stringify(['name', 'warehouse_name']) }
+        params: { 
+          fields: JSON.stringify(['name', 'warehouse_name', 'parent_warehouse']),
+          filters: JSON.stringify([['disabled', '=', 0]])
+        }
       }),
       frappeApi.get('/api/resource/Item', {
         params: {
@@ -520,11 +715,27 @@ const fetchFrappeItems = async () => {
           fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
           limit_page_length: 0 // 전체 재고 로드
         }
+      }),
+      frappeApi.get('/api/resource/Customer', {
+        params: {
+          fields: JSON.stringify(['name', 'customer_name']),
+          filters: JSON.stringify([['disabled', '=', 0]]),
+          limit_page_length: 500
+        }
+      }),
+      frappeApi.get('/api/resource/Sales Person', {
+        params: {
+          fields: JSON.stringify(['name', 'sales_person_name', 'enabled', 'custom_branch']),
+          filters: JSON.stringify([['enabled', '=', 1]]),
+          limit_page_length: 500
+        }
       })
     ]);
 
     warehouseList.value = whRes.data.data
     binData.value = binRes.data.data || []
+    customerList.value = custRes.data.data || []
+    salesPersonList.value = spRes.data.data || []
     
     // 3. 단일 품목(Single)과 묶음 품목(Grid) 자동 분류 로직
     const fetchedItems = itemRes.data.data;
@@ -563,9 +774,11 @@ const fetchFrappeItems = async () => {
       // 명시적으로 그리드라고 체크되어 있거나, 혹은 같은 품목명의 컬러 변형이 2개 이상이면 그리드로 자동 분류
       if (group.is_explicit_grid || group.variants.length > 1) {
         newGrids.push(group);
-      } else {
-        newSingles.push(group.variants[0]);
-      }
+      } 
+      // 🌟 단일 핫키 지정이나 바코드 스캔, 메인 검색에서 모든 개별 품목이 잡히도록 전부 넣어줍니다!
+      group.variants.forEach(v => {
+        newSingles.push(v);
+      });
     });
 
     rawSingleItems.value = newSingles;
@@ -614,6 +827,7 @@ const tabList = ref([
     title: '주문서 1',
     selectedSource: '',
     selectedTarget: '',
+    selectedCustomer: '',
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
@@ -645,6 +859,7 @@ const addNewTab = () => {
     title: `주문서 ${nextNum}`,
     selectedSource: currentTab.value?.selectedSource || '',
     selectedTarget: currentTab.value?.selectedTarget || '',
+    selectedCustomer: currentTab.value?.selectedCustomer || '',
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
@@ -839,7 +1054,7 @@ const submitGridSelection = () => {
         name: v.name,
         item_name: activeGroup.value.group_name,
         custom_color: v.custom_color,
-        custom_pack_qty: activeGroup.value.pack_qty,
+        custom_pack_qty: v.custom_pack_qty || 1,
         input_box: v.input_box || 0,
         input_each: v.input_each || 0
       })
@@ -865,13 +1080,37 @@ const submitToFrappe = async () => {
   }
 
   try {
+    // 유연한 물동량 처리 로직 (회계 이슈 우회)
+    let entryType = 'Material Issue';
+    let fromWh = undefined;
+    let toWh = undefined;
+
+    if (transactionMode.value === 'inbound') {
+      if (currentTab.value.selectedSource) {
+        // 출발지가 있으면 완벽한 재고 이동 (Material Transfer - 회계 꼬임 없음)
+        entryType = 'Material Transfer';
+        fromWh = currentTab.value.selectedSource;
+        toWh = currentTab.value.selectedBranch;
+      } else {
+        // 출발지가 없으면 단순 입고 (Material Receipt - 임시 계정 사용)
+        entryType = 'Material Receipt';
+        fromWh = undefined;
+        toWh = currentTab.value.selectedBranch;
+      }
+    } else {
+      // 출고 (Material Issue)
+      entryType = 'Material Issue';
+      fromWh = currentTab.value.selectedSource || currentTab.value.selectedBranch; // 소스가 명시 안되면 담당지점에서 뺌
+      toWh = undefined;
+    }
+
     // Frappe Stock Entry 규격에 맞게 페이로드 조립
     const stockEntryPayload = {
       docstatus: 0, // 0: Draft, 1: Submit
-      stock_entry_type: transactionMode.value === 'inbound' ? 'Material Receipt' : 'Material Issue',
+      stock_entry_type: entryType,
       // ✨ 명시적으로 Source와 Target 매핑
-      from_warehouse: currentTab.value.selectedSource || undefined,
-      to_warehouse: currentTab.value.selectedTarget || undefined,
+      from_warehouse: fromWh,
+      to_warehouse: toWh,
       
       // ✨ 스크린샷에 명시된 2가지 핵심 커스텀 뼈대 매핑
       custom_ordering_branch: currentTab.value.selectedBranch || undefined,
@@ -882,8 +1121,8 @@ const submitToFrappe = async () => {
         return {
           item_code: item.name,
           qty: totalQty,
-          s_warehouse: currentTab.value.selectedSource || undefined,
-          t_warehouse: currentTab.value.selectedTarget || undefined,
+          s_warehouse: fromWh,
+          t_warehouse: toWh,
         }
       })
     }
@@ -920,6 +1159,27 @@ const submitToFrappe = async () => {
   background: #f4f6f9;
   box-sizing: border-box;
 }
+
+.workspace-left { flex: 1.2; display: flex; flex-direction: column; overflow-y: auto; padding-right: 10px; }
+.workspace-right { flex: 1.8; display: flex; flex-direction: column; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 2px solid #3b82f6; overflow: hidden; }
+
+.search-section { margin-bottom: 20px; }
+.search-bar { width: 100%; padding: 12px 15px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; box-sizing: border-box; }
+
+.dual-search { display: flex; gap: 10px; }
+.search-box-wrapper, .barcode-box-wrapper { position: relative; flex: 1; display: flex; align-items: center; }
+.search-icon { position: absolute; left: 12px; font-size: 16px; color: #94a3b8; pointer-events: none; }
+.search-box-wrapper .search-bar, .barcode-box-wrapper .search-bar { padding-left: 36px; }
+.barcode-bar { border-color: #3b82f6; background-color: #f0f9ff; }
+.barcode-bar:focus { outline: 2px solid #3b82f6; }
+
+.search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 100; list-style: none; padding: 0; }
+.search-dropdown li { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+.search-dropdown li:hover { background: #f8fafc; }
+.search-dropdown li .item-name { font-weight: bold; color: #1e293b; }
+.search-dropdown li .item-color { color: #64748b; font-size: 12px; }
+.search-dropdown li .item-pack-qty { color: #94a3b8; font-size: 12px; font-weight: bold; margin-left: 4px; }
+.search-item-stock { color: #0f766e; font-size: 12px; font-weight: bold; background: #f0fdfa; padding: 2px 6px; border-radius: 4px; }
 
 .master-input-row { display: flex; gap: 15px; }
 .master-select, .master-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; min-width: 150px; background: white; }
@@ -1068,4 +1328,12 @@ const submitToFrappe = async () => {
 .empty-icon { font-size: 20px; display: block; margin-bottom: 4px; color: #94a3b8; }
 .empty-slot .line-2 { color: #94a3b8; font-weight: bold; }
 .empty-slot:hover { background: #f1f5f9; border-color: #94a3b8; }
+/* 컬러 유틸 클래스 */
+.bg-light-red {
+  background-color: #ffe4e6 !important;
+}
+.bg-light-green {
+  background-color: #dcfce7 !important;
+}
+
 </style>

@@ -159,7 +159,7 @@ const loadDependencies = async (selectBrandName = null) => {
   try {
     const [bRes, wRes] = await Promise.all([
       frappeApi.get('/api/resource/Brand?fields=["name","brand"]&limit_page_length=0'),
-      frappeApi.get('/api/resource/Warehouse?filters=[["is_group","=",0],["company","=","kecon"]]&fields=["name","warehouse_name"]&limit_page_length=0')
+      frappeApi.get('/api/resource/Warehouse?filters=[["is_group","=",0],["company","=","kecon"],["disabled","=",0]]&fields=["name","warehouse_name"]&limit_page_length=0')
     ])
     brands.value = bRes.data.data || []
     warehouses.value = wRes.data.data || []

@@ -193,7 +193,11 @@ const fetchInitialData = async () => {
   try {
     // 1. Fetch Warehouses
     const whRes = await frappeApi.get('/api/resource/Warehouse', {
-      params: { fields: JSON.stringify(['name', 'warehouse_name']) }
+      params: { 
+        fields: JSON.stringify(['name', 'warehouse_name']),
+        filters: JSON.stringify([['disabled', '=', 0]]),
+        limit_page_length: 0
+      }
     })
     warehouseList.value = whRes.data.data
 

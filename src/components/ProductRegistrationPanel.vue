@@ -207,7 +207,7 @@ const loadData = async (selectBrandName = null) => {
   try {
     const [bRes, wRes, iRes] = await Promise.all([
       frappeApi.get('/api/resource/Brand?fields=["name","brand"]&limit_page_length=0'),
-      frappeApi.get('/api/resource/Warehouse?filters=[["is_group","=",0],["company","=","kecon"]]&fields=["name","warehouse_name"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Warehouse?filters=[["is_group","=",0],["company","=","kecon"],["disabled","=",0]]&fields=["name","warehouse_name"]&limit_page_length=0'),
       frappeApi.get('/api/resource/Item?fields=["name","item_code","item_name","custom_color","custom_pack_qty","custom_is_grid_item"]&order_by=creation desc&limit_page_length=50')
     ])
     brands.value = bRes.data?.data ?? []

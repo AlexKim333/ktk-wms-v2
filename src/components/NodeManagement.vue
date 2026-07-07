@@ -115,6 +115,7 @@
           class="filter-input" 
         />
         <button class="btn-refresh" @click="fetchNodeList">🔄 Refresh</button>
+        <button class="btn-save-status" @click="saveNodeStatus" :disabled="isSaving">💾 Update Status</button>
         <button class="btn-new-node-action" @click="currentView = 'register'">➕ New Node</button>
       </div>
 
@@ -122,13 +123,17 @@
         <table class="data-table">
           <thead>
             <tr>
+              <th class="text-center" style="width: 60px;">Active</th>
               <th>Type</th>
               <th>Name</th>
               <th class="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="node in filteredNodes" :key="node.id">
+            <tr v-for="node in filteredNodes" :key="node.id" :class="{'disabled-row': node.disabled === 1}">
+              <td class="text-center">
+                <input type="checkbox" class="status-checkbox" :checked="node.disabled === 0" @change="node.disabled = $event.target.checked ? 0 : 1" />
+              </td>
               <td>
                 <span :class="['type-badge', node.type.toLowerCase()]">{{ node.type }}</span>
               </td>
@@ -243,15 +248,15 @@ const addEditAddress = () => editForm.value.addresses.push({ id: Date.now(), val
 const fetchNodeList = async () => {
   try {
     const [warehouseRes, customerRes, supplierRes] = await Promise.all([
-      frappeApi.get('/api/resource/Warehouse?fields=["name","warehouse_name"]&limit_page_length=0'),
-      frappeApi.get('/api/resource/Customer?fields=["name","customer_name"]&limit_page_length=0'),
-      frappeApi.get('/api/resource/Supplier?fields=["name","supplier_name"]&limit_page_length=0')
+      frappeApi.get('/api/resource/Warehouse?fields=["name","warehouse_name","disabled"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Customer?fields=["name","customer_name","disabled"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Supplier?fields=["name","supplier_name","disabled"]&limit_page_length=0')
     ])
 
     const combinedList = []
-    if (warehouseRes.data?.data) warehouseRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Warehouse', name: item.warehouse_name || item.name }))
-    if (customerRes.data?.data) customerRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Customer', name: item.customer_name || item.name }))
-    if (supplierRes.data?.data) supplierRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Supplier', name: item.supplier_name || item.name }))
+    if (warehouseRes.data?.data) warehouseRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Warehouse', name: item.warehouse_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
+    if (customerRes.data?.data) customerRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Customer', name: item.customer_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
+    if (supplierRes.data?.data) supplierRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Supplier', name: item.supplier_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
     
     nodeList.value = combinedList
   } catch (error) {
@@ -267,7 +272,7 @@ const matrixMatches = computed(() => {
   const disassembledQ = disassembleHangul(rawQ)
   const grouped = {}
   
-  nodeList.value.forEach(n => {
+  nodeList.value.filter(n => n.disabled !== 1).forEach(n => {
     const cleanName = n.name.replace(/^\[.*?\]\s*/, '').trim()
     if (disassembleHangul(cleanName.toLowerCase()).includes(disassembledQ)) {
       if (!grouped[cleanName]) grouped[cleanName] = { id: n.id, name: cleanName, types: [] }
@@ -289,7 +294,31 @@ const filteredNodes = computed(() => {
   return result
 })
 
-// 🚀 Save New Node
+// 🚀 Save Node Status (Active/Inactive)
+const saveNodeStatus = async () => {
+  const changedNodes = nodeList.value.filter(n => n.disabled !== n.originalDisabled);
+  if (changedNodes.length === 0) {
+    alert('No status changes detected.');
+    return;
+  }
+  
+  isSaving.value = true;
+  try {
+    const updatePromises = changedNodes.map(node => {
+      return frappeApi.put(`/api/resource/${node.type}/${node.id}`, { disabled: node.disabled });
+    });
+    
+    await Promise.all(updatePromises);
+    alert(`✅ Successfully updated ${changedNodes.length} node statuses!`);
+    await fetchNodeList();
+  } catch (error) {
+    console.error('Failed to update node statuses:', error);
+    alert('❌ Failed to update statuses. Please try again.');
+  } finally {
+    isSaving.value = false;
+  }
+}
+
 // 🚀 Save New Node
 const saveNode = async () => {
   isSaving.value = true
@@ -505,6 +534,9 @@ const deleteNode = (node) => alert(`Delete action triggered for ${node.name}`)
 .filter-select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-weight: bold;}
 .filter-input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
 .btn-refresh { background: #334155; color: white; padding: 0 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;}
+.btn-save-status { background: #f59e0b; color: white; padding: 0 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: auto; transition: background 0.2s; }
+.btn-save-status:hover:not(:disabled) { background: #d97706; }
+.btn-save-status:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-new-node-action { background: #00a896; color: white; padding: 0 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 5px; transition: background 0.2s; }
 .btn-new-node-action:hover { background: #008f7f; }
 .node-list-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -512,7 +544,10 @@ const deleteNode = (node) => alert(`Delete action triggered for ${node.name}`)
 .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
 .data-table th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; text-align: left; position: sticky; top: 0; z-index: 10; }
 .data-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-.type-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase;}
+.disabled-row { background-color: #f1f5f9; opacity: 0.6; }
+.disabled-row td.fw-bold { text-decoration: line-through; color: #94a3b8; }
+.status-checkbox { width: 18px; height: 18px; cursor: pointer; }
+.type-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; text-decoration: none !important;}
 .type-badge.warehouse { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
 .type-badge.customer { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;}
 .type-badge.supplier { background: #fef08a; color: #a16207; border: 1px solid #fde047;}
