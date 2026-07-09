@@ -16,6 +16,10 @@
             <input type="text" v-model="form.color" placeholder="예: BLACK (비워두면 기본 상품)" />
           </div>
           <div class="form-group">
+            <label>브랜드 (Brand)</label>
+            <input type="text" v-model="form.brand" placeholder="예: KTK (선택 사항)" />
+          </div>
+          <div class="form-group">
             <label>포장 수량 (Pack Qty) <span class="required">*</span></label>
             <input type="number" v-model.number="form.pack_qty" required min="1" placeholder="예: 400" />
           </div>
@@ -52,6 +56,7 @@ const frappeApi = axios.create({
 const form = ref({
   item_name: '',
   color: '',
+  brand: '',
   pack_qty: 1
 })
 const isSaving = ref(false)
@@ -59,7 +64,7 @@ const firstInput = ref(null)
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    form.value = { item_name: '', color: '', pack_qty: 1 }
+    form.value = { item_name: '', color: '', brand: '', pack_qty: 1 }
     nextTick(() => {
       firstInput.value?.focus()
     })
@@ -91,6 +96,7 @@ const submitForm = async () => {
     const response = await frappeApi.post('/api/resource/Item', {
       item_code: finalItemCode,
       item_name: itemName,
+      brand: form.value.brand ? form.value.brand.trim() : undefined,
       item_group: itemGroup,
       stock_uom: 'Nos',
       is_stock_item: 1,

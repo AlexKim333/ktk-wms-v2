@@ -69,9 +69,8 @@ const submitForm = async () => {
   try {
     const response = await frappeApi.post('/api/resource/Customer', {
       customer_name: customerName,
-      customer_group: 'All Customer Groups',
-      territory: 'All Territories',
-      customer_type: 'Individual'
+      customer_group: 'Commercial',
+      territory: 'All Territories'
     })
 
     const newCustomer = response.data.data
@@ -81,10 +80,20 @@ const submitForm = async () => {
   } catch (err) {
     console.error('고객 추가 에러:', err)
     if (err.response && err.response.data && err.response.data.exc) {
+      let errorReason = '알 수 없는 서버 오류';
+      try {
+        const excObj = JSON.parse(err.response.data.exc);
+        errorReason = excObj[0] || err.response.data.exc;
+      } catch (e) {
+        // If it's a string stack trace, try to extract the last line or just show the string
+        const lines = err.response.data.exc.split('\n');
+        errorReason = lines[lines.length - 2] || lines[0] || err.response.data.exc;
+      }
+      
       if (err.response.data.exc.includes('DuplicateEntryError')) {
         alert('이미 동일한 이름의 고객이 존재합니다.');
       } else {
-        alert('고객 등록 중 오류가 발생했습니다. (개발자 도구 참조)');
+        alert(`고객 등록 실패 사유:\n\n${errorReason}`);
       }
     } else {
       alert('고객 등록 중 오류가 발생했습니다.');

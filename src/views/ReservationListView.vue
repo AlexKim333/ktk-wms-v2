@@ -38,12 +38,15 @@
           <tr v-for="res in filteredReservations" :key="res.name" @click="openDetail(res)" class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.schedule_date }}</td>
-            <td class="customer-name">{{ res.customer || '-' }}</td>
-            <td>{{ res.custom_ordering_branch || res.set_warehouse || '-' }}</td>
+            <td class="customer-name">{{ res.custom_customer || res.customer || '-' }}</td>
+            <td>
+              <div>{{ res.custom_ordering_branch || res.set_warehouse || '-' }}</div>
+              <div style="font-size: 11px; color: #64748b;">{{ res.custom_orderer || '-' }}</div>
+            </td>
             <td>
               <span class="status-badge" :class="getStatusClass(res)">{{ res.status }}</span>
             </td>
-            <td>{{ getTotalQty(res) }} 개</td>
+            <td>{{ totalQtyMap[res.name] || 0 }} 개</td>
             <td>
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: getProgressPercent(res) + '%' }"></div>
@@ -51,7 +54,9 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button class="btn-delete" @click="cancelReservation(res.name)" title="예약 취소">🗑️</button>
+              <button class="btn-delete" @click="cancelReservation(res)" :title="res.status === 'Pending' ? '예약 취소' : '잔여 예약 종료'">
+                🗑️
+              </button>
             </td>
           </tr>
           <tr v-if="filteredReservations.length === 0">
@@ -76,7 +81,11 @@
             </div>
             <div class="detail-card">
               <label>고객명</label>
-              <div class="val">{{ selectedReservation.customer || '-' }}</div>
+              <div class="val">{{ selectedReservation.custom_customer || selectedReservation.customer || '-' }}</div>
+            </div>
+            <div class="detail-card">
+              <label>담당자</label>
+              <div class="val">{{ selectedReservation.custom_orderer || '-' }}</div>
             </div>
             <div class="detail-card">
               <label>날짜</label>
@@ -97,8 +106,8 @@
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="text-align: left; font-weight: bold;">{{ item.item_name || item.item_code }}</td>
                 <td>{{ item.qty }}</td>
-                <td style="color: #0ea5e9; font-weight: bold;">{{ item.issued_qty || 0 }}</td>
-                <td style="color: #ef4444; font-weight: bold;">{{ item.qty - (item.issued_qty || 0) }}</td>
+                <td style="color: #0ea5e9; font-weight: bold;">{{ Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
+                <td style="color: #ef4444; font-weight: bold;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
               </tr>
             </tbody>
           </table>
@@ -122,10 +131,14 @@ const props = defineProps({
   branchList: {
     type: Array,
     default: () => []
+  },
+  reservationType: {
+    type: String,
+    default: 'Material Issue'
   }
 })
 
-const emit = defineEmits(['create-new', 'edit-reservation'])
+const emit = defineEmits(['create-new', 'edit-reservation', 'refresh-items'])
 
 const frappeApi = axios.create({
   headers: {
@@ -141,19 +154,43 @@ const statusFilter = ref('incomplete')
 const branchFilter = ref('all')
 const selectedReservation = ref(null)
 const selectedReservationItems = ref([])
+const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Material Request', {
       params: {
-        fields: JSON.stringify(['name', 'status', 'schedule_date', 'customer', 'custom_ordering_branch', 'set_warehouse', 'per_ordered', 'per_received']),
-        filters: JSON.stringify([['docstatus', '=', 1]]),
+        fields: JSON.stringify(['name', 'status', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'per_ordered', 'per_received']),
+        filters: JSON.stringify([
+          ['docstatus', '=', 1],
+          ['material_request_type', '=', props.reservationType]
+        ]),
         limit_page_length: 100,
         order_by: 'creation desc'
       }
     })
     
     reservations.value = resWithProgress.data.data || []
+    
+    // 예약 총 수량 계산을 위해 각 예약 문서 상세 조회
+    if (reservations.value.length > 0) {
+      const detailPromises = reservations.value.map(r => 
+        frappeApi.get(`/api/resource/Material Request/${r.name}`)
+      )
+      const detailResArray = await Promise.all(detailPromises)
+      
+      const qtyMap = {}
+      detailResArray.forEach(res => {
+        const doc = res.data.data
+        if (doc && doc.items) {
+          const total = doc.items.reduce((sum, item) => sum + (item.qty || 0), 0)
+          qtyMap[doc.name] = total
+        }
+      })
+      totalQtyMap.value = qtyMap
+    } else {
+      totalQtyMap.value = {}
+    }
   } catch (error) {
     console.error('예약 목록 조회 에러:', error)
   }
@@ -182,7 +219,7 @@ const filteredReservations = computed(() => {
     // 3. Branch Filter
     let matchBranch = true
     if (branchFilter.value !== 'all') {
-      const resBranch = res.custom_ordering_branch || res.set_warehouse
+      const resBranch = res.set_warehouse
       matchBranch = resBranch === branchFilter.value
     }
     
@@ -203,13 +240,15 @@ const getProgressPercent = (res) => {
 }
 
 const getTotalQty = (res) => {
-  return '-'
+  return totalQtyMap.value[res.name] || 0
 }
 
 const openDetail = async (res) => {
-  selectedReservation.value = res
+  selectedReservation.value = { ...res }
   try {
     const detail = await frappeApi.get(`/api/resource/Material Request/${res.name}`)
+    // 전체 문서를 병합하여 모든 필드를 PosView로 넘겨줄 수 있게 함
+    selectedReservation.value = { ...selectedReservation.value, ...detail.data.data }
     selectedReservationItems.value = detail.data.data.items || []
   } catch (err) {
     console.error('상세 조회 에러:', err)
@@ -225,19 +264,35 @@ const loadToCart = () => {
   selectedReservation.value = null
 }
 
-const cancelReservation = async (name) => {
-  if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return
-  try {
-    // Frappe Cancel Method
-    await frappeApi.post(`/api/method/frappe.client.cancel`, {
-      doctype: 'Material Request',
-      name: name
-    })
-    alert('취소되었습니다.')
-    fetchReservations()
-  } catch (error) {
-    console.error('취소 에러:', error)
-    alert('취소 중 오류가 발생했습니다. 이미 일부 출고된 예약일 수 있습니다.')
+const cancelReservation = async (res) => {
+  if (res.status === 'Pending') {
+    if (!confirm(`${res.name} 예약을 취소하시겠습니까?`)) return
+    try {
+      await frappeApi.post(`/api/method/frappe.client.cancel`, {
+        doctype: 'Material Request',
+        name: res.name
+      })
+      alert('취소되었습니다.')
+      fetchReservations()
+      emit('refresh-items')
+    } catch (error) {
+      console.error('취소 에러:', error)
+      alert('취소 중 오류가 발생했습니다. 이미 일부 출고된 예약일 수 있습니다.')
+    }
+  } else {
+    if (!confirm(`${res.name} 예약은 이미 일부 처리되었습니다. 남은 잔여 수량을 모두 취소(종료)하시겠습니까?`)) return
+    try {
+      await frappeApi.post(`/api/method/erpnext.stock.doctype.material_request.material_request.update_status`, {
+        name: res.name,
+        status: 'Stopped'
+      })
+      alert('잔여 예약이 성공적으로 종료(취소)되었습니다.')
+      fetchReservations()
+      emit('refresh-items')
+    } catch (error) {
+      console.error('중지 에러:', error)
+      alert('잔여 예약 종료 중 오류가 발생했습니다.')
+    }
   }
 }
 </script>
