@@ -2,31 +2,31 @@
   <div class="modal-overlay" v-if="isOpen">
     <div class="modal-container">
       <div class="modal-header">
-        <h3>📦 새 상품 퀵 추가</h3>
+        <h3>{{ $t('quick_add.title_item') }}</h3>
         <button class="close-btn" @click="closeModal">×</button>
       </div>
       <div class="modal-body">
         <form @submit.prevent="submitForm">
           <div class="form-group">
-            <label>품명 (Item Name) <span class="required">*</span></label>
-            <input type="text" v-model="form.item_name" required placeholder="예: P-160" ref="firstInput" />
+            <label>{{ $t('quick_add.label_item_name') }} <span class="required">*</span></label>
+            <input type="text" v-model="form.item_name" required :placeholder="$t('quick_add.ph_item_name')" ref="firstInput" />
           </div>
           <div class="form-group">
-            <label>컬러 (Color)</label>
-            <input type="text" v-model="form.color" placeholder="예: BLACK (비워두면 기본 상품)" />
+            <label>{{ $t('quick_add.label_color') }}</label>
+            <input type="text" v-model="form.color" :placeholder="$t('quick_add.ph_color')" />
           </div>
           <div class="form-group">
-            <label>브랜드 (Brand)</label>
-            <input type="text" v-model="form.brand" placeholder="예: KTK (선택 사항)" />
+            <label>{{ $t('quick_add.label_brand') }}</label>
+            <input type="text" v-model="form.brand" :placeholder="$t('quick_add.ph_brand')" />
           </div>
           <div class="form-group">
-            <label>포장 수량 (Pack Qty) <span class="required">*</span></label>
-            <input type="number" v-model.number="form.pack_qty" required min="1" placeholder="예: 400" />
+            <label>{{ $t('quick_add.label_pack_qty') }} <span class="required">*</span></label>
+            <input type="number" v-model.number="form.pack_qty" required min="1" :placeholder="$t('quick_add.ph_pack_qty')" />
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="closeModal">취소</button>
+            <button type="button" class="btn-cancel" @click="closeModal">{{ $t('quick_add.btn_cancel') }}</button>
             <button type="submit" class="btn-submit" :disabled="isSaving">
-              {{ isSaving ? '저장 중...' : '추가 및 장바구니 담기' }}
+              {{ isSaving ? $t('quick_add.saving') : $t('quick_add.btn_add_cart') }}
             </button>
           </div>
         </form>
@@ -38,6 +38,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   isOpen: Boolean
@@ -112,19 +115,28 @@ const submitForm = async () => {
     // Ensure item has needed properties for PosView
     newItem.name = newItem.name || finalItemCode;
 
-    alert('상품이 성공적으로 등록되었습니다!');
-    emit('success', newItem);
-    closeModal();
+    alert(t('quick_add.msg_item_success'))
+    emit('success', newItem)
+    closeModal()
   } catch (err) {
     console.error('상품 추가 에러:', err)
     if (err.response && err.response.data && err.response.data.exc) {
+      let errorReason = t('quick_add.msg_unknown_err')
+      try {
+        const excObj = JSON.parse(err.response.data.exc)
+        errorReason = excObj[0] || err.response.data.exc
+      } catch (e) {
+        const lines = err.response.data.exc.split('\n')
+        errorReason = lines[lines.length - 2] || lines[0] || err.response.data.exc
+      }
+
       if (err.response.data.exc.includes('DuplicateEntryError')) {
-        alert('이미 동일한 코드의 상품이 존재합니다.');
+        alert(t('quick_add.msg_item_dup'))
       } else {
-        alert('상품 등록 중 오류가 발생했습니다. (개발자 도구 참조)');
+        alert(t('quick_add.msg_item_fail', { reason: errorReason }))
       }
     } else {
-      alert('상품 등록 중 오류가 발생했습니다.');
+      alert(t('quick_add.msg_item_err'))
     }
   } finally {
     isSaving.value = false

@@ -1,22 +1,22 @@
 <template>
   <div class="reservation-list-container">
     <div class="header-actions">
-      <h2>📅 예약 현황 (Reservations)</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 예약)</button>
+      <h2>📅 {{ $t('reservation_list.title') }}</h2>
+      <button class="btn-create" @click="$emit('create-new')">➕ {{ $t('reservation_list.btn_create') }}</button>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="예약 검색 (고객명, 번호)" class="filter-input" />
+      <input type="text" v-model="searchQuery" :placeholder="$t('reservation_list.search_placeholder')" class="filter-input" />
       <select v-model="branchFilter" class="filter-select">
-        <option value="all">모든 지점 (All Branches)</option>
+        <option value="all">{{ $t('reservation_list.all_branches') }}</option>
         <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
           {{ branch.warehouse_name || branch.name }}
         </option>
       </select>
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 (All)</option>
-        <option value="incomplete">진행 중 (Incomplete)</option>
-        <option value="completed">완료됨 (Completed)</option>
+        <option value="all">{{ $t('reservation_list.status_all') }}</option>
+        <option value="incomplete">{{ $t('reservation_list.status_incomplete') }}</option>
+        <option value="completed">{{ $t('reservation_list.status_completed') }}</option>
       </select>
     </div>
 
@@ -24,29 +24,31 @@
       <table class="reservation-table">
         <thead>
           <tr>
-            <th>예약 번호</th>
-            <th>날짜</th>
-            <th>고객명</th>
-            <th>담당 지점</th>
-            <th>상태</th>
-            <th>총 수량</th>
-            <th>진행률</th>
-            <th>취소</th>
+            <th>{{ $t('reservation_list.col_res_no') }}</th>
+            <th>{{ $t('reservation_list.col_date') }}</th>
+            <th>{{ reservationType === 'Material Transfer' ? $t('pos.lbl_src_wh') : $t('reservation_list.col_customer') }}</th>
+            <th>{{ reservationType === 'Material Transfer' ? $t('pos.lbl_tgt_wh') : $t('reservation_list.col_branch') }}</th>
+            <th>{{ $t('reservation_list.col_status') }}</th>
+            <th>{{ $t('reservation_list.col_total_qty') }}</th>
+            <th>{{ $t('reservation_list.col_progress') }}</th>
+            <th>{{ $t('reservation_list.col_cancel') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="res in filteredReservations" :key="res.name" @click="openDetail(res)" class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.schedule_date }}</td>
-            <td class="customer-name">{{ res.custom_customer || res.customer || '-' }}</td>
+            <td class="customer-name">
+              {{ reservationType === 'Material Transfer' ? (res.set_from_warehouse || '-') : (res.custom_customer || res.customer || '-') }}
+            </td>
             <td>
-              <div>{{ res.custom_ordering_branch || res.set_warehouse || '-' }}</div>
+              <div>{{ reservationType === 'Material Transfer' ? (res.set_warehouse || '-') : (res.custom_ordering_branch || res.set_warehouse || '-') }}</div>
               <div style="font-size: 11px; color: #64748b;">{{ res.custom_orderer || '-' }}</div>
             </td>
             <td>
-              <span class="status-badge" :class="getStatusClass(res)">{{ res.status }}</span>
+              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status) }}</span>
             </td>
-            <td>{{ totalQtyMap[res.name] || 0 }} 개</td>
+            <td>{{ totalQtyMap[res.name] || 0 }} {{ $t('reservation_list.ea') }}</td>
             <td>
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: getProgressPercent(res) + '%' }"></div>
@@ -54,13 +56,13 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button class="btn-delete" @click="cancelReservation(res)" :title="res.status === 'Pending' ? '예약 취소' : '잔여 예약 종료'">
+              <button class="btn-delete" @click="cancelReservation(res)" :title="res.status === 'Pending' ? $t('reservation_list.btn_cancel') : $t('reservation_list.btn_terminate')">
                 🗑️
               </button>
             </td>
           </tr>
           <tr v-if="filteredReservations.length === 0">
-            <td colspan="8" class="empty-msg">조건에 맞는 예약이 없습니다.</td>
+            <td colspan="8" class="empty-msg">{{ $t('reservation_list.empty_msg') }}</td>
           </tr>
         </tbody>
       </table>
@@ -70,25 +72,33 @@
     <div class="modal-overlay" v-if="selectedReservation">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>예약 상세: {{ selectedReservation.name }}</h3>
+          <h3>{{ $t('reservation_list.modal_title_prefix') }}{{ selectedReservation.name }}</h3>
           <button class="close-btn" @click="selectedReservation = null">×</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>상태</label>
-              <div class="val"><span class="status-badge" :class="getStatusClass(selectedReservation)">{{ selectedReservation.status }}</span></div>
+              <label>{{ $t('reservation_list.modal_status') }}</label>
+              <div class="val"><span class="status-badge" :class="getStatusClass(selectedReservation)">{{ translateStatus(selectedReservation.status) }}</span></div>
             </div>
             <div class="detail-card">
-              <label>고객명</label>
-              <div class="val">{{ selectedReservation.custom_customer || selectedReservation.customer || '-' }}</div>
+              <label>{{ reservationType === 'Material Transfer' ? $t('pos.lbl_src_wh') : $t('reservation_list.modal_customer') }}</label>
+              <div class="val">{{ reservationType === 'Material Transfer' ? (selectedReservation.set_from_warehouse || '-') : (selectedReservation.custom_customer || selectedReservation.customer || '-') }}</div>
             </div>
             <div class="detail-card">
-              <label>담당자</label>
-              <div class="val">{{ selectedReservation.custom_orderer || '-' }}</div>
+              <label>{{ reservationType === 'Material Transfer' ? $t('pos.lbl_tgt_wh') : $t('reservation_list.modal_manager') }}</label>
+              <div class="val">
+                <template v-if="reservationType === 'Material Transfer'">
+                  {{ selectedReservation.set_warehouse || '-' }}
+                  <div style="font-size:0.8em;color:#666;margin-top:2px;">{{ selectedReservation.custom_orderer || '-' }}</div>
+                </template>
+                <template v-else>
+                  {{ selectedReservation.custom_orderer || '-' }}
+                </template>
+              </div>
             </div>
             <div class="detail-card">
-              <label>날짜</label>
+              <label>{{ $t('reservation_list.modal_date') }}</label>
               <div class="val">{{ selectedReservation.schedule_date }}</div>
             </div>
           </div>
@@ -96,10 +106,10 @@
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목명</th>
-                <th>예약 수량</th>
-                <th>출고 완료</th>
-                <th>잔여 수량</th>
+                <th>{{ $t('reservation_list.modal_col_item') }}</th>
+                <th>{{ $t('reservation_list.modal_col_req_qty') }}</th>
+                <th>{{ $t('reservation_list.modal_col_issued') }}</th>
+                <th>{{ $t('reservation_list.modal_col_remain') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -114,7 +124,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn-load-cart" @click="loadToCart" v-if="selectedReservation.status !== 'Completed' && selectedReservation.status !== 'Cancelled'">
-            🛒 장바구니로 이동하여 수정/출고
+            🛒 {{ $t('reservation_list.btn_edit') }}
           </button>
         </div>
       </div>
@@ -125,6 +135,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 const props = defineProps({
@@ -137,6 +148,8 @@ const props = defineProps({
     default: 'Material Issue'
   }
 })
+
+const { t } = useI18n()
 
 const emit = defineEmits(['create-new', 'edit-reservation', 'refresh-items'])
 
@@ -227,6 +240,13 @@ const filteredReservations = computed(() => {
   })
 })
 
+const translateStatus = (status) => {
+  if (!status) return ''
+  const key = 'status.' + status.toLowerCase().replace(/ /g, '_')
+  const translated = t(key)
+  return translated !== key ? translated : status
+}
+
 const getStatusClass = (res) => {
   if (res.status === 'Pending') return 'status-pending'
   if (res.status.includes('Partial')) return 'status-partial'
@@ -266,32 +286,32 @@ const loadToCart = () => {
 
 const cancelReservation = async (res) => {
   if (res.status === 'Pending') {
-    if (!confirm(`${res.name} 예약을 취소하시겠습니까?`)) return
+    if (!confirm(t('reservation_list.msg_confirm_cancel', { name: res.name }))) return
     try {
       await frappeApi.post(`/api/method/frappe.client.cancel`, {
         doctype: 'Material Request',
         name: res.name
       })
-      alert('취소되었습니다.')
+      alert(t('reservation_list.msg_cancel_success'))
       fetchReservations()
       emit('refresh-items')
     } catch (error) {
       console.error('취소 에러:', error)
-      alert('취소 중 오류가 발생했습니다. 이미 일부 출고된 예약일 수 있습니다.')
+      alert(t('reservation_list.msg_cancel_error'))
     }
   } else {
-    if (!confirm(`${res.name} 예약은 이미 일부 처리되었습니다. 남은 잔여 수량을 모두 취소(종료)하시겠습니까?`)) return
+    if (!confirm(t('reservation_list.msg_confirm_stop', { name: res.name }))) return
     try {
       await frappeApi.post(`/api/method/erpnext.stock.doctype.material_request.material_request.update_status`, {
         name: res.name,
         status: 'Stopped'
       })
-      alert('잔여 예약이 성공적으로 종료(취소)되었습니다.')
+      alert(t('reservation_list.msg_stop_success'))
       fetchReservations()
       emit('refresh-items')
     } catch (error) {
       console.error('중지 에러:', error)
-      alert('잔여 예약 종료 중 오류가 발생했습니다.')
+      alert(t('reservation_list.msg_stop_error'))
     }
   }
 }

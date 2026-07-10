@@ -2,8 +2,8 @@
   <div class="modal-overlay">
     <div class="modal-content">
       <header class="modal-header">
-        <h2>📦 Product Registration</h2>
-        <p class="modal-subtitle">Stock & Accounting Integration · Valuation & Pricing (F8: Save / F4: Grid / F9: Reset)</p>
+        <h2>{{ $t('product_reg.title') }}</h2>
+        <p class="modal-subtitle">{{ $t('product_reg.subtitle') }}</p>
         <button class="close-btn" @click="handleClose">✕</button>
       </header>
 
@@ -11,76 +11,76 @@
         <form class="product-reg-form" @submit.prevent="submitProduct">
           <div class="form-grid">
             <label class="form-field">
-              <span>Item Name *</span>
-              <input v-model="form.item_name" type="text" required placeholder="e.g., P-160" ref="firstInput" />
+              <span>{{ $t('product_reg.item_name') }}</span>
+              <input v-model="form.item_name" type="text" required :placeholder="$t('product_reg.item_name_ph')" ref="firstInput" />
             </label>
             
             <label class="form-field">
-              <span>Color *</span>
-              <input v-model="form.color" type="text" required placeholder="e.g., BLACK" />
+              <span>{{ $t('product_reg.color') }}</span>
+              <input v-model="form.color" type="text" required :placeholder="$t('product_reg.color_ph')" />
             </label>
             
             <label class="form-field brand-field">
-              <span>Brand *</span>
+              <span>{{ $t('product_reg.brand') }}</span>
               <div class="brand-input-group">
                 <select v-model="form.brand" required :disabled="isLoadingBrands">
-                  <option value="" disabled>Select Brand</option>
+                  <option value="" disabled>{{ $t('product_reg.brand_select') }}</option>
                   <option v-for="b in brands" :key="b.name" :value="b.name">{{ b.name }}</option>
                 </select>
-                <button type="button" class="btn-new-brand" @click="openBrandDialog">+ New</button>
+                <button type="button" class="btn-new-brand" @click="openBrandDialog">{{ $t('product_reg.btn_new') }}</button>
               </div>
             </label>
 
             <label class="form-field barcode-field">
-              <span>Barcode / QR</span>
-              <input ref="barcodeInputRef" v-model="form.barcode" type="text" placeholder="Scanner Input" @keydown.enter.prevent="submitProduct" />
+              <span>{{ $t('product_reg.barcode') }}</span>
+              <input ref="barcodeInputRef" v-model="form.barcode" type="text" :placeholder="$t('product_reg.barcode_ph')" @keydown.enter.prevent="submitProduct" />
             </label>
             
             <!-- 🌟 물류/회계 통합 입력 영역 -->
             <label class="form-field">
-              <span>Opening Warehouse *</span>
+              <span>{{ $t('product_reg.warehouse') }}</span>
               <select v-model="form.warehouse" required>
-                <option value="" disabled>Select Warehouse</option>
+                <option value="" disabled>{{ $t('product_reg.warehouse_select') }}</option>
                 <option v-for="wh in warehouses" :key="wh.name" :value="wh.name">{{ wh.warehouse_name || wh.name }}</option>
               </select>
             </label>
 
             <!-- 🌟 듀얼 입력 기반 기초 재고 -->
             <label class="form-field dual-qty-field">
-              <span>Opening Qty (Box + Pza) *</span>
+              <span>{{ $t('product_reg.opening_qty_dual') }}</span>
               <div class="dual-inputs">
-                <input type="number" v-model.number="form.input_box" min="0" placeholder="Box" />
+                <input type="number" v-model.number="form.input_box" min="0" :placeholder="$t('product_reg.ph_box')" />
                 <span class="plus-icon">+</span>
-                <input type="number" v-model.number="form.input_each" min="0" placeholder="Pza" />
+                <input type="number" v-model.number="form.input_each" min="0" :placeholder="$t('product_reg.ph_pza')" />
               </div>
               <div class="realtime-feedback" v-if="totalQty > 0">= Total {{ totalQty }} Units</div>
             </label>
 
             <label class="form-field">
-              <span>Valuation Rate (Cost) *</span>
-              <input v-model.number="form.valuation_rate" type="number" step="0.01" min="0" required placeholder="e.g., 17.00" />
+              <span>{{ $t('product_reg.valuation_rate') }}</span>
+              <input v-model.number="form.valuation_rate" type="number" step="0.01" min="0" required :placeholder="$t('product_reg.ph_valuation')" />
             </label>
 
             <label class="form-field">
-              <span>Selling Price (Standard) *</span>
-              <input v-model.number="form.selling_price" type="number" step="0.01" min="0" required placeholder="e.g., 20.00" />
+              <span>{{ $t('product_reg.selling_price') }}</span>
+              <input v-model.number="form.selling_price" type="number" step="0.01" min="0" required :placeholder="$t('product_reg.ph_selling')" />
             </label>
 
             <label class="form-field">
-              <span>Pack Qty *</span>
-              <input v-model.number="form.pack_qty" type="number" min="1" required placeholder="10" />
+              <span>{{ $t('product_reg.pack_qty') }}</span>
+              <input v-model.number="form.pack_qty" type="number" min="1" required :placeholder="$t('product_reg.ph_pack')" />
             </label>
             
             <label class="form-field">
-              <span>Safety Stock</span>
-              <input v-model.number="form.safety_stock" type="number" min="0" placeholder="0" />
+              <span>{{ $t('product_reg.safety_stock') }}</span>
+              <input v-model.number="form.safety_stock" type="number" min="0" :placeholder="$t('product_reg.ph_safety')" />
             </label>
 
             <label class="form-field checkbox-field">
-              <span>Grid Item (F4)</span>
+              <span>{{ $t('product_reg.grid_item') }}</span>
               <div class="checkbox-wrapper">
                 <input type="checkbox" v-model="form.is_grid" id="grid-checkbox" />
-                <label for="grid-checkbox">This is a grid item with various options</label>
+                <label for="grid-checkbox">{{ $t('product_reg.grid_desc') }}</label>
               </div>
             </label>
           </div>
@@ -88,9 +88,9 @@
       </div>
 
       <footer class="modal-footer">
-        <button type="button" class="btn-cancel" @click="handleClose" :disabled="isSaving">Cancel</button>
+        <button type="button" class="btn-cancel" @click="handleClose" :disabled="isSaving">{{ $t('product_reg.btn_cancel') }}</button>
         <button type="button" class="btn-save" @click="submitProduct" :disabled="isSaving">
-          {{ isSaving ? 'Saving...' : 'Save Product (F8)' }}
+          {{ isSaving ? $t('product_reg.saving') : $t('product_reg.btn_save') }}
         </button>
       </footer>
     </div>

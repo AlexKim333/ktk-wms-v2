@@ -1,22 +1,38 @@
 <template>
   <div class="history-list-container">
     <div class="header-actions">
-      <h2>📅 취소/수정 내역 현황 (OutboundHistorys)</h2>
+      <h2>🔄 {{ listType === 'Material Transfer' ? '재고이동 취소/수정 내역' : '출고 취소/수정 내역' }}</h2>
       <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 취소/수정 내역)</button>
     </div>
 
     <div class="filters">
       <input type="text" v-model="searchQuery" placeholder="취소/수정 내역 검색 (고객명, 번호)" class="filter-input" />
-      <select v-model="branchFilter" class="filter-select">
-        <option value="all">모든 지점 (All Branches)</option>
-        <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
-          {{ branch.warehouse_name || branch.name }}
-        </option>
-      </select>
+      <template v-if="listType === 'Material Transfer'">
+        <select v-model="sourceFilter" class="filter-select">
+          <option value="all">출발지 전체 (All Source)</option>
+          <option v-for="branch in branchList" :key="'src-'+branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+        <select v-model="targetFilter" class="filter-select">
+          <option value="all">도착지 전체 (All Target)</option>
+          <option v-for="branch in branchList" :key="'tgt-'+branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+      </template>
+      <template v-else>
+        <select v-model="branchFilter" class="filter-select">
+          <option value="all">모든 지점 (All Branches)</option>
+          <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+      </template>
       <select v-model="statusFilter" class="filter-select">
         <option value="all">전체 (All)</option>
         <option value="incomplete">진행 중 (Incomplete)</option>
-        <option value="completed">완료됨 (Completed)</option>
+        <option value="completed">{{ $t('status.completed') }}</option>
       </select>
     </div>
 
@@ -26,9 +42,8 @@
           <tr>
             <th>전표 ID</th>
             <th>생성일</th>
-            <th>담당자</th>
-            <th>취소/수정자</th>
-            <th>지점/창고</th>
+            <th>담당자 / 고객명</th>
+            <th>{{ listType === 'Material Transfer' ? '출발/도착 창고' : '담당 지점' }}</th>
             <th>상태</th>
           </tr>
         </thead>
@@ -37,8 +52,14 @@
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.creation ? res.creation.split(' ')[0] : '' }}</td>
             <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || '-' }}</td>
-            <td class="customer-name" style="color:#ef4444">{{ res.modified_by || '-' }}</td>
-            <td>{{ res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || '-' }}</td>
+            <td>
+              <template v-if="listType === 'Material Transfer'">
+                {{ res.from_warehouse }} ➔ {{ res.to_warehouse }}
+              </template>
+              <template v-else>
+                {{ res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || '-' }}
+              </template>
+            </td>
             <td>
               <span class="res-badge" style="background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:0.85rem">취소/대체됨</span>
             </td>
@@ -54,16 +75,16 @@
     <div class="modal-overlay" v-if="selectedOutboundHistory">
       <div class="modal-content modal-large">
         <div class="modal-header with-nav">
-          <button class="nav-arrow" @click="goToPreviousHistory" title="이전 내역">◀</button>
-          <h3>내역 상세: {{ selectedOutboundHistory.name }}</h3>
-          <button class="nav-arrow" @click="goToNextHistory" title="다음 내역">▶</button>
+          <button class="nav-arrow" @click="goToPreviousHistory" :title="listType === 'Material Transfer' ? '이전 재고이동' : '이전 출고'">◀</button>
+          <h3>{{ listType === 'Material Transfer' ? '재고이동 상세' : '출고 상세' }}: {{ selectedOutboundHistory.name }}</h3>
+          <button class="nav-arrow" @click="goToNextHistory" :title="listType === 'Material Transfer' ? '다음 재고이동' : '다음 출고'">▶</button>
           <button class="close-btn" @click="selectedOutboundHistory = null">×</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>담당자 / 취소자 / 고객명</label>
-              <div class="val">{{ [selectedOutboundHistory.custom_orderer, selectedOutboundHistory.custom_customer].filter(Boolean).join(' / ') || '-' }} <br/> <span style="color:#ef4444; font-size: 0.9em">(취소자: {{ selectedOutboundHistory.modified_by }})</span></div>
+              <label>담당자 / 고객명</label>
+              <div class="val">{{ [selectedOutboundHistory.custom_orderer, selectedOutboundHistory.custom_customer].filter(Boolean).join(' / ') || '-' }}</div>
             </div>
             <div class="detail-card">
               <label>생성일</label>
@@ -128,6 +149,10 @@ const props = defineProps({
   branchList: {
     type: Array,
     default: () => []
+  },
+  listType: {
+    type: String,
+    default: 'Material Issue'
   }
 })
 
@@ -144,6 +169,9 @@ const frappeApi = axios.create({
 const historys = ref([])
 const searchQuery = ref('')
 const branchFilter = ref('all')
+const sourceFilter = ref('all')
+const targetFilter = ref('all')
+const statusFilter = ref('all')
 const selectedOutboundHistory = ref(null)
 const selectedOutboundHistoryItems = ref([])
 const amendedDocumentItems = ref([])
@@ -153,8 +181,8 @@ const fetchOutboundHistorys = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
-        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'custom_customer', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified']),
-        filters: JSON.stringify([['docstatus', '=', 2], ['stock_entry_type', 'in', ['Material Issue', 'Material Transfer']]]),
+        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified']),
+        filters: JSON.stringify([['docstatus', '=', 2], ['stock_entry_type', '=', props.listType]]),
         limit_page_length: 100,
         order_by: 'creation desc'
       }
@@ -177,10 +205,20 @@ const filteredOutboundHistorys = computed(() => {
       (res.name && res.name.toLowerCase().includes(q)) || 
       (res.custom_orderer && res.custom_orderer.toLowerCase().includes(q))
       
+    // 2. Branch Filter
     let matchBranch = true
-    if (branchFilter.value !== 'all') {
-      const resBranch = res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || ''
-      matchBranch = resBranch.includes(branchFilter.value)
+    if (props.listType === 'Material Transfer') {
+      if (sourceFilter.value !== 'all') {
+        matchBranch = matchBranch && (res.from_warehouse || '').includes(sourceFilter.value)
+      }
+      if (targetFilter.value !== 'all') {
+        matchBranch = matchBranch && (res.to_warehouse || '').includes(targetFilter.value)
+      }
+    } else {
+      if (branchFilter.value !== 'all') {
+        const b = res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || ''
+        matchBranch = b.includes(branchFilter.value)
+      }
     }
     
     return matchSearch && matchBranch

@@ -1,9 +1,9 @@
 <template>
   <div class="adj-list-container">
     <div class="header-actions">
-      <h2>Stock Adjustments</h2>
+      <h2>{{ $t('stock_adj.title') }}</h2>
       <button class="btn-primary" @click="$emit('new-adjustment')">
-        New Stock Count
+        {{ $t('stock_adj.btn_new') }}
       </button>
     </div>
 
@@ -13,13 +13,13 @@
         <input 
           type="text" 
           v-model="searchQuery" 
-          placeholder="Search by ID, location, or reason..." 
+          :placeholder="$t('stock_adj.search_placeholder')" 
         />
       </div>
       <div class="filter-tabs">
-        <button :class="{ active: filterStatus === 'All' }" @click="filterStatus = 'All'">All</button>
-        <button :class="{ active: filterStatus === 'Draft' }" @click="filterStatus = 'Draft'">Drafts</button>
-        <button :class="{ active: filterStatus === 'Submitted' }" @click="filterStatus = 'Submitted'">Submitted</button>
+        <button :class="{ active: filterStatus === 'All' }" @click="filterStatus = 'All'">{{ $t('stock_adj.filter_all') }}</button>
+        <button :class="{ active: filterStatus === 'Draft' }" @click="filterStatus = 'Draft'">{{ $t('stock_adj.filter_draft') }}</button>
+        <button :class="{ active: filterStatus === 'Submitted' }" @click="filterStatus = 'Submitted'">{{ $t('stock_adj.filter_submitted') }}</button>
       </div>
     </div>
 
@@ -27,13 +27,13 @@
       <table class="adj-table">
         <thead>
           <tr>
-            <th>Adjustment #</th>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Reason</th>
-            <th>Created By</th>
+            <th>{{ $t('stock_adj.col_adj_no') }}</th>
+            <th>{{ $t('stock_adj.col_date') }}</th>
+            <th>{{ $t('stock_adj.col_location') }}</th>
+            <th>{{ $t('stock_adj.col_type') }}</th>
+            <th>{{ $t('stock_adj.col_status') }}</th>
+            <th>{{ $t('stock_adj.col_reason') }}</th>
+            <th>{{ $t('stock_adj.col_created_by') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -45,18 +45,18 @@
           >
             <td class="text-blue font-bold">{{ adj.name }}</td>
             <td>{{ formatDate(adj.posting_date) }}</td>
-            <td>{{ adj.set_warehouse || 'Multiple' }}</td>
-            <td><span class="badge type-badge">Stock Count</span></td>
+            <td>{{ adj.set_warehouse || $t('stock_adj.multiple') }}</td>
+            <td><span class="badge type-badge">{{ $t('stock_adj.type_stock_count') }}</span></td>
             <td>
               <span class="badge status-badge" :class="adj.docstatus === 0 ? 'draft' : 'submitted'">
-                {{ adj.docstatus === 0 ? 'Draft' : 'Submitted' }}
+                {{ adj.docstatus === 0 ? $t('stock_adj.status_draft') : $t('stock_adj.status_submitted') }}
               </span>
             </td>
-            <td>{{ adj.purpose || 'Correction' }}</td>
+            <td>{{ adj.purpose === 'Correction' ? $t('stock_adj.reason_correction') : (adj.purpose === 'Damage' ? $t('stock_adj.reason_damage') : (adj.purpose === 'Theft' ? $t('stock_adj.reason_theft') : adj.purpose)) || $t('stock_adj.reason_correction') }}</td>
             <td>{{ adj.owner }}</td>
           </tr>
           <tr v-if="filteredAdjustments.length === 0">
-            <td colspan="7" class="empty-state">No stock adjustments found.</td>
+            <td colspan="7" class="empty-state">{{ $t('stock_adj.empty_list') }}</td>
           </tr>
         </tbody>
       </table>

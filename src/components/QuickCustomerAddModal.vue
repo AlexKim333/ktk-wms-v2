@@ -2,19 +2,19 @@
   <div class="modal-overlay" v-if="isOpen">
     <div class="modal-container">
       <div class="modal-header">
-        <h3>🤝 새 고객 퀵 추가</h3>
+        <h3>{{ $t('quick_add.title_customer') }}</h3>
         <button class="close-btn" @click="closeModal">×</button>
       </div>
       <div class="modal-body">
         <form @submit.prevent="submitForm">
           <div class="form-group">
-            <label>고객명 (Customer Name) <span class="required">*</span></label>
-            <input type="text" v-model="form.customer_name" required placeholder="예: 단골고객 A" ref="firstInput" />
+            <label>{{ $t('quick_add.label_customer_name') }} <span class="required">*</span></label>
+            <input type="text" v-model="form.customer_name" required :placeholder="$t('quick_add.ph_customer_name')" ref="firstInput" />
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="closeModal">취소</button>
+            <button type="button" class="btn-cancel" @click="closeModal">{{ $t('quick_add.btn_cancel') }}</button>
             <button type="submit" class="btn-submit" :disabled="isSaving">
-              {{ isSaving ? '저장 중...' : '고객 추가 및 선택' }}
+              {{ isSaving ? $t('quick_add.saving') : $t('quick_add.btn_add_select_customer') }}
             </button>
           </div>
         </form>
@@ -26,6 +26,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   isOpen: Boolean
@@ -74,29 +77,28 @@ const submitForm = async () => {
     })
 
     const newCustomer = response.data.data
-    alert('고객이 성공적으로 등록되었습니다!');
-    emit('success', newCustomer);
-    closeModal();
+    alert(t('quick_add.msg_customer_success'))
+    emit('success', newCustomer)
+    closeModal()
   } catch (err) {
     console.error('고객 추가 에러:', err)
     if (err.response && err.response.data && err.response.data.exc) {
-      let errorReason = '알 수 없는 서버 오류';
+      let errorReason = t('quick_add.msg_unknown_err')
       try {
-        const excObj = JSON.parse(err.response.data.exc);
-        errorReason = excObj[0] || err.response.data.exc;
+        const excObj = JSON.parse(err.response.data.exc)
+        errorReason = excObj[0] || err.response.data.exc
       } catch (e) {
-        // If it's a string stack trace, try to extract the last line or just show the string
-        const lines = err.response.data.exc.split('\n');
-        errorReason = lines[lines.length - 2] || lines[0] || err.response.data.exc;
+        const lines = err.response.data.exc.split('\n')
+        errorReason = lines[lines.length - 2] || lines[0] || err.response.data.exc
       }
       
       if (err.response.data.exc.includes('DuplicateEntryError')) {
-        alert('이미 동일한 이름의 고객이 존재합니다.');
+        alert(t('quick_add.msg_customer_dup'))
       } else {
-        alert(`고객 등록 실패 사유:\n\n${errorReason}`);
+        alert(t('quick_add.msg_customer_fail', { reason: errorReason }))
       }
     } else {
-      alert('고객 등록 중 오류가 발생했습니다.');
+      alert(t('quick_add.msg_customer_err'))
     }
   } finally {
     isSaving.value = false

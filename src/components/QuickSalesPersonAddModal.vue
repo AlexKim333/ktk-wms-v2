@@ -2,28 +2,28 @@
   <div class="modal-overlay" v-if="isOpen">
     <div class="modal-container">
       <div class="modal-header">
-        <h3>👤 새 응대자 퀵 추가</h3>
+        <h3>{{ $t('quick_add.title_sp') }}</h3>
         <button class="close-btn" @click="closeModal">×</button>
       </div>
       <div class="modal-body">
         <form @submit.prevent="submitForm">
           <div class="form-group">
-            <label>응대자 이름 (Name) <span class="required">*</span></label>
-            <input type="text" v-model="form.sales_person_name" required placeholder="예: MONSE" ref="firstInput" />
+            <label>{{ $t('quick_add.label_sp_name') }} <span class="required">*</span></label>
+            <input type="text" v-model="form.sales_person_name" required :placeholder="$t('quick_add.ph_sp_name')" ref="firstInput" />
           </div>
           <div class="form-group">
-            <label>담당 지점 (Branch) <span class="required">*</span></label>
+            <label>{{ $t('quick_add.label_branch') }} <span class="required">*</span></label>
             <select v-model="form.custom_branch" required>
-              <option value="">지점 선택</option>
+              <option value="">{{ $t('quick_add.select_branch') }}</option>
               <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
                 {{ branch.warehouse_name }}
               </option>
             </select>
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="closeModal">취소</button>
+            <button type="button" class="btn-cancel" @click="closeModal">{{ $t('quick_add.btn_cancel') }}</button>
             <button type="submit" class="btn-submit" :disabled="isSaving">
-              {{ isSaving ? '저장 중...' : '응대자 추가 및 선택' }}
+              {{ isSaving ? $t('quick_add.saving') : $t('quick_add.btn_add_select_sp') }}
             </button>
           </div>
         </form>
@@ -35,6 +35,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -89,26 +92,40 @@ const submitForm = async () => {
 
   isSaving.value = true
   try {
+    // 지점별로 중복된 이름을 허용하기 위해 이름 뒤에 지점명을 붙여서 고유하게 만듦
+    // 예: [MAIN] ALARCON - K -> ALARCON
+    const branchLabel = customBranch.replace(/\[.*?\]\s*/, '').replace(/\s*-\s*K$/, '').trim()
+    const uniqueName = salesPersonName.includes('(') ? salesPersonName : `${salesPersonName} (${branchLabel})`
+
     const response = await frappeApi.post('/api/resource/Sales Person', {
-      sales_person_name: salesPersonName,
+      sales_person_name: uniqueName,
       custom_branch: customBranch,
       enabled: 1
     })
 
     const newSalesPerson = response.data.data
-    alert('응대자가 성공적으로 등록되었습니다!');
-    emit('success', newSalesPerson);
-    closeModal();
+    alert(t('quick_add.msg_sp_success'))
+    emit('success', newSalesPerson)
+    closeModal()
   } catch (err) {
     console.error('응대자 추가 에러:', err)
     if (err.response && err.response.data && err.response.data.exc) {
+      let errorReason = t('quick_add.msg_unknown_err')
+      try {
+        const excObj = JSON.parse(err.response.data.exc)
+        errorReason = excObj[0] || err.response.data.exc
+      } catch (e) {
+        const lines = err.response.data.exc.split('\n')
+        errorReason = lines[lines.length - 2] || lines[0] || err.response.data.exc
+      }
+      
       if (err.response.data.exc.includes('DuplicateEntryError')) {
-        alert('이미 동일한 이름의 응대자가 존재합니다.');
+        alert(t('quick_add.msg_sp_dup'))
       } else {
-        alert('응대자 등록 중 오류가 발생했습니다. (개발자 도구 참조)');
+        alert(t('quick_add.msg_sp_fail', { reason: errorReason }))
       }
     } else {
-      alert('응대자 등록 중 오류가 발생했습니다.');
+      alert(t('quick_add.msg_sp_err'))
     }
   } finally {
     isSaving.value = false

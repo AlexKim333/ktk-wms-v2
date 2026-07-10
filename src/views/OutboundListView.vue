@@ -1,22 +1,38 @@
 <template>
   <div class="outbound-list-container">
     <div class="header-actions">
-      <h2>📅 출고 현황 (Outbounds)</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 출고)</button>
+      <h2>📅 {{ listType === 'Material Transfer' ? $t('outbound_list.title_transfer') : $t('outbound_list.title_outbound') }}</h2>
+      <button class="btn-create" @click="$emit('create-new')">➕ {{ listType === 'Material Transfer' ? $t('outbound_list.btn_create_transfer') : $t('outbound_list.btn_create_outbound') }}</button>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="출고 검색 (고객명, 번호)" class="filter-input" />
-      <select v-model="branchFilter" class="filter-select">
-        <option value="all">모든 지점 (All Branches)</option>
-        <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
-          {{ branch.warehouse_name || branch.name }}
-        </option>
-      </select>
+      <input type="text" v-model="searchQuery" :placeholder="$t('outbound_list.search_placeholder')" class="filter-input" />
+      <template v-if="listType === 'Material Transfer'">
+        <select v-model="sourceFilter" class="filter-select">
+          <option value="all">{{ $t('outbound_list.all_source') }}</option>
+          <option v-for="branch in branchList" :key="'src-'+branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+        <select v-model="targetFilter" class="filter-select">
+          <option value="all">{{ $t('outbound_list.all_target') }}</option>
+          <option v-for="branch in branchList" :key="'tgt-'+branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+      </template>
+      <template v-else>
+        <select v-model="branchFilter" class="filter-select">
+          <option value="all">{{ $t('outbound_list.all_branches') }}</option>
+          <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
+            {{ branch.warehouse_name || branch.name }}
+          </option>
+        </select>
+      </template>
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 (All)</option>
-        <option value="incomplete">진행 중 (Incomplete)</option>
-        <option value="completed">완료됨 (Completed)</option>
+        <option value="all">{{ $t('outbound_list.status_all') }}</option>
+        <option value="incomplete">{{ $t('outbound_list.status_incomplete') }}</option>
+        <option value="completed">{{ $t('outbound_list.status_completed') }}</option>
       </select>
     </div>
 
@@ -24,11 +40,11 @@
       <table class="outbound-table">
         <thead>
           <tr>
-            <th>출고 번호</th>
-            <th>날짜</th>
-            <th>담당자 / 고객명</th>
-            <th>담당 지점</th>
-            <th>유형</th>
+            <th>{{ $t('outbound_list.col_outbound_no') }}</th>
+            <th>{{ $t('outbound_list.col_date') }}</th>
+            <th>{{ $t('outbound_list.col_manager_customer') }}</th>
+            <th>{{ listType === 'Material Transfer' ? $t('outbound_list.col_source_target') : $t('outbound_list.col_manager_branch') }}</th>
+            <th>{{ $t('outbound_list.col_type') }}</th>
             <th class="action-cell"></th>
           </tr>
         </thead>
@@ -37,16 +53,25 @@
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.posting_date }}</td>
             <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || '-' }}</td>
-            <td>{{ res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || '-' }}</td>
+            <td>
+              <template v-if="listType === 'Material Transfer'">
+                {{ res.from_warehouse }} ➔ {{ res.to_warehouse }}
+              </template>
+              <template v-else>
+                {{ res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || '-' }}
+              </template>
+            </td>
             <td>
               <span class="res-badge" :style="getStatusStyle(res)">{{ getStatusText(res) }}</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button class="btn-delete" @click="cancelOutbound(res.name)" title="출고 취소">🗑️</button>
+              <button class="btn-delete" @click="cancelOutbound(res.name)" :title="$t('outbound_list.btn_delete_title')">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredOutbounds.length === 0">
-            <td colspan="8" class="empty-msg">조건에 맞는 출고이 없습니다.</td>
+            <td colspan="6" class="empty-msg">
+              {{ listType === 'Material Transfer' ? $t('outbound_list.empty_msg_transfer') : $t('outbound_list.empty_msg_outbound') }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -56,31 +81,31 @@
     <div class="modal-overlay" v-if="selectedOutbound">
       <div class="modal-content modal-large">
         <div class="modal-header with-nav">
-          <button class="nav-arrow" @click="goToPreviousOutbound" title="이전 출고">◀</button>
-          <h3>출고 상세: {{ selectedOutbound.name }}</h3>
-          <button class="nav-arrow" @click="goToNextOutbound" title="다음 출고">▶</button>
+          <button class="nav-arrow" @click="goToPreviousOutbound" :title="listType === 'Material Transfer' ? $t('outbound_list.btn_prev_transfer') : $t('outbound_list.btn_prev_outbound')">◀</button>
+          <h3>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_title_transfer') : $t('outbound_list.modal_title_outbound') }}: {{ selectedOutbound.name }}</h3>
+          <button class="nav-arrow" @click="goToNextOutbound" :title="listType === 'Material Transfer' ? $t('outbound_list.btn_next_transfer') : $t('outbound_list.btn_next_outbound')">▶</button>
           <button class="close-btn" @click="selectedOutbound = null">×</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid" style="flex-wrap: wrap;">
             <div class="detail-card">
-              <label>유형 / 상태</label>
+              <label>{{ $t('outbound_list.modal_type_status') }}</label>
               <div class="val"><span class="res-badge" :style="getStatusStyle(selectedOutbound)">{{ getStatusText(selectedOutbound) }}</span></div>
             </div>
             <div class="detail-card">
-              <label>소스창고 (출발)</label>
+              <label>{{ $t('outbound_list.modal_source') }}</label>
               <div class="val">{{ selectedOutbound.from_warehouse || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>담당 지점 (도착)</label>
-              <div class="val">{{ selectedOutbound.custom_ordering_branch || selectedOutbound.to_warehouse || '-' }}</div>
+              <label>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_target') : $t('outbound_list.modal_manager_branch') }}</label>
+              <div class="val">{{ listType === 'Material Transfer' ? selectedOutbound.to_warehouse : (selectedOutbound.custom_ordering_branch || selectedOutbound.to_warehouse || '-') }}</div>
             </div>
             <div class="detail-card">
-              <label>담당자 / 고객명</label>
+              <label>{{ $t('outbound_list.modal_manager_customer') }}</label>
               <div class="val">{{ [selectedOutbound.custom_orderer, selectedOutbound.custom_customer].filter(Boolean).join(' / ') || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>출고일</label>
+              <label>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_transfer_date') : $t('outbound_list.modal_outbound_date') }}</label>
               <div class="val">{{ selectedOutbound.posting_date }}</div>
             </div>
           </div>
@@ -88,11 +113,11 @@
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목명</th>
-                <th>컬러</th>
-                <th>출고 박스</th>
-                <th>출고 낱개</th>
-                <th>총 수량</th>
+                <th>{{ $t('outbound_list.modal_col_item') }}</th>
+                <th>{{ $t('outbound_list.modal_col_color') }}</th>
+                <th>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_col_transfer_box') : $t('outbound_list.modal_col_outbound_box') }}</th>
+                <th>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_col_transfer_ea') : $t('outbound_list.modal_col_outbound_ea') }}</th>
+                <th>{{ $t('outbound_list.modal_col_total') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -105,19 +130,19 @@
                   <span v-else>-</span>
                 </td>
                 <td style="color: #10b981; font-weight: bold;">
-                  {{ getBoxQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} 박스
+                  {{ getBoxQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} {{ $t('outbound_list.box') }}
                 </td>
                 <td style="color: #f59e0b; font-weight: bold;">
-                  {{ getEachQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} 개
+                  {{ getEachQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} {{ $t('outbound_list.ea') }}
                 </td>
-                <td style="color: #0ea5e9; font-weight: bold;">{{ item.qty }} 개</td>
+                <td style="color: #0ea5e9; font-weight: bold;">{{ item.qty }} {{ $t('outbound_list.ea') }}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="modal-footer">
           <button class="btn-load-cart" @click="loadToCart">
-            ✏️ 내역 수정 (장바구니로 이동)
+            ✏️ {{ $t('outbound_list.btn_edit') }}
           </button>
         </div>
       </div>
@@ -128,6 +153,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 const props = defineProps({
@@ -138,8 +164,14 @@ const props = defineProps({
   rawItems: {
     type: Array,
     default: () => []
+  },
+  listType: {
+    type: String,
+    default: 'Material Issue'
   }
 })
+
+const { t } = useI18n()
 
 const emit = defineEmits(['create-new', 'edit-outbound'])
 
@@ -153,8 +185,10 @@ const frappeApi = axios.create({
 
 const outbounds = ref([])
 const searchQuery = ref('')
-const statusFilter = ref('incomplete')
 const branchFilter = ref('all')
+const sourceFilter = ref('all')
+const targetFilter = ref('all')
+const statusFilter = ref('all')
 const selectedOutbound = ref(null)
 const selectedOutboundItems = ref([])
 const getItemDetails = (itemCode) => {
@@ -178,13 +212,20 @@ const fetchOutbounds = async () => {
         fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'custom_ordering_branch', 'custom_orderer', 'custom_customer', 'to_warehouse', 'from_warehouse', 'docstatus', 'total_outgoing_value']),
         filters: JSON.stringify([['docstatus', '=', 1], ['stock_entry_type', 'in', ['Material Issue', 'Material Transfer']]]),
         limit_page_length: 100,
-        order_by: 'creation desc'
+        order_by: 'creation desc',
+        _t: Date.now() // 캐시 방지 (브라우저/클라우드플레어)
       }
     })
     
-    outbounds.value = resWithProgress.data.data || []
+    const allOutbounds = resWithProgress.data.data || []
+    
+    // JS 레벨에서 한 번 더 필터링 (구 버전 API 호출 유지하되 현재 탭에 맞는 것만 표시)
+    outbounds.value = allOutbounds.filter(doc => doc.stock_entry_type === props.listType);
+    console.log("FILTERED OUTBOUNDS (JS):", outbounds.value);
   } catch (error) {
     console.error('출고 목록 조회 에러:', error)
+    const errorMsg = error.response ? (error.response.data.exc_type || JSON.stringify(error.response.data)) : error.message;
+    alert(t('pos.msg_err_res_svr') + '\n' + errorMsg);
   }
 }
 
@@ -200,19 +241,28 @@ const filteredOutbounds = computed(() => {
       (res.name && res.name.toLowerCase().includes(q)) || 
       (res.custom_orderer && res.custom_orderer.toLowerCase().includes(q))
       
-    // 2. Status Filter
+    // 2. Status Filter (Stock Entries with docstatus=1 are always completed)
     let matchStatus = true
     if (statusFilter.value === 'incomplete') {
-      matchStatus = true;
+      matchStatus = false; // No incomplete stock entries are fetched
     } else if (statusFilter.value === 'completed') {
-      matchStatus = false;
+      matchStatus = true;
     }
     
     // 3. Branch Filter
     let matchBranch = true
-    if (branchFilter.value !== 'all') {
-      const b = res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || ''
-      matchBranch = b.includes(branchFilter.value)
+    if (props.listType === 'Material Transfer') {
+      if (sourceFilter.value !== 'all') {
+        matchBranch = matchBranch && (res.from_warehouse || '').includes(sourceFilter.value)
+      }
+      if (targetFilter.value !== 'all') {
+        matchBranch = matchBranch && (res.to_warehouse || '').includes(targetFilter.value)
+      }
+    } else {
+      if (branchFilter.value !== 'all') {
+        const b = res.custom_ordering_branch || res.to_warehouse || res.from_warehouse || ''
+        matchBranch = b.includes(branchFilter.value)
+      }
     }
     
     return matchSearch && matchStatus && matchBranch
@@ -231,7 +281,7 @@ const getStatusStyle = (res) => {
 }
 
 const getStatusText = (res) => {
-  return res.stock_entry_type === 'Material Transfer' ? '이동 완료' : '출고 완료'
+  return res.stock_entry_type === 'Material Transfer' ? t('status.transfer_completed') : t('status.outbound_completed')
 }
 
 const getProgressPercent = (res) => {
@@ -277,18 +327,18 @@ const loadToCart = () => {
 }
 
 const cancelOutbound = async (name) => {
-  if (!confirm(`${name} 출고을 취소하시겠습니까?`)) return
+  if (!confirm(t('outbound_list.msg_confirm_cancel', { name: name }))) return
   try {
     // Frappe Cancel Method
     await frappeApi.post(`/api/method/frappe.client.cancel`, {
       doctype: 'Stock Entry',
       name: name
     })
-    alert('취소되었습니다.')
+    alert(t('outbound_list.msg_cancel_success'))
     fetchOutbounds()
   } catch (error) {
     console.error('취소 에러:', error)
-    alert('취소 중 오류가 발생했습니다. 이미 일부 출고된 출고일 수 있습니다.')
+    alert(t('outbound_list.msg_cancel_error'))
   }
 }
 </script>

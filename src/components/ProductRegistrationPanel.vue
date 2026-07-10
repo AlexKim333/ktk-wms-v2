@@ -1,101 +1,101 @@
 <template>
   <div class="product-registration-zone">
     <header class="product-reg-header">
-      <h2>📦 Product Registration</h2>
-      <p class="product-reg-subtitle">Stock & Accounting Integration · Valuation & Pricing (F8: Save / F4: Grid / F9: Reset)</p>
+      <h2>{{ $t('product_reg.title') }}</h2>
+      <p class="product-reg-subtitle">{{ $t('product_reg.subtitle') }}</p>
     </header>
 
     <form class="product-reg-form" @submit.prevent="saveProduct">
       <div class="form-grid">
         <label class="form-field">
-          <span>Item Name *</span>
-          <input v-model="form.item_name" type="text" required placeholder="e.g., P-160" autofocus />
+          <span>{{ $t('product_reg.item_name') }}</span>
+          <input v-model="form.item_name" type="text" required :placeholder="$t('product_reg.item_name_ph')" autofocus />
         </label>
         
         <label class="form-field">
-          <span>Color *</span>
-          <input v-model="form.color" type="text" required placeholder="e.g., BLACK" />
+          <span>{{ $t('product_reg.color') }}</span>
+          <input v-model="form.color" type="text" required :placeholder="$t('product_reg.color_ph')" />
         </label>
         
         <label class="form-field brand-field">
-          <span>Brand *</span>
+          <span>{{ $t('product_reg.brand') }}</span>
           <div class="brand-input-group">
             <select v-model="form.brand_id" required :disabled="brandsLoading">
-              <option value="" disabled>Select Brand</option>
+              <option value="" disabled>{{ $t('product_reg.brand_select') }}</option>
               <option v-for="b in brands" :key="b.name" :value="b.name">{{ b.name }}</option>
             </select>
-            <button type="button" class="btn-new-brand" @click="openBrandDialog">+ New</button>
+            <button type="button" class="btn-new-brand" @click="openBrandDialog">{{ $t('product_reg.btn_new') }}</button>
           </div>
         </label>
 
         <label class="form-field barcode-field">
-          <span>Barcode / QR</span>
-          <input ref="barcodeInputRef" v-model="form.barcode" type="text" placeholder="Scanner Input" @keydown.enter.prevent="saveProduct" />
+          <span>{{ $t('product_reg.barcode') }}</span>
+          <input ref="barcodeInputRef" v-model="form.barcode" type="text" :placeholder="$t('product_reg.barcode_ph')" @keydown.enter.prevent="saveProduct" />
         </label>
         
         <!-- 🌟 물류/회계 통합 입력 영역 -->
         <label class="form-field">
-          <span>Opening Warehouse *</span>
+          <span>{{ $t('product_reg.warehouse') }}</span>
           <select v-model="form.opening_warehouse" required>
-            <option value="" disabled>Select Warehouse</option>
+            <option value="" disabled>{{ $t('product_reg.warehouse_select') }}</option>
             <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name || wh.name }}</option>
           </select>
         </label>
 
         <label class="form-field">
-          <span>Opening Qty (Units) *</span>
+          <span>{{ $t('product_reg.opening_qty_units') }}</span>
           <input v-model.number="form.opening_qty" type="number" min="0" required placeholder="0" />
         </label>
 
         <label class="form-field">
-          <span>Valuation Rate (Cost) *</span>
-          <input v-model.number="form.valuation_rate" type="number" step="0.01" min="0" required placeholder="e.g., 17.00" />
+          <span>{{ $t('product_reg.valuation_rate') }}</span>
+          <input v-model.number="form.valuation_rate" type="number" step="0.01" min="0" required :placeholder="$t('product_reg.ph_valuation')" />
         </label>
 
         <label class="form-field">
-          <span>Selling Price (Standard) *</span>
-          <input v-model.number="form.selling_price" type="number" step="0.01" min="0" required placeholder="e.g., 20.00" />
+          <span>{{ $t('product_reg.selling_price') }}</span>
+          <input v-model.number="form.selling_price" type="number" step="0.01" min="0" required :placeholder="$t('product_reg.ph_selling')" />
         </label>
 
         <label class="form-field">
-          <span>Pack Qty *</span>
-          <input v-model.number="form.box_packaging_qty" type="number" min="1" required placeholder="10" />
+          <span>{{ $t('product_reg.pack_qty') }}</span>
+          <input v-model.number="form.box_packaging_qty" type="number" min="1" required :placeholder="$t('product_reg.ph_pack')" />
         </label>
         
         <label class="form-field checkbox-field">
-          <span>Grid Item (F4)</span>
+          <span>{{ $t('product_reg.grid_item') }}</span>
           <div class="checkbox-wrapper">
             <input type="checkbox" v-model="form.is_grid" id="grid-checkbox" />
-            <label for="grid-checkbox">This is a grid item with various options</label>
+            <label for="grid-checkbox">{{ $t('product_reg.grid_desc') }}</label>
           </div>
         </label>
       </div>
 
       <div class="form-actions">
         <button type="submit" class="btn-save" :disabled="isSaving">
-          {{ isSaving ? 'Saving 3-Step Process...' : 'Save Product (F8)' }}
+          {{ isSaving ? $t('product_reg.saving_3step') : $t('product_reg.btn_save') }}
         </button>
-        <button type="button" class="btn-reset" @click="resetForm">Reset Form (F9)</button>
+        <button type="button" class="btn-reset" @click="resetForm">{{ $t('product_reg.btn_reset') }}</button>
       </div>
     </form>
 
     <section class="product-list-section">
       <div class="list-header">
-        <h3>Registered Products Monitor</h3>
-        <button type="button" class="btn-refresh" @click="loadData" :disabled="itemsLoading">🔄 Refresh</button>
+        <h3>{{ $t('product_reg.monitor_title') }}</h3>
+        <button type="button" class="btn-refresh" @click="loadData" :disabled="itemsLoading">🔄 {{ $t('product_reg.btn_refresh') }}</button>
       </div>
 
-      <div v-if="itemsLoading" class="list-empty">Loading list...</div>
-      <div v-else-if="registeredItems.length === 0" class="list-empty">No products registered.</div>
+      <div v-if="itemsLoading" class="list-empty">{{ $t('product_reg.loading_list') }}</div>
+      <div v-else-if="registeredItems.length === 0" class="list-empty">{{ $t('product_reg.empty_list') }}</div>
 
       <table v-else class="product-monitor-table">
         <thead>
           <tr>
-            <th>Item Code</th>
-            <th>Item Name</th>
-            <th>Color</th>
-            <th>Pack Qty</th>
-            <th>Grid</th>
+            <th>{{ $t('product_reg.col_item_code') }}</th>
+            <th>{{ $t('product_reg.col_item_name') }}</th>
+            <th>{{ $t('product_reg.col_color') }}</th>
+            <th>{{ $t('product_reg.col_pack_qty') }}</th>
+            <th>{{ $t('product_reg.col_grid') }}</th>
           </tr>
         </thead>
         <tbody>

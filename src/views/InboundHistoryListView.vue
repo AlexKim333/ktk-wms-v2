@@ -1,22 +1,22 @@
 <template>
   <div class="history-list-container">
     <div class="header-actions">
-      <h2>📅 취소/수정 내역 현황 (InboundHistorys)</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 취소/수정 내역)</button>
+      <h2>📅 {{ $t('inbound_list.history_title') }}</h2>
+      <button class="btn-create" @click="$emit('create-new')">➕ {{ $t('inbound_list.history_btn_create') }}</button>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="취소/수정 내역 검색 (고객명, 번호)" class="filter-input" />
+      <input type="text" v-model="searchQuery" :placeholder="$t('inbound_list.history_search_placeholder')" class="filter-input" />
       <select v-model="branchFilter" class="filter-select">
-        <option value="all">모든 지점 (All Branches)</option>
+        <option value="all">{{ $t('inbound_list.all_branches') }}</option>
         <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
           {{ branch.warehouse_name || branch.name }}
         </option>
       </select>
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 (All)</option>
-        <option value="incomplete">진행 중 (Incomplete)</option>
-        <option value="completed">완료됨 (Completed)</option>
+        <option value="all">{{ $t('inbound_list.status_all') }}</option>
+        <option value="incomplete">{{ $t('inbound_list.status_incomplete') }}</option>
+        <option value="completed">{{ $t('inbound_list.status_completed') }}</option>
       </select>
     </div>
 
@@ -24,12 +24,12 @@
       <table class="history-table">
         <thead>
           <tr>
-            <th>전표 ID</th>
-            <th>생성일</th>
-            <th>공급자 ➡️ 도착 창고</th>
-            <th>발주자 / 발주처</th>
-            <th>취소/수정자</th>
-            <th>상태</th>
+            <th>{{ $t('inbound_list.history_col_id') }}</th>
+            <th>{{ $t('inbound_list.history_col_date') }}</th>
+            <th>{{ $t('inbound_list.col_supplier_target') }}</th>
+            <th>{{ $t('inbound_list.col_orderer_branch') }}</th>
+            <th>{{ $t('inbound_list.history_col_modifier') }}</th>
+            <th>{{ $t('inbound_list.history_col_status') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -40,11 +40,11 @@
             <td>{{ [res.custom_orderer, res.custom_ordering_branch].filter(Boolean).join(' / ') || '-' }}</td>
             <td class="customer-name" style="color:#ef4444">{{ res.modified_by || '-' }}</td>
             <td>
-              <span class="res-badge" style="background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:0.85rem">취소/대체됨</span>
+              <span class="res-badge" style="background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:0.85rem">{{ $t('inbound_list.status_cancelled') }}</span>
             </td>
           </tr>
           <tr v-if="filteredInboundHistorys.length === 0">
-            <td colspan="5" class="empty-msg">조건에 맞는 취소/수정 내역이 없습니다.</td>
+            <td colspan="5" class="empty-msg">{{ $t('inbound_list.history_empty_msg') }}</td>
           </tr>
         </tbody>
       </table>
@@ -54,43 +54,43 @@
     <div class="modal-overlay" v-if="selectedInboundHistory">
       <div class="modal-content modal-large">
         <div class="modal-header with-nav">
-          <button class="nav-arrow" @click="goToPreviousHistory" title="이전 내역">◀</button>
-          <h3>내역 상세: {{ selectedInboundHistory.name }}</h3>
-          <button class="nav-arrow" @click="goToNextHistory" title="다음 내역">▶</button>
+          <button class="nav-arrow" @click="goToPreviousHistory" :title="$t('inbound_list.btn_prev')">◀</button>
+          <h3>{{ $t('inbound_list.history_modal_title_prefix') }}{{ selectedInboundHistory.name }}</h3>
+          <button class="nav-arrow" @click="goToNextHistory" :title="$t('inbound_list.btn_next')">▶</button>
           <button class="close-btn" @click="selectedInboundHistory = null">×</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>공급자 (Source)</label>
+              <label>{{ $t('inbound_list.modal_supplier') }}</label>
               <div class="val">{{ selectedInboundHistory.supplier || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>도착 창고 (Target)</label>
+              <label>{{ $t('inbound_list.modal_target') }}</label>
               <div class="val">{{ selectedInboundHistory.to_warehouse || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>발주처 (Orderer Branch)</label>
+              <label>{{ $t('inbound_list.modal_orderer_branch') }}</label>
               <div class="val">{{ selectedInboundHistory.custom_ordering_branch || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>발주자 (Orderer) / 취소자</label>
-              <div class="val">{{ selectedInboundHistory.custom_orderer || '-' }} <br/> <span style="color:#ef4444; font-size: 0.9em">(취소자: {{ selectedInboundHistory.modified_by }})</span></div>
+              <label>{{ $t('inbound_list.history_modal_orderer') }}</label>
+              <div class="val">{{ selectedInboundHistory.custom_orderer || '-' }} <br/> <span style="color:#ef4444; font-size: 0.9em">({{ $t('inbound_list.modal_cancelled_by') }}: {{ selectedInboundHistory.modified_by }})</span></div>
             </div>
             <div class="detail-card">
-              <label>생성일</label>
+              <label>{{ $t('inbound_list.history_modal_creation_date') }}</label>
               <div class="val">{{ selectedInboundHistory.creation ? selectedInboundHistory.creation.split(' ')[0] : '' }}</div>
             </div>
           </div>
           
           <div class="compare-tables">
             <div class="compare-section">
-              <h4 style="color: #ef4444; margin-bottom: 10px;">📉 취소된 내역 (수정 전)</h4>
+              <h4 style="color: #ef4444; margin-bottom: 10px;">📉 {{ $t('inbound_list.history_cancelled_items') }}</h4>
               <table class="detail-items-table">
                 <thead>
                   <tr>
-                    <th>품목명</th>
-                    <th>수량</th>
+                    <th>{{ $t('inbound_list.modal_col_item') }}</th>
+                    <th>{{ $t('inbound_list.modal_col_qty') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -103,12 +103,12 @@
             </div>
 
             <div class="compare-section" v-if="amendedDocumentItems.length > 0">
-              <h4 style="color: #0ea5e9; margin-bottom: 10px;">📈 재발행된 내역 (수정 후: {{ amendedDocumentName }})</h4>
+              <h4 style="color: #0ea5e9; margin-bottom: 10px;">📈 {{ $t('inbound_list.history_replaced_items', { doc: amendedDocumentName }) }}</h4>
               <table class="detail-items-table">
                 <thead>
                   <tr>
-                    <th>품목명</th>
-                    <th>수량</th>
+                    <th>{{ $t('inbound_list.modal_col_item') }}</th>
+                    <th>{{ $t('inbound_list.modal_col_qty') }}</th>
                   </tr>
                 </thead>
                 <tbody>

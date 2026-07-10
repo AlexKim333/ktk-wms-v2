@@ -1,19 +1,19 @@
 <template>
   <div class="product-list-zone">
     <header class="page-header">
-      <h2>📋 Product List & Inventory</h2>
+      <h2>📋 {{ $t('product_list.title') }}</h2>
       <div class="action-buttons">
         <button class="btn-action outline" @click="handleMigration">
-          <span class="icon">📥</span> CSV Import
+          <span class="icon">📥</span> {{ $t('common.csv_import') }}
         </button>
         <button class="btn-action outline" @click="exportCSV">
-          <span class="icon">📤</span> CSV Export
+          <span class="icon">📤</span> {{ $t('common.csv_export') }}
         </button>
         <button class="btn-action outline" @click="openBarcodeModal" :disabled="selectedItems.length === 0">
-          <span class="icon">🖨️</span> Print Barcode ({{ selectedItems.length }})
+          <span class="icon">🖨️</span> {{ $t('product_list.print_barcode', { count: selectedItems.length }) }}
         </button>
         <button class="btn-action primary" @click="isRegModalOpen = true">
-          <span class="icon">➕</span> New Product
+          <span class="icon">➕</span> {{ $t('product_list.new_product') }}
         </button>
       </div>
     </header>
@@ -24,24 +24,24 @@
           <input 
             type="text" 
             v-model="searchQuery" 
-            placeholder="🔍 Search by name, color, brand..." 
+            :placeholder="$t('product_list.search_placeholder')" 
             class="search-input" 
           />
         </div>
         
         <div class="warehouse-filter-wrapper">
           <select v-model="selectedWarehouse" class="warehouse-select">
-            <option value="All">전체 창고 (All Warehouses)</option>
+            <option value="All">{{ $t('product_list.all_warehouses') }}</option>
             <option v-for="wh in availableWarehouses" :key="wh.name" :value="wh.name">
               {{ wh.warehouse_name }}
             </option>
           </select>
-          <button class="btn-action outline icon-only" @click="isExcludeModalOpen = true" title="제외 창고 설정">
+          <button class="btn-action outline icon-only" @click="isExcludeModalOpen = true" :title="$t('product_list.exclude_wh_setting')">
             ⚙️
           </button>
         </div>
 
-        <button class="btn-refresh" @click="loadProducts" :disabled="isLoading">🔄 Refresh</button>
+        <button class="btn-refresh" @click="loadProducts" :disabled="isLoading">🔄 {{ $t('common.refresh') }}</button>
       </div>
 
       <div class="table-scroll">
@@ -49,22 +49,22 @@
           <thead>
             <tr>
               <th width="40"><input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected" /></th>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Brand</th>
-              <th>Color</th>
-              <th>Pack Qty</th>
-              <th class="align-right">Box Stock</th>
-              <th class="align-right">Piece Stock</th>
-              <th class="align-right">Total Pieces</th>
+              <th>{{ $t('product_list.col_item_code') }}</th>
+              <th>{{ $t('product_list.col_item_name') }}</th>
+              <th>{{ $t('product_list.col_brand') }}</th>
+              <th>{{ $t('product_list.col_color') }}</th>
+              <th>{{ $t('product_list.col_pack_qty') }}</th>
+              <th class="align-right">{{ $t('product_list.col_box_stock') }}</th>
+              <th class="align-right">{{ $t('product_list.col_piece_stock') }}</th>
+              <th class="align-right">{{ $t('product_list.col_total_pieces') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="isLoading">
-              <td colspan="9" class="empty-state">Loading data...</td>
+              <td colspan="9" class="empty-state">{{ $t('common.loading') }}</td>
             </tr>
             <tr v-else-if="filteredProducts.length === 0">
-              <td colspan="9" class="empty-state">No product data available.</td>
+              <td colspan="9" class="empty-state">{{ $t('product_list.no_data') }}</td>
             </tr>
             <tr v-else v-for="item in filteredProducts" :key="item.name" :class="{ selected: selectedItems.includes(item.name) }">
               <td><input type="checkbox" :value="item.name" v-model="selectedItems" /></td>
@@ -92,10 +92,10 @@
     <div class="modal-overlay" v-if="isExcludeModalOpen">
       <div class="modal-content exclude-modal">
         <div class="modal-header">
-          <h3>⚙️ 검색 제외 창고 설정</h3>
+          <h3>⚙️ {{ $t('product_list.exclude_modal_title') }}</h3>
         </div>
         <div class="modal-body">
-          <p class="text-sm text-gray mb-3">체크된 창고는 전체 재고 합산 및 창고 드롭다운 목록에서 제외됩니다.</p>
+          <p class="text-sm text-gray mb-3">{{ $t('product_list.exclude_modal_desc') }}</p>
           <div class="warehouse-checklist">
             <label v-for="wh in rawWarehouses" :key="wh.name" class="check-label">
               <input type="checkbox" :value="wh.name" v-model="excludedWarehouses" @change="saveExcluded" />
@@ -104,7 +104,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn-action primary" @click="isExcludeModalOpen = false">완료</button>
+          <button class="btn-action primary" @click="isExcludeModalOpen = false">{{ $t('common.done') }}</button>
         </div>
       </div>
     </div>

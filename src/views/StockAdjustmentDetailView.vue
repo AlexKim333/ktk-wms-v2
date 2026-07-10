@@ -2,21 +2,21 @@
   <div class="adj-detail-container">
     <div class="header-nav">
       <button class="back-btn" @click="$emit('go-back')">←</button>
-      <h2>{{ isDraft ? `Draft #${adjustmentId}` : 'New Stock Count' }}</h2>
-      <span v-if="isDraft" class="draft-badge">Draft</span>
+      <h2>{{ isDraft ? `${$t('stock_adj.detail_draft_prefix')}${adjustmentId}` : $t('stock_adj.detail_new') }}</h2>
+      <span v-if="isDraft" class="draft-badge">{{ $t('stock_adj.status_draft') }}</span>
     </div>
 
     <div class="content-layout">
       <!-- Left Area: Items -->
       <div class="left-panel">
         <div class="panel-card search-card">
-          <label>Products to Adjust</label>
+          <label>{{ $t('stock_adj.detail_products_label') }}</label>
           <div class="search-input-wrapper">
             <span class="icon">🔍</span>
             <input 
               type="text" 
               v-model="searchQuery" 
-              placeholder="Search products..." 
+              :placeholder="$t('stock_adj.detail_search_placeholder')" 
               @focus="isDropdownOpen = true"
             />
             <span class="icon scanner-icon">🎫</span>
@@ -32,10 +32,10 @@
                 <div class="item-img-placeholder">📷</div>
                 <div class="item-info">
                   <div class="item-name">{{ item.item_name }}</div>
-                  <div class="item-color">{{ item.custom_color || 'Default' }} · Pack: {{ item.custom_pack_qty || 1 }}</div>
+                  <div class="item-color">{{ item.custom_color || $t('stock_adj.detail_default_color') }} · {{ $t('stock_adj.detail_pack') }}: {{ item.custom_pack_qty || 1 }}</div>
                 </div>
                 <div class="item-stock-badge">
-                  {{ getBinStock(item.name) }} Units
+                  {{ getBinStock(item.name) }} {{ $t('stock_adj.detail_units') }}
                 </div>
               </div>
             </div>
@@ -47,11 +47,11 @@
             <table class="items-table">
               <thead>
                 <tr>
-                  <th style="width: 35%">Product</th>
-                  <th style="width: 15%">System Stock</th>
-                  <th style="width: 20%">Physical Qty</th>
-                  <th style="width: 15%">Unit Cost</th>
-                  <th style="width: 10%">Diff</th>
+                  <th style="width: 35%">{{ $t('stock_adj.col_product') }}</th>
+                  <th style="width: 15%">{{ $t('stock_adj.col_sys_stock') }}</th>
+                  <th style="width: 20%">{{ $t('stock_adj.col_phys_qty') }}</th>
+                  <th style="width: 15%">{{ $t('stock_adj.col_unit_cost') }}</th>
+                  <th style="width: 10%">{{ $t('stock_adj.col_diff') }}</th>
                   <th style="width: 5%"></th>
                 </tr>
               </thead>
@@ -62,7 +62,7 @@
                       <div class="img-placeholder">📷</div>
                       <div>
                         <div class="font-bold">{{ row.item_name }}</div>
-                        <div class="text-sm text-gray">{{ row.item_code }} (Pack: {{ row.pack_qty }})</div>
+                        <div class="text-sm text-gray">{{ row.item_code }} ({{ $t('stock_adj.detail_pack') }}: {{ row.pack_qty }})</div>
                       </div>
                     </div>
                   </td>
@@ -71,9 +71,9 @@
                   </td>
                   <td>
                     <div class="qty-inputs">
-                      <input type="number" v-model.number="row.input_box" placeholder="Box" class="qty-box" />
+                      <input type="number" v-model.number="row.input_box" :placeholder="$t('stock_adj.box')" class="qty-box" />
                       <span>+</span>
-                      <input type="number" v-model.number="row.input_each" placeholder="Pcs" class="qty-each" />
+                      <input type="number" v-model.number="row.input_each" :placeholder="$t('stock_adj.pcs')" class="qty-each" />
                     </div>
                   </td>
                   <td>
@@ -83,11 +83,11 @@
                     {{ calculateDiff(row) > 0 ? '+' : '' }}{{ calculateDiff(row) }}
                   </td>
                   <td class="text-center">
-                    <button class="btn-delete" @click="removeItem(idx)" title="Remove item">🗑️</button>
+                    <button class="btn-delete" @click="removeItem(idx)" :title="$t('stock_adj.btn_remove_title')">🗑️</button>
                   </td>
                 </tr>
                 <tr v-if="adjustmentItems.length === 0">
-                  <td colspan="6" class="empty-state">Search and add products to adjust.</td>
+                  <td colspan="6" class="empty-state">{{ $t('stock_adj.empty_detail') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -96,15 +96,15 @@
         
         <div class="panel-card summary-card">
           <div class="summary-item">
-            <span class="label">Total Products</span>
+            <span class="label">{{ $t('stock_adj.summary_total_products') }}</span>
             <span class="value">{{ adjustmentItems.length }}</span>
           </div>
           <div class="summary-item">
-            <span class="label">Total Physical Qty</span>
+            <span class="label">{{ $t('stock_adj.summary_total_qty') }}</span>
             <span class="value">{{ totalPhysicalQty }}</span>
           </div>
           <div class="summary-item">
-            <span class="label">Net Difference</span>
+            <span class="label">{{ $t('stock_adj.summary_net_diff') }}</span>
             <span class="value" :class="totalDiff > 0 ? 'text-green' : (totalDiff < 0 ? 'text-red' : '')">
               {{ totalDiff > 0 ? '+' : '' }}{{ totalDiff }}
             </span>
@@ -117,9 +117,9 @@
         <div class="panel-card settings-card">
           
           <div class="form-group">
-            <label>Destination (Warehouse)</label>
+            <label>{{ $t('stock_adj.label_destination') }}</label>
             <select v-model="selectedWarehouse" @change="fetchBinData">
-              <option disabled value="">Choose Location</option>
+              <option disabled value="">{{ $t('stock_adj.placeholder_location') }}</option>
               <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">
                 {{ wh.warehouse_name }}
               </option>
@@ -127,20 +127,20 @@
           </div>
 
           <div class="form-group">
-            <label>Adjustment Reason</label>
+            <label>{{ $t('stock_adj.label_reason') }}</label>
             <select v-model="selectedReason">
-              <option disabled value="">Choose Reason</option>
-              <option value="Stock Reconciliation">Correction (Reconciliation)</option>
-              <option value="Damage">Deterioration</option>
-              <option value="Theft">Theft or loss</option>
+              <option disabled value="">{{ $t('stock_adj.placeholder_reason') }}</option>
+              <option value="Stock Reconciliation">{{ $t('stock_adj.reason_correction') }}</option>
+              <option value="Damage">{{ $t('stock_adj.reason_damage') }}</option>
+              <option value="Theft">{{ $t('stock_adj.reason_theft') }}</option>
             </select>
           </div>
 
           <div class="form-group">
             <label class="flex-between">
-              Notes <span class="icon">✏️</span>
+              {{ $t('stock_adj.label_notes') }} <span class="icon">✏️</span>
             </label>
-            <textarea v-model="notes" placeholder="No notes added" rows="4"></textarea>
+            <textarea v-model="notes" :placeholder="$t('stock_adj.placeholder_notes')" rows="4"></textarea>
           </div>
 
         </div>
@@ -148,9 +148,9 @@
     </div>
 
     <div class="bottom-actions">
-      <button class="btn-cancel" @click="$emit('go-back')">Cancel</button>
-      <button class="btn-draft" @click="saveAdjustment(0)">Save Draft</button>
-      <button class="btn-confirm" @click="saveAdjustment(1)">Confirm Entry</button>
+      <button class="btn-cancel" @click="$emit('go-back')">{{ $t('stock_adj.btn_cancel') }}</button>
+      <button class="btn-draft" @click="saveAdjustment(0)">{{ $t('stock_adj.btn_save_draft') }}</button>
+      <button class="btn-confirm" @click="saveAdjustment(1)">{{ $t('stock_adj.btn_confirm') }}</button>
     </div>
   </div>
 </template>

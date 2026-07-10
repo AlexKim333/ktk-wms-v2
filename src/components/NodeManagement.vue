@@ -1,12 +1,12 @@
 <template>
   <div class="node-management-zone">
     <header class="node-header">
-      <h2>🏢 Logistics Node & Partner Management</h2>
-      <p>Real-time node detection & multi-category registration.</p>
+      <h2>{{ $t('node.title') }}</h2>
+      <p>{{ $t('node.desc') }}</p>
       
       <div class="tab-controller">
-        <button :class="['tab-btn', { active: currentView === 'register' }]" @click="currentView = 'register'">📝 Register</button>
-        <button :class="['tab-btn', { active: currentView === 'list' }]" @click="switchToListView">📋 Manage</button>
+        <button :class="['tab-btn', { active: currentView === 'register' }]" @click="currentView = 'register'">{{ $t('node.tab_register') }}</button>
+        <button :class="['tab-btn', { active: currentView === 'list' }]" @click="switchToListView">{{ $t('node.tab_manage') }}</button>
       </div>
     </header>
 
@@ -14,22 +14,25 @@
     <form v-if="currentView === 'register'" class="node-form" @submit.prevent="saveNode">
       <div class="form-grid">
         <label class="form-field">
-          <span>Node Type *</span>
+          <span>{{ $t('node.node_type') }}</span>
           <select v-model="form.node_type" required>
-            <option value="Warehouse">📦 Warehouse</option>
-            <option value="Customer">🏪 Customer</option>
-            <option value="Supplier">🏭 Supplier</option>
+            <option value="Warehouse">{{ $t('node.type_warehouse') }}</option>
+            <option value="Customer">{{ $t('node.type_customer') }}</option>
+            <option value="Supplier">{{ $t('node.type_supplier') }}</option>
           </select>
         </label>
 
         <label class="form-field">
-          <span>Node Name *</span>
+          <span>{{ $t('node.node_name') }}</span>
           <div class="name-input-group">
             <select v-if="form.node_type === 'Warehouse'" v-model="form.prefix" class="prefix-select">
               <option value="[MAIN] ">[MAIN]</option>
               <option value="[SUB] ">[SUB]</option>
               <option value="[CONT] ">[CONT]</option>
-              <option value="">None</option>
+              <option value="[MAIN] ">[MAIN]</option>
+              <option value="[SUB] ">[SUB]</option>
+              <option value="[CONT] ">[CONT]</option>
+              <option value="">{{ $t('node.none') }}</option>
             </select>
             
             <input 
@@ -37,7 +40,7 @@
               @input="form.name = $event.target.value"
               type="text" 
               required 
-              placeholder="Start typing to search or register (e.g., ㅎ, 홍ㄱ...)" 
+              :placeholder="$t('node.search_placeholder')" 
               autocomplete="off"
             />
           </div>
@@ -47,9 +50,9 @@
             <table class="matrix-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Customer</th>
-                  <th>Supplier</th>
+                  <th>{{ $t('node.col_name') }}</th>
+                  <th>{{ $t('node.col_customer') }}</th>
+                  <th>{{ $t('node.col_supplier') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -64,7 +67,7 @@
                 </tr>
                 <tr v-if="matrixMatches.length === 0">
                   <td colspan="3" class="empty-msg">
-                    <button type="button" class="btn-new-node" @click="registerNewNode">✨ Register "{{ form.name }}" as New Node</button>
+                    <button type="button" class="btn-new-node" @click="registerNewNode">{{ $t('node.btn_register_new', { name: form.name }) }}</button>
                   </td>
                 </tr>
               </tbody>
@@ -74,26 +77,26 @@
 
         <!-- ✨ Phone Number Input -->
         <label class="form-field">
-          <span>Phone Number <span class="optional-text">(Optional)</span></span>
-          <input v-model="form.phone" type="text" placeholder="e.g., +52 55 1234 5678" />
+          <span>{{ $t('node.phone') }} <span class="optional-text">{{ $t('node.optional') }}</span></span>
+          <input v-model="form.phone" type="text" :placeholder="$t('node.phone_placeholder')" />
         </label>
 
         <!-- ✨ Multi-Address Input Area -->
         <div class="form-field">
-         <span>Addresses <span class="optional-text">(Optional)</span></span>
+         <span>{{ $t('node.addresses') }} <span class="optional-text">{{ $t('node.optional') }}</span></span>
           <div v-for="(addr, index) in form.addresses" :key="addr.id" class="dynamic-row address-group">
-            <input v-model="addr.city" type="text" placeholder="City (e.g., Monterrey)" class="city-input" />
-            <input v-model="addr.val" type="text" placeholder="Detailed address..." class="addr-input" />
+            <input v-model="addr.city" type="text" :placeholder="$t('node.city_placeholder')" class="city-input" />
+            <input v-model="addr.val" type="text" :placeholder="$t('node.addr_placeholder')" class="addr-input" />
             <button v-if="form.addresses.length > 1" type="button" class="btn-remove-row" @click="removeRegisterAddress(index)">🗑️</button>
           </div>
           <button type="button" class="btn-add-row" @click="addRegisterAddress">
-            <span class="plus-icon">➕</span> Add Another Address
+            <span class="plus-icon">➕</span> {{ $t('node.btn_add_address') }}
           </button>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn-save" :disabled="isSaving">Register</button>
+        <button type="submit" class="btn-save" :disabled="isSaving">{{ $t('node.btn_register') }}</button>
       </div>
     </form>
 
@@ -101,32 +104,32 @@
     <div v-else-if="currentView === 'list'" class="node-list-view">
       <div class="list-filter-bar">
         <select v-model="listFilterType" class="filter-select">
-          <option value="All">🌐 All Types</option>
-          <option value="Warehouse">📦 Warehouse</option>
-          <option value="Customer">🏪 Customer</option>
-          <option value="Supplier">🏭 Supplier</option>
+          <option value="All">{{ $t('node.filter_all_types') }}</option>
+          <option value="Warehouse">{{ $t('node.type_warehouse') }}</option>
+          <option value="Customer">{{ $t('node.type_customer') }}</option>
+          <option value="Supplier">{{ $t('node.type_supplier') }}</option>
         </select>
         
         <input 
           :value="searchQuery"
           @input="searchQuery = $event.target.value"
           type="text" 
-          placeholder="Search to edit... (e.g., ㅎ, 홍ㄱ...)" 
+          :placeholder="$t('node.search_edit_placeholder')" 
           class="filter-input" 
         />
-        <button class="btn-refresh" @click="fetchNodeList">🔄 Refresh</button>
-        <button class="btn-save-status" @click="saveNodeStatus" :disabled="isSaving">💾 Update Status</button>
-        <button class="btn-new-node-action" @click="currentView = 'register'">➕ New Node</button>
+        <button class="btn-refresh" @click="fetchNodeList">🔄 {{ $t('common.refresh') }}</button>
+        <button class="btn-save-status" @click="saveNodeStatus" :disabled="isSaving">{{ $t('node.btn_update_status') }}</button>
+        <button class="btn-new-node-action" @click="currentView = 'register'">{{ $t('node.btn_new_node') }}</button>
       </div>
 
       <div class="table-container">
         <table class="data-table">
           <thead>
             <tr>
-              <th class="text-center" style="width: 60px;">Active</th>
-              <th>Type</th>
-              <th>Name</th>
-              <th class="text-center">Actions</th>
+              <th class="text-center" style="width: 60px;">{{ $t('node.col_active') }}</th>
+              <th>{{ $t('node.col_type') }}</th>
+              <th>{{ $t('node.col_name') }}</th>
+              <th class="text-center">{{ $t('node.col_actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -139,12 +142,12 @@
               </td>
               <td class="fw-bold">{{ node.name }}</td>
               <td class="text-center">
-                <button class="btn-edit" @click="openEditModal(node)">✏️ Edit</button>
+                <button class="btn-edit" @click="openEditModal(node)">{{ $t('node.btn_edit') }}</button>
                 <button class="btn-delete" @click="deleteNode(node)">🗑️</button>
               </td>
             </tr>
             <tr v-if="filteredNodes.length === 0">
-              <td colspan="3" class="text-center empty-msg">No nodes found.</td>
+              <td colspan="3" class="text-center empty-msg">{{ $t('node.empty_list') }}</td>
             </tr>
           </tbody>
         </table>
@@ -154,39 +157,39 @@
     <!-- ✏️ EDIT MODAL (Fully Upgraded with City) -->
     <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal-content">
-        <h3>✏️ Edit {{ editForm.type }}</h3>
+        <h3>{{ $t('node.modal_edit_title', { type: editForm.type }) }}</h3>
         
         <div class="form-grid">
           <label class="form-field">
-            <span>Node Name *</span>
+            <span>{{ $t('node.node_name') }}</span>
             <input v-model="editForm.name" type="text" required />
           </label>
 
           <label class="form-field">
-            <span>Phone Number</span>
-            <input v-model="editForm.phone" type="text" placeholder="Update phone number..." />
+            <span>{{ $t('node.phone') }}</span>
+            <input v-model="editForm.phone" type="text" :placeholder="$t('node.update_phone_placeholder')" />
           </label>
 
           <!-- Edit Addresses Area -->
           <div class="form-field">
-            <span>Manage Addresses</span>
+            <span>{{ $t('node.manage_addresses') }}</span>
             <div v-for="(addr, index) in editForm.addresses" :key="addr.id" class="dynamic-row address-group">
-              <input v-model="addr.city" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" placeholder="City" class="city-input" />
-              <input v-model="addr.val" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" placeholder="Detailed address..." class="addr-input" />
+              <input v-model="addr.city" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" :placeholder="$t('node.city_placeholder')" class="city-input" />
+              <input v-model="addr.val" type="text" :class="{'deleted-input': addr.isDeleted}" :disabled="addr.isDeleted" :placeholder="$t('node.addr_placeholder')" class="addr-input" />
               
               <!-- Toggle Restore/Delete -->
               <button v-if="!addr.isDeleted" type="button" class="btn-remove-row" @click="addr.isDeleted = true">🗑️</button>
               <button v-else type="button" class="btn-restore-row" @click="addr.isDeleted = false">↩️</button>
             </div>
             <button type="button" class="btn-add-row" @click="addEditAddress">
-              <span class="plus-icon">➕</span> Add New Address
+              <span class="plus-icon">➕</span> {{ $t('node.btn_add_new_address') }}
             </button>
           </div>
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn-cancel" @click="closeEditModal">Cancel</button>
-          <button type="button" class="btn-save" @click="updateNode" :disabled="isSaving">💾 Apply Changes</button>
+          <button type="button" class="btn-cancel" @click="closeEditModal">{{ $t('node.btn_cancel') }}</button>
+          <button type="button" class="btn-save" @click="updateNode" :disabled="isSaving">{{ $t('node.btn_apply_changes') }}</button>
         </div>
       </div>
     </div>

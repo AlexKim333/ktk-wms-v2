@@ -1,22 +1,22 @@
 <template>
   <div class="inbound-list-container">
     <div class="header-actions">
-      <h2>📅 입고 현황 (Inbounds)</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 입고)</button>
+      <h2>📅 {{ $t('inbound_list.title') }}</h2>
+      <button class="btn-create" @click="$emit('create-new')">➕ {{ $t('inbound_list.btn_create') }}</button>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="입고 검색 (고객명, 번호)" class="filter-input" />
+      <input type="text" v-model="searchQuery" :placeholder="$t('inbound_list.search_placeholder')" class="filter-input" />
       <select v-model="branchFilter" class="filter-select">
-        <option value="all">모든 지점 (All Branches)</option>
+        <option value="all">{{ $t('inbound_list.all_branches') }}</option>
         <option v-for="branch in branchList" :key="branch.name" :value="branch.name">
           {{ branch.warehouse_name || branch.name }}
         </option>
       </select>
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 (All)</option>
-        <option value="incomplete">진행 중 (Incomplete)</option>
-        <option value="completed">완료됨 (Completed)</option>
+        <option value="all">{{ $t('inbound_list.status_all') }}</option>
+        <option value="incomplete">{{ $t('inbound_list.status_incomplete') }}</option>
+        <option value="completed">{{ $t('inbound_list.status_completed') }}</option>
       </select>
     </div>
 
@@ -24,11 +24,11 @@
       <table class="inbound-table">
         <thead>
           <tr>
-            <th>입고 번호</th>
-            <th>날짜</th>
-            <th>공급자 ➡️ 도착 창고</th>
-            <th>발주자 / 발주처</th>
-            <th>유형</th>
+            <th>{{ $t('inbound_list.col_inbound_no') }}</th>
+            <th>{{ $t('inbound_list.col_date') }}</th>
+            <th>{{ $t('inbound_list.col_supplier_target') }}</th>
+            <th>{{ $t('inbound_list.col_orderer_branch') }}</th>
+            <th>{{ $t('inbound_list.col_type') }}</th>
             <th class="action-cell"></th>
           </tr>
         </thead>
@@ -42,11 +42,11 @@
               <span class="res-badge" :style="getStatusStyle(res)">{{ getStatusText(res) }}</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button class="btn-delete" @click="cancelInbound(res.name)" title="입고 취소">🗑️</button>
+              <button class="btn-delete" @click="cancelInbound(res.name)" :title="$t('inbound_list.btn_delete_title')">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredInbounds.length === 0">
-            <td colspan="8" class="empty-msg">조건에 맞는 입고이 없습니다.</td>
+            <td colspan="8" class="empty-msg">{{ $t('inbound_list.empty_msg') }}</td>
           </tr>
         </tbody>
       </table>
@@ -56,35 +56,35 @@
     <div class="modal-overlay" v-if="selectedInbound">
       <div class="modal-content modal-large">
         <div class="modal-header with-nav">
-          <button class="nav-arrow" @click="goToPreviousInbound" title="이전 입고">◀</button>
-          <h3>입고 상세: {{ selectedInbound.name }}</h3>
-          <button class="nav-arrow" @click="goToNextInbound" title="다음 입고">▶</button>
+          <button class="nav-arrow" @click="goToPreviousInbound" :title="$t('inbound_list.btn_prev')">◀</button>
+          <h3>{{ $t('inbound_list.modal_title_prefix') }}{{ selectedInbound.name }}</h3>
+          <button class="nav-arrow" @click="goToNextInbound" :title="$t('inbound_list.btn_next')">▶</button>
           <button class="close-btn" @click="selectedInbound = null">×</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid" style="flex-wrap: wrap;">
             <div class="detail-card">
-              <label>유형 / 상태</label>
+              <label>{{ $t('inbound_list.modal_type_status') }}</label>
               <div class="val"><span class="res-badge" :style="getStatusStyle(selectedInbound)">{{ getStatusText(selectedInbound) }}</span></div>
             </div>
             <div class="detail-card">
-              <label>공급자 (Source)</label>
+              <label>{{ $t('inbound_list.modal_supplier') }}</label>
               <div class="val">{{ selectedInbound.supplier || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>도착 창고 (Target)</label>
+              <label>{{ $t('inbound_list.modal_target') }}</label>
               <div class="val">{{ selectedInbound.to_warehouse || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>발주처 (Orderer Branch)</label>
+              <label>{{ $t('inbound_list.modal_orderer_branch') }}</label>
               <div class="val">{{ selectedInbound.custom_ordering_branch || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>발주자 (Orderer)</label>
+              <label>{{ $t('inbound_list.modal_orderer') }}</label>
               <div class="val">{{ selectedInbound.custom_orderer || '-' }}</div>
             </div>
             <div class="detail-card">
-              <label>입고일</label>
+              <label>{{ $t('inbound_list.modal_inbound_date') }}</label>
               <div class="val">{{ selectedInbound.posting_date }}</div>
             </div>
           </div>
@@ -92,11 +92,11 @@
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목명</th>
-                <th>컬러</th>
-                <th>입고 박스</th>
-                <th>입고 낱개</th>
-                <th>총 수량</th>
+                <th>{{ $t('inbound_list.modal_col_item') }}</th>
+                <th>{{ $t('inbound_list.modal_col_color') }}</th>
+                <th>{{ $t('inbound_list.modal_col_in_box') }}</th>
+                <th>{{ $t('inbound_list.modal_col_in_ea') }}</th>
+                <th>{{ $t('inbound_list.modal_col_total') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -109,19 +109,19 @@
                   <span v-else>-</span>
                 </td>
                 <td style="color: #10b981; font-weight: bold;">
-                  {{ getBoxQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} 박스
+                  {{ getBoxQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} {{ $t('inbound_list.box') }}
                 </td>
                 <td style="color: #f59e0b; font-weight: bold;">
-                  {{ getEachQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} 개
+                  {{ getEachQty(item.qty, getItemDetails(item.item_code).custom_pack_qty) }} {{ $t('inbound_list.ea') }}
                 </td>
-                <td style="color: #0ea5e9; font-weight: bold;">{{ item.qty }} 개</td>
+                <td style="color: #0ea5e9; font-weight: bold;">{{ item.qty }} {{ $t('inbound_list.ea') }}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="modal-footer">
           <button class="btn-load-cart" @click="loadToCart">
-            ✏️ 내역 수정 (장바구니로 이동)
+            ✏️ {{ $t('inbound_list.btn_edit') }}
           </button>
         </div>
       </div>
@@ -132,6 +132,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 const props = defineProps({
@@ -144,6 +145,8 @@ const props = defineProps({
     default: () => []
   }
 })
+
+const { t } = useI18n()
 
 const emit = defineEmits(['create-new', 'edit-inbound'])
 
@@ -235,7 +238,7 @@ const getStatusStyle = (res) => {
 }
 
 const getStatusText = (res) => {
-  return res.stock_entry_type === 'Material Transfer' ? '이동 완료' : '입고 완료'
+  return res.stock_entry_type === 'Material Transfer' ? t('status.transfer_completed') : t('status.inbound_completed')
 }
 
 const getProgressPercent = (res) => {
@@ -281,18 +284,18 @@ const loadToCart = () => {
 }
 
 const cancelInbound = async (name) => {
-  if (!confirm(`${name} 입고을 취소하시겠습니까?`)) return
+  if (!confirm(t('inbound_list.msg_confirm_cancel', { name: name }))) return
   try {
     // Frappe Cancel Method
     await frappeApi.post(`/api/method/frappe.client.cancel`, {
       doctype: 'Stock Entry',
       name: name
     })
-    alert('취소되었습니다.')
+    alert(t('inbound_list.msg_cancel_success'))
     fetchInbounds()
   } catch (error) {
     console.error('취소 에러:', error)
-    alert('취소 중 오류가 발생했습니다. 이미 일부 입고된 입고일 수 있습니다.')
+    alert(t('inbound_list.msg_cancel_error'))
   }
 }
 </script>
