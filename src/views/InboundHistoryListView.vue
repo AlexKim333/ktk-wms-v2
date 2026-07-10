@@ -37,7 +37,7 @@
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.creation ? res.creation.split(' ')[0] : '' }}</td>
             <td class="customer-name">{{ res.supplier || '-' }} ➡️ {{ res.to_warehouse || '-' }}</td>
-            <td>{{ [res.custom_orderer, res.custom_ordering_branch].filter(Boolean).join(' / ') || '-' }}</td>
+            <td>{{ [res.custom_orderer, res.custom_ordering_branch].filter(Boolean).join(' / ') || res.owner || '-' }}</td>
             <td class="customer-name" style="color:#ef4444">{{ res.modified_by || '-' }}</td>
             <td>
               <span class="res-badge" style="background:#fef2f2;color:#b91c1c;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:0.85rem">{{ $t('inbound_list.status_cancelled') }}</span>
@@ -75,7 +75,7 @@
             </div>
             <div class="detail-card">
               <label>{{ $t('inbound_list.history_modal_orderer') }}</label>
-              <div class="val">{{ selectedInboundHistory.custom_orderer || '-' }} <br/> <span style="color:#ef4444; font-size: 0.9em">({{ $t('inbound_list.modal_cancelled_by') }}: {{ selectedInboundHistory.modified_by }})</span></div>
+              <div class="val">{{ selectedInboundHistory.custom_orderer || selectedInboundHistory.owner || '-' }} <br/> <span style="color:#ef4444; font-size: 0.9em">({{ $t('inbound_list.modal_cancelled_by') }}: {{ selectedInboundHistory.modified_by }})</span></div>
             </div>
             <div class="detail-card">
               <label>{{ $t('inbound_list.history_modal_creation_date') }}</label>
@@ -165,7 +165,7 @@ const fetchInboundHistorys = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
-        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'supplier', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified']),
+        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'supplier', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified', 'owner']),
         filters: JSON.stringify([['docstatus', '=', 2], ['stock_entry_type', 'in', ['Material Receipt', 'Material Transfer']]]),
         limit_page_length: 100,
         order_by: 'creation desc'

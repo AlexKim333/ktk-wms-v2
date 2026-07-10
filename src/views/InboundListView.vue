@@ -37,7 +37,7 @@
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.posting_date }}</td>
             <td class="customer-name">{{ res.supplier || '-' }} ➡️ {{ res.to_warehouse || '-' }}</td>
-            <td>{{ [res.custom_orderer, res.custom_ordering_branch].filter(Boolean).join(' / ') || '-' }}</td>
+            <td>{{ [res.custom_orderer, res.custom_ordering_branch].filter(Boolean).join(' / ') || res.owner || '-' }}</td>
             <td>
               <span class="res-badge" :style="getStatusStyle(res)">{{ getStatusText(res) }}</span>
             </td>
@@ -81,7 +81,7 @@
             </div>
             <div class="detail-card">
               <label>{{ $t('inbound_list.modal_orderer') }}</label>
-              <div class="val">{{ selectedInbound.custom_orderer || '-' }}</div>
+              <div class="val">{{ selectedInbound.custom_orderer || selectedInbound.owner || '-' }}</div>
             </div>
             <div class="detail-card">
               <label>{{ $t('inbound_list.modal_inbound_date') }}</label>
@@ -182,7 +182,7 @@ const fetchInbounds = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
-        fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'custom_ordering_branch', 'custom_orderer', 'supplier', 'to_warehouse', 'from_warehouse', 'docstatus', 'total_outgoing_value']),
+        fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'custom_ordering_branch', 'custom_orderer', 'supplier', 'to_warehouse', 'from_warehouse', 'docstatus', 'total_outgoing_value', 'owner']),
         filters: JSON.stringify([['docstatus', '=', 1], ['stock_entry_type', 'in', ['Material Receipt', 'Material Transfer']]]),
         limit_page_length: 100,
         order_by: 'creation desc'

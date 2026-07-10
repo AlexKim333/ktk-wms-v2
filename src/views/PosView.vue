@@ -1680,7 +1680,7 @@ const submitToFrappe = async () => {
       
       
       custom_ordering_branch: transactionMode.value === 'outbound' ? (currentTab.value.selectedBranch || undefined) : undefined,
-      custom_orderer: currentTab.value.selectedResponder || undefined,
+      custom_orderer: currentTab.value.selectedResponder || currentTab.value.selectedCreator || undefined,
       custom_customer: transactionMode.value === 'outbound' ? currentTab.value.selectedCustomer || undefined : undefined,
       supplier: transactionMode.value === 'inbound' ? currentTab.value.selectedSupplier || undefined : undefined,
 
@@ -1865,7 +1865,7 @@ const submitReservation = async () => {
       custom_customer: currentTab.value.selectedCustomer || undefined,
       
       custom_ordering_branch: transactionMode.value === 'outbound' ? (currentTab.value.selectedBranch || undefined) : undefined,
-      custom_orderer: currentTab.value.selectedResponder || undefined,
+      custom_orderer: currentTab.value.selectedResponder || currentTab.value.selectedCreator || undefined,
       
       items: currentTab.value.cartItems.map(item => {
         const totalQty = (Number(item.input_box) * (item.custom_pack_qty || 1)) + Number(item.input_each);

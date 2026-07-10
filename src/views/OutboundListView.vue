@@ -52,7 +52,7 @@
           <tr v-for="res in filteredOutbounds" :key="res.name" @click="openDetail(res)" class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.posting_date }}</td>
-            <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || '-' }}</td>
+            <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || res.owner || '-' }}</td>
             <td>
               <template v-if="listType === 'Material Transfer'">
                 {{ res.from_warehouse }} ➔ {{ res.to_warehouse }}
@@ -102,7 +102,7 @@
             </div>
             <div class="detail-card">
               <label>{{ $t('outbound_list.modal_manager_customer') }}</label>
-              <div class="val">{{ [selectedOutbound.custom_orderer, selectedOutbound.custom_customer].filter(Boolean).join(' / ') || '-' }}</div>
+              <div class="val">{{ [selectedOutbound.custom_orderer, selectedOutbound.custom_customer].filter(Boolean).join(' / ') || selectedOutbound.owner || '-' }}</div>
             </div>
             <div class="detail-card">
               <label>{{ listType === 'Material Transfer' ? $t('outbound_list.modal_transfer_date') : $t('outbound_list.modal_outbound_date') }}</label>
@@ -209,7 +209,7 @@ const fetchOutbounds = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
-        fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'custom_ordering_branch', 'custom_orderer', 'custom_customer', 'to_warehouse', 'from_warehouse', 'docstatus', 'total_outgoing_value']),
+        fields: JSON.stringify(['name', 'stock_entry_type', 'posting_date', 'custom_ordering_branch', 'custom_orderer', 'custom_customer', 'to_warehouse', 'from_warehouse', 'docstatus', 'total_outgoing_value', 'owner']),
         filters: JSON.stringify([['docstatus', '=', 1], ['stock_entry_type', 'in', ['Material Issue', 'Material Transfer']]]),
         limit_page_length: 100,
         order_by: 'creation desc',

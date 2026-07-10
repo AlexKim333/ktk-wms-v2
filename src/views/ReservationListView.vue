@@ -43,7 +43,7 @@
             </td>
             <td>
               <div>{{ reservationType === 'Material Transfer' ? (res.set_warehouse || '-') : (res.custom_ordering_branch || res.set_warehouse || '-') }}</div>
-              <div style="font-size: 11px; color: #64748b;">{{ res.custom_orderer || '-' }}</div>
+              <div style="font-size: 11px; color: #64748b;">{{ res.custom_orderer || res.owner || '-' }}</div>
             </td>
             <td>
               <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status) }}</span>
@@ -90,10 +90,10 @@
               <div class="val">
                 <template v-if="reservationType === 'Material Transfer'">
                   {{ selectedReservation.set_warehouse || '-' }}
-                  <div style="font-size:0.8em;color:#666;margin-top:2px;">{{ selectedReservation.custom_orderer || '-' }}</div>
+                  <div style="font-size:0.8em;color:#666;margin-top:2px;">{{ selectedReservation.custom_orderer || selectedReservation.owner || '-' }}</div>
                 </template>
                 <template v-else>
-                  {{ selectedReservation.custom_orderer || '-' }}
+                  {{ selectedReservation.custom_orderer || selectedReservation.owner || '-' }}
                 </template>
               </div>
             </div>
@@ -173,7 +173,7 @@ const fetchReservations = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Material Request', {
       params: {
-        fields: JSON.stringify(['name', 'status', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'per_ordered', 'per_received']),
+        fields: JSON.stringify(['name', 'status', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'per_ordered', 'per_received', 'owner']),
         filters: JSON.stringify([
           ['docstatus', '=', 1],
           ['material_request_type', '=', props.reservationType]

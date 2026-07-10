@@ -51,7 +51,7 @@
           <tr v-for="res in filteredOutboundHistorys" :key="res.name" @click="openDetail(res)" class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.creation ? res.creation.split(' ')[0] : '' }}</td>
-            <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || '-' }}</td>
+            <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || res.owner || '-' }}</td>
             <td>
               <template v-if="listType === 'Material Transfer'">
                 {{ res.from_warehouse }} ➔ {{ res.to_warehouse }}
@@ -84,7 +84,7 @@
           <div class="detail-grid">
             <div class="detail-card">
               <label>담당자 / 고객명</label>
-              <div class="val">{{ [selectedOutboundHistory.custom_orderer, selectedOutboundHistory.custom_customer].filter(Boolean).join(' / ') || '-' }}</div>
+              <div class="val">{{ [selectedOutboundHistory.custom_orderer, selectedOutboundHistory.custom_customer].filter(Boolean).join(' / ') || selectedOutboundHistory.owner || '-' }}</div>
             </div>
             <div class="detail-card">
               <label>생성일</label>
@@ -181,7 +181,7 @@ const fetchOutboundHistorys = async () => {
   try {
     const resWithProgress = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
-        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified']),
+        fields: JSON.stringify(['name', 'stock_entry_type', 'creation', 'custom_ordering_branch', 'custom_orderer', 'to_warehouse', 'from_warehouse', 'modified_by', 'modified', 'owner']),
         filters: JSON.stringify([['docstatus', '=', 2], ['stock_entry_type', '=', props.listType]]),
         limit_page_length: 100,
         order_by: 'creation desc'
