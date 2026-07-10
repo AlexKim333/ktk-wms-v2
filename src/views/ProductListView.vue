@@ -256,6 +256,12 @@ const handleMigration = () => {
 }
 
 const processCsvFile = (e) => {
+  if (selectedWarehouse.value === 'All') {
+    alert("기초재고를 입고할 특정 창고를 선택한 후 다시 시도해주세요.")
+    e.target.value = ''
+    return
+  }
+
   const file = e.target.files[0]
   if (!file) return
 
@@ -268,6 +274,8 @@ const processCsvFile = (e) => {
       
       if (rows.length < 2) throw new Error("No data found in CSV.")
       
+      const stockEntryItems = []
+
       for (let i = 1; i < rows.length; i++) {
         const cols = rows[i].split(',').map(c => c.trim())
         // 최소한 제품명(0), 컬러(1), 박스당낱개수량(5), 메이커(7) 컬럼이 존재할 수 있도록 길이 체크 완화
@@ -275,12 +283,17 @@ const processCsvFile = (e) => {
         
         const itemName = cols[0]
         const color = cols[1]
+        const boxQty = Number(cols[2]) || 0       // 인덱스 2: 박스재고수량
+        const pieceQty = Number(cols[3]) || 0     // 인덱스 3: 갯수재고수량
         const safetyStock = Number(cols[4]) || 0  // 인덱스 4: 안전재고
         const packQty = Number(cols[5]) || 1      // 인덱스 5: 박스당낱개수량
         const brandName = cols[7]                 // 인덱스 7: 메이커(브랜드)
 
         let finalItemCode = `${itemName}-${color}`
         if (packQty > 1) finalItemCode += `-${packQty}`
+
+        // 총 재고 계산
+        const totalQty = (boxQty * packQty) + pieceQty
 
         try {
           await frappeApi.post('/api/resource/Brand', { brand: brandName })
@@ -299,9 +312,31 @@ const processCsvFile = (e) => {
             safety_stock: safetyStock
           })
         } catch (err) { }
+
+        if (totalQty > 0) {
+          stockEntryItems.push({
+            item_code: finalItemCode,
+            qty: totalQty,
+            t_warehouse: selectedWarehouse.value,
+            allow_zero_valuation_rate: 1
+          })
+        }
       }
       
-      alert("Migration (Import) completed successfully.")
+      if (stockEntryItems.length > 0) {
+        // 너무 많은 항목을 한 번에 올리면 에러가 날 수 있으므로 100개씩 분할 (필요시)
+        const chunkSize = 200
+        for (let i = 0; i < stockEntryItems.length; i += chunkSize) {
+          const chunk = stockEntryItems.slice(i, i + chunkSize)
+          await frappeApi.post('/api/resource/Stock Entry', {
+            docstatus: 1, // 확정(Submit) 상태로 생성
+            stock_entry_type: 'Material Receipt',
+            items: chunk
+          })
+        }
+      }
+
+      alert("Migration (Import & Initial Stock) completed successfully.")
       loadProducts()
     } catch (error) {
       alert("Error occurred during CSV processing.")
