@@ -556,7 +556,7 @@
     <!-- 🌟 퀵 추가 모달 -->
     <QuickItemAddModal :is-open="isQuickItemModalOpen" @close="isQuickItemModalOpen = false" @success="handleItemSuccess" />
     <QuickCustomerAddModal :is-open="isQuickCustomerModalOpen" @close="isQuickCustomerModalOpen = false" @success="handleCustomerSuccess" />
-    <QuickSalesPersonAddModal :is-open="isQuickSalesPersonModalOpen" :branch-list="branchList" :default-branch="currentTab?.selectedBranch" @close="isQuickSalesPersonModalOpen = false" @success="handleSalesPersonSuccess" />
+    <QuickSalesPersonAddModal :is-open="isQuickSalesPersonModalOpen" :branch-list="warehouseList" :default-branch="currentTab?.selectedBranch" @close="isQuickSalesPersonModalOpen = false" @success="handleSalesPersonSuccess" />
   </div>
 </template>
 
