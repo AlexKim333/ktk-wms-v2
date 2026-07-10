@@ -123,12 +123,12 @@ const generateAndPrint = async () => {
     if (targetSelection.value === 'selected') {
       const filters = JSON.stringify([["name", "in", props.selectedItems]])
       const res = await frappeApi.get('/api/resource/Item', {
-        params: { filters, fields: JSON.stringify(['name', 'item_code', 'item_name', 'custom_color', 'custom_pack_qty']), limit_page_length: 500 }
+        params: { filters, fields: JSON.stringify(['name', 'item_code', 'item_name', 'custom_color', 'custom_pack_qty']), limit_page_length: 0 }
       })
       rawItems = res.data.data
     } else {
       const res = await frappeApi.get('/api/resource/Item', {
-        params: { fields: JSON.stringify(['name', 'item_code', 'item_name', 'custom_color', 'custom_pack_qty']), limit_page_length: 1000 }
+        params: { fields: JSON.stringify(['name', 'item_code', 'item_name', 'custom_color', 'custom_pack_qty']), limit_page_length: 0 }
       })
       rawItems = res.data.data
     }

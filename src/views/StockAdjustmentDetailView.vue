@@ -205,7 +205,7 @@ const fetchInitialData = async () => {
     const itemRes = await frappeApi.get('/api/resource/Item', {
       params: {
         fields: JSON.stringify(['name', 'item_name', 'custom_color', 'custom_pack_qty']),
-        limit_page_length: 500
+        limit_page_length: 0
       }
     })
     allItems.value = itemRes.data.data
@@ -252,7 +252,7 @@ const fetchBinData = async () => {
       params: {
         filters: JSON.stringify([['warehouse', '=', selectedWarehouse.value]]),
         fields: JSON.stringify(['item_code', 'actual_qty']),
-        limit_page_length: 1000
+        limit_page_length: 0
       }
     })
     const bins = {}
