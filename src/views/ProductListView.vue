@@ -169,7 +169,7 @@ const loadProducts = async () => {
       frappeApi.get('/api/resource/Item', {
         params: { 
           fields: JSON.stringify(['name', 'item_code', 'item_name', 'brand', 'custom_color', 'custom_pack_qty']),
-          limit_page_length: 500,
+          limit_page_length: 0,
           order_by: 'creation desc'
         }
       }),
