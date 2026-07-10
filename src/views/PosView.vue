@@ -106,7 +106,7 @@
                   </div>
                 </li>
                 <li class="quick-add-btn-row" @mousedown.prevent="isQuickItemModalOpen = true">
-                  <span class="quick-add-text">{{ $t('pos.btn_quick_add_item') }}<</span>
+                  <span class="quick-add-text">{{ $t('pos.btn_quick_add_item') }}</span>
                 </li>
               </ul>
             </div>
@@ -210,7 +210,7 @@
               <div class="master-input-row">
                 <!-- 출고 모드 (소스 선택) -->
                 <div v-if="transactionMode === 'outbound'" class="master-lock-group">
-                  <label>{{ $t('pos.lbl_src') }}<</label>
+                  <label>{{ $t('pos.lbl_src') }}</label>
                   <select v-model="currentTab.selectedSource" :disabled="!canEditMasterFields && (!!currentTab.activeReservationId && !!currentTab.reservationOriginalSource)" class="master-select">
                     <option value="">{{ $t('pos.sel_src') }}</option>
                     <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
@@ -219,21 +219,21 @@
                 <!-- 입고 모드 (공급자, 발주처, 도착창고) -->
                 <template v-if="transactionMode === 'inbound'">
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_supplier') }}<</label>
+                    <label>{{ $t('pos.lbl_supplier') }}</label>
                     <select v-model="currentTab.selectedSupplier" :disabled="!canEditMasterFields" class="master-select">
                       <option value="">{{ $t('pos.sel_supplier') }}</option>
                       <option v-for="sup in supplierList" :key="sup.name" :value="sup.name">{{ sup.supplier_name || sup.name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_order_branch') }}<</label>
+                    <label>{{ $t('pos.lbl_order_branch') }}</label>
                     <select v-model="currentTab.selectedBranch" :disabled="!canEditMasterFields" class="master-select">
                       <option value="">{{ $t('pos.sel_order_branch') }}</option>
                       <option v-for="branch in branchList" :key="branch.name" :value="branch.name">{{ branch.warehouse_name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_target') }}<</label>
+                    <label>{{ $t('pos.lbl_target') }}</label>
                     <select v-model="currentTab.selectedTarget" :disabled="!canEditMasterFields" class="master-select">
                       <option value="">{{ $t('pos.sel_target') }}</option>
                       <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
@@ -244,14 +244,14 @@
                 <!-- 재고이동 모드 (소스, 타겟) -->
                 <template v-if="transactionMode === 'transfer'">
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_src_wh') }}<</label>
+                    <label>{{ $t('pos.lbl_src_wh') }}</label>
                     <select v-model="currentTab.selectedSource" :disabled="!canEditMasterFields" class="master-select">
                       <option value="">{{ $t('pos.sel_src_wh') }}</option>
                       <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_tgt_wh') }}<</label>
+                    <label>{{ $t('pos.lbl_tgt_wh') }}</label>
                     <select v-model="currentTab.selectedTarget" :disabled="!canEditMasterFields" class="master-select">
                       <option value="">{{ $t('pos.sel_target') }}</option>
                       <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name }}</option>
@@ -261,7 +261,7 @@
                 
                 <!-- 출고 모드 (공통: 담당 지점) -->
                 <div v-if="transactionMode === 'outbound'" class="master-lock-group">
-                  <label>{{ $t('pos.lbl_branch') }}<</label>
+                  <label>{{ $t('pos.lbl_branch') }}</label>
                   <select v-model="currentTab.selectedBranch" :disabled="!canEditMasterFields" class="master-select">
                     <option value="">{{ $t('pos.sel_branch') }}</option>
                     <option v-for="branch in branchList" :key="branch.name" :value="branch.name">{{ branch.warehouse_name }}</option>
@@ -272,27 +272,27 @@
                 <!-- 출고 전용: 고객 및 응대자 -->
                 <template v-if="transactionMode === 'outbound'">
                   <div class="master-lock-group" style="position: relative;">
-                    <label>{{ $t('pos.lbl_customer') }}<</label>
+                    <label>{{ $t('pos.lbl_customer') }}</label>
                     <input type="text" v-model="currentTab.selectedCustomer" @focus="isCustomerDropdownOpen = true" @blur="closeCustomerDropdown" :disabled="!canEditMasterFields" class="master-input" :placeholder="$t('pos.ph_customer')" autocomplete="off" />
                     <ul v-if="isCustomerDropdownOpen && filteredCustomerSearchItems.length > 0" class="search-dropdown" style="top: 100%; max-height: 200px;">
                       <li v-for="cust in filteredCustomerSearchItems" :key="cust.name" @mousedown.prevent="selectCustomerFromDropdown(cust.name)">
                         <span class="item-name">{{ cust.customer_name || cust.name }}</span> <span class="item-color">({{ cust.name }})</span>
                       </li>
                       <li class="quick-add-btn-row" @mousedown.prevent="isQuickCustomerModalOpen = true">
-                        <span class="quick-add-text">{{ $t('pos.btn_quick_add_customer') }}<</span>
+                        <span class="quick-add-text">{{ $t('pos.btn_quick_add_customer') }}</span>
                       </li>
                     </ul>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_sp') }}<</label>
+                    <label>{{ $t('pos.lbl_sp') }}</label>
                     <select v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-select" @change="handleSalesPersonChange">
                       <option value="">{{ $t('pos.sel_sp') }}</option>
-                      <option value="ADD_NEW">{{ $t('pos.btn_add_sp') }}<</option>
+                      <option value="ADD_NEW">{{ $t('pos.btn_add_sp') }}</option>
                       <option v-for="sp in filteredSalesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_creator') }}<</label>
+                    <label>{{ $t('pos.lbl_creator') }}</label>
                     <input type="text" v-model="currentTab.selectedCreator" :disabled="!canEditMasterFields" class="master-input"/>
                   </div>
                 </template>
@@ -300,15 +300,15 @@
                 <!-- 재고이동 전용: 재고이동요청자 및 작성자 -->
                 <template v-if="transactionMode === 'transfer'">
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_requester') }}<</label>
+                    <label>{{ $t('pos.lbl_requester') }}</label>
                     <select v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-select" @change="handleSalesPersonChange">
                       <option value="">{{ $t('pos.sel_requester') }}</option>
-                      <option value="ADD_NEW">{{ $t('pos.btn_add_requester') }}<</option>
+                      <option value="ADD_NEW">{{ $t('pos.btn_add_requester') }}</option>
                       <option v-for="sp in filteredSalesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_creator_en') }}<</label>
+                    <label>{{ $t('pos.lbl_creator_en') }}</label>
                     <input type="text" v-model="currentTab.selectedCreator" :disabled="!canEditMasterFields" class="master-input"/>
                   </div>
                 </template>
@@ -316,15 +316,15 @@
                 <!-- 입고 전용: 발주자 및 작성자 -->
                 <template v-if="transactionMode === 'inbound'">
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_orderer') }}<</label>
+                    <label>{{ $t('pos.lbl_orderer') }}</label>
                     <select v-model="currentTab.selectedResponder" :disabled="!canEditMasterFields" class="master-select" @change="handleSalesPersonChange">
-                      <option value="">{{ $t('pos.sel_orderer') }}<</option>
-                      <option value="ADD_NEW">{{ $t('pos.btn_add_orderer') }}<</option>
+                      <option value="">{{ $t('pos.sel_orderer') }}</option>
+                      <option value="ADD_NEW">{{ $t('pos.btn_add_orderer') }}</option>
                       <option v-for="sp in filteredSalesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
                     </select>
                   </div>
                   <div class="master-lock-group">
-                    <label>{{ $t('pos.lbl_sys_user') }}<</label>
+                    <label>{{ $t('pos.lbl_sys_user') }}</label>
                     <input type="text" v-model="currentTab.selectedCreator" :disabled="true" class="master-input" style="background-color: #f1f5f9; color: #475569;" />
                   </div>
                 </template>
@@ -333,8 +333,8 @@
 
             <table class="pos-cart-table">
               <thead>
-                <tr><th>{{ $t('pos.th_item_color') }}<</th><th colspan="2">{{ $t('pos.th_qty_input') }}<</th><th>{{ $t('pos.th_total_qty') }}<</th><th style="width: 40px;"></th></tr>
-                <tr class="sub-th"><th></th><th>{{ $t('pos.th_box') }}<</th><th>{{ $t('pos.th_each') }}<</th><th></th><th></th></tr>
+                <tr><th>{{ $t('pos.th_item_color') }}</th><th colspan="2">{{ $t('pos.th_qty_input') }}</th><th>{{ $t('pos.th_total_qty') }}</th><th style="width: 40px;"></th></tr>
+                <tr class="sub-th"><th></th><th>{{ $t('pos.th_box') }}</th><th>{{ $t('pos.th_each') }}</th><th></th><th></th></tr>
               </thead>
               <tbody>
                 <tr v-for="item in currentTab.cartItems" :key="item.name">
@@ -348,13 +348,13 @@
                   <td class="input-green">
                     <input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="item.input_each" placeholder="0" />
                   </td>
-                  <td class="total-qty-cell"><strong>{{ (item.input_box * (item.custom_pack_qty || 1)) + item.input_each }}</strong> {{ $t('pos.unit_ea') }}<</td>
+                  <td class="total-qty-cell"><strong>{{ (item.input_box * (item.custom_pack_qty || 1)) + item.input_each }}</strong> {{ $t('pos.unit_ea') }}</td>
                   <td class="delete-cell">
                     <button class="btn-delete-row" @click="removeFromCart(item.name)" :title="$t('pos.btn_del')">🗑️</button>
                   </td>
                 </tr>
                 <tr v-if="currentTab.cartItems.length === 0">
-                  <td colspan="5" class="empty-cart-msg">{{ $t('pos.empty_cart') }}<</td>
+                  <td colspan="5" class="empty-cart-msg">{{ $t('pos.empty_cart') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -424,7 +424,7 @@
         </div>
         <table class="grid-table">
           <thead>
-            <tr><th>{{ $t('pos.th_color_pack') }}<</th><th colspan="2">{{ $t('pos.th_qty_input') }}<</th><th>{{ $t('pos.th_sel_total') }}<</th><th>{{ $t('pos.th_cur_stock') }}<</th></tr>
+            <tr><th>{{ $t('pos.th_color_pack') }}</th><th colspan="2">{{ $t('pos.th_qty_input') }}</th><th>{{ $t('pos.th_sel_total') }}</th><th>{{ $t('pos.th_cur_stock') }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
@@ -436,7 +436,7 @@
             </tr>
           </tbody>
         </table>
-        <button class="close-text-btn" @click="isGridModalOpen = false">{{ $t('pos.btn_close') }}<</button>
+        <button class="close-text-btn" @click="isGridModalOpen = false">{{ $t('pos.btn_close') }}</button>
       </div>
     </div>
     <!-- 🌟 단일 버튼 상품 지정 모달 -->
@@ -460,9 +460,9 @@
             <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || t('pos.default_color') }})</div>
             <div class="item-stock">{{ getFormattedStockFor(item) }}</div>
           </div>
-          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}<</div>
+          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}</div>
         </div>
-        <button class="btn-clear-slot" @click="clearSlot">{{ $t('pos.btn_clear_slot') }}<</button>
+        <button class="btn-clear-slot" @click="clearSlot">{{ $t('pos.btn_clear_slot') }}</button>
       </div>
     </div>
 
@@ -483,9 +483,9 @@
                @click="assignGridSlotItem(group)">
             <div class="item-desc"><strong>{{ group.group_name }}</strong> ({{ group.variants.length }} color)</div>
           </div>
-          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}<</div>
+          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}</div>
         </div>
-        <button class="btn-clear-slot" @click="clearGridSlot">{{ $t('pos.btn_clear_slot') }}<</button>
+        <button class="btn-clear-slot" @click="clearGridSlot">{{ $t('pos.btn_clear_slot') }}</button>
       </div>
     </div>
 
@@ -493,7 +493,7 @@
     <div class="modal-overlay" v-if="isQuickAdjustModalOpen">
       <div class="modal-content" style="max-width: 450px; padding: 24px; border-radius: 8px;">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0; color:#ef4444;">{{ $t('pos.qa_title') }}<</h3>
+          <h3 style="margin:0; color:#ef4444;">{{ $t('pos.qa_title') }}</h3>
           <button class="close-text-btn" @click="isQuickAdjustModalOpen = false" style="margin:0;">{{ $t('pos.btn_close') }}</button>
         </div>
         
@@ -509,14 +509,14 @@
               <input type="number" v-model.number="quickAdjustForm.input_box" class="search-bar" placeholder="0" min="0" style="margin-top:5px; padding: 10px;"/>
             </div>
             <div style="flex:1;">
-              <label style="font-size:12px; font-weight:bold; color:#64748b;">{{ $t('pos.qa_lbl_each') }}<</label>
+              <label style="font-size:12px; font-weight:bold; color:#64748b;">{{ $t('pos.qa_lbl_each') }}</label>
               <input type="number" v-model.number="quickAdjustForm.input_each" class="search-bar" placeholder="0" min="0" style="margin-top:5px; padding: 10px;"/>
             </div>
           </div>
 
           <div v-if="!quickAdjustItem?.valuation_rate" style="margin-top:15px; background: #fffbeb; padding: 12px; border-radius:6px; border: 1px solid #fde68a;">
-            <label style="font-size:12px; font-weight:bold; color:#b45309;">{{ $t('pos.qa_req_val') }}<</label>
-            <p style="font-size: 11px; color:#b45309; margin:4px 0;">{{ $t('pos.qa_req_val_desc') }}<</p>
+            <label style="font-size:12px; font-weight:bold; color:#b45309;">{{ $t('pos.qa_req_val') }}</label>
+            <p style="font-size: 11px; color:#b45309; margin:4px 0;">{{ $t('pos.qa_req_val_desc') }}</p>
             <input type="number" v-model.number="quickAdjustForm.valuation_rate" class="search-bar" :placeholder="$t('pos.qa_ph_val')" style="margin-top:5px; border-color:#fcd34d; padding: 10px;" />
           </div>
           <div v-else style="margin-top:15px; text-align:right;">
@@ -526,7 +526,7 @@
         </div>
         
         <div class="modal-footer" style="margin-top: 25px; display:flex; justify-content:flex-end; gap:10px;">
-          <button style="padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="isQuickAdjustModalOpen = false" :disabled="isAdjusting">{{ $t('pos.qa_btn_cancel') }}<</button>
+          <button style="padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="isQuickAdjustModalOpen = false" :disabled="isAdjusting">{{ $t('pos.qa_btn_cancel') }}</button>
           <button style="padding:10px 20px; background:#00a896; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="submitQuickAdjust" :disabled="isAdjusting">
             {{ isAdjusting ? $t('pos.qa_btn_adjusting') : $t('pos.qa_btn_submit') }}
           </button>
@@ -547,9 +547,9 @@
           <div v-for="cust in filteredCustomerSlotItems" :key="cust.name" class="slot-list-item" @click="assignCustomerToSlot(cust)">
             <div class="item-desc"><strong>{{ cust.customer_name || cust.name }}</strong> ({{ cust.name }})</div>
           </div>
-          <div v-if="filteredCustomerSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}<</div>
+          <div v-if="filteredCustomerSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}</div>
         </div>
-        <button class="btn-clear-slot" @click="clearCustomerSlot">{{ $t('pos.btn_clear_slot') }}<</button>
+        <button class="btn-clear-slot" @click="clearCustomerSlot">{{ $t('pos.btn_clear_slot') }}</button>
       </div>
     </div>
 
