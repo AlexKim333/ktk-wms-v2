@@ -345,12 +345,11 @@ const processCsvFile = (e) => {
           } catch (err) { }
         }
 
-        if (totalQty > 0) {
+        if (totalQty >= 0) { // 0 이상의 재고만 조정 반영
           stockEntryItems.push({
             item_code: finalItemCode,
             qty: totalQty,
-            t_warehouse: selectedWarehouse.value,
-            allow_zero_valuation_rate: 1
+            warehouse: selectedWarehouse.value
           })
         }
       }
@@ -360,17 +359,17 @@ const processCsvFile = (e) => {
         const chunkSize = 200
         const totalChunks = Math.ceil(stockEntryItems.length / chunkSize)
         for (let i = 0; i < stockEntryItems.length; i += chunkSize) {
-          migrationProgress.value = `기초재고 전표 생성 중... (${Math.floor(i/chunkSize) + 1} / ${totalChunks})`
+          migrationProgress.value = `기초재고 설정 중... (${Math.floor(i/chunkSize) + 1} / ${totalChunks})`
           const chunk = stockEntryItems.slice(i, i + chunkSize)
-          await frappeApi.post('/api/resource/Stock Entry', {
+          await frappeApi.post('/api/resource/Stock Reconciliation', {
             docstatus: 1, // 확정(Submit) 상태로 생성
-            stock_entry_type: 'Material Receipt',
+            purpose: 'Stock Reconciliation',
             items: chunk
           })
         }
       }
 
-      alert("Migration (Import & Initial Stock) completed successfully.")
+      alert("Migration (Import & Initial Stock) completed successfully. 재고가 정확하게 동기화되었습니다.")
       loadProducts()
     } catch (error) {
       alert("Error occurred during CSV processing. " + error.message)
