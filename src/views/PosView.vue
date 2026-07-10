@@ -939,7 +939,7 @@ const fetchFrappeItems = async () => {
             'custom_is_grid_item', 'custom_grid_group_id', 'custom_name_number',
             'valuation_rate'
           ]),
-          limit_page_length: 500 // 넉넉하게 로드
+          limit_page_length: 0
         }
       }),
       frappeApi.get('/api/resource/Bin', {
@@ -952,14 +952,14 @@ const fetchFrappeItems = async () => {
         params: {
           fields: JSON.stringify(['name', 'customer_name']),
           filters: JSON.stringify([['disabled', '=', 0]]),
-          limit_page_length: 500
+          limit_page_length: 0
         }
       }),
       frappeApi.get('/api/resource/Sales Person', {
         params: {
           fields: JSON.stringify(['name', 'sales_person_name', 'enabled', 'custom_branch']),
           filters: JSON.stringify([['enabled', '=', 1]]),
-          limit_page_length: 500
+          limit_page_length: 0
         }
       }),
       frappeApi.get('/api/resource/Material Request', {
@@ -972,7 +972,7 @@ const fetchFrappeItems = async () => {
       frappeApi.get('/api/resource/Supplier', {
         params: {
           fields: JSON.stringify(['name', 'supplier_name']),
-          limit_page_length: 500
+          limit_page_length: 0
         }
       })
     ]);
