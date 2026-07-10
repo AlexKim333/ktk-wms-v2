@@ -109,6 +109,14 @@
       </div>
     </div>
 
+    <!-- Migration Loading Overlay -->
+    <div class="modal-overlay" v-if="migrationProgress" style="z-index: 9999; flex-direction: column;">
+      <div class="spinner" style="width: 50px; height: 50px; border-width: 5px; border-top-color: white;"></div>
+      <div style="margin-top: 20px; font-weight: bold; font-size: 1.2rem; color: white;">
+        {{ migrationProgress }}
+      </div>
+    </div>
+
     <!-- Hidden CSV File Input -->
     <input type="file" ref="fileInputRef" accept=".csv" style="display: none" @change="processCsvFile" />
   </div>
@@ -250,6 +258,7 @@ const openBarcodeModal = () => {
 }
 
 const fileInputRef = ref(null)
+const migrationProgress = ref('')
 
 const handleMigration = () => {
   fileInputRef.value?.click()
@@ -275,8 +284,25 @@ const processCsvFile = (e) => {
       if (rows.length < 2) throw new Error("No data found in CSV.")
       
       const stockEntryItems = []
+      
+      migrationProgress.value = '기존 품목 및 브랜드 정보 가져오는 중...'
+      let existingBrands = new Set()
+      let existingItems = new Set()
+      try {
+        const brandsRes = await frappeApi.get('/api/resource/Brand', { params: { fields: JSON.stringify(['name']), limit_page_length: 0 } })
+        if (brandsRes.data && brandsRes.data.data) {
+          existingBrands = new Set(brandsRes.data.data.map(b => b.name))
+        }
+        const itemsRes = await frappeApi.get('/api/resource/Item', { params: { fields: JSON.stringify(['name']), limit_page_length: 0 } })
+        if (itemsRes.data && itemsRes.data.data) {
+          existingItems = new Set(itemsRes.data.data.map(i => i.name))
+        }
+      } catch (err) {
+        console.warn('기존 목록 가져오기 실패, 개별 검증으로 진행합니다.', err)
+      }
 
       for (let i = 1; i < rows.length; i++) {
+        migrationProgress.value = `데이터 처리 중... (${i} / ${rows.length - 1})`
         const cols = rows[i].split(',').map(c => c.trim())
         // 최소한 제품명(0), 컬러(1), 박스당낱개수량(5), 메이커(7) 컬럼이 존재할 수 있도록 길이 체크 완화
         if (cols.length < 8) continue
@@ -295,23 +321,29 @@ const processCsvFile = (e) => {
         // 총 재고 계산
         const totalQty = (boxQty * packQty) + pieceQty
 
-        try {
-          await frappeApi.post('/api/resource/Brand', { brand: brandName })
-        } catch (err) { }
+        if (brandName && !existingBrands.has(brandName)) {
+          try {
+            await frappeApi.post('/api/resource/Brand', { brand: brandName })
+            existingBrands.add(brandName)
+          } catch (err) { }
+        }
 
-        try {
-          await frappeApi.post('/api/resource/Item', {
-            item_code: finalItemCode,
-            item_name: itemName,
-            item_group: 'Products',
-            brand: brandName,
-            stock_uom: 'Nos',
-            is_stock_item: 1,
-            custom_color: color,
-            custom_pack_qty: packQty,
-            safety_stock: safetyStock
-          })
-        } catch (err) { }
+        if (finalItemCode && !existingItems.has(finalItemCode)) {
+          try {
+            await frappeApi.post('/api/resource/Item', {
+              item_code: finalItemCode,
+              item_name: itemName,
+              item_group: 'Products',
+              brand: brandName,
+              stock_uom: 'Nos',
+              is_stock_item: 1,
+              custom_color: color,
+              custom_pack_qty: packQty,
+              safety_stock: safetyStock
+            })
+            existingItems.add(finalItemCode)
+          } catch (err) { }
+        }
 
         if (totalQty > 0) {
           stockEntryItems.push({
@@ -326,7 +358,9 @@ const processCsvFile = (e) => {
       if (stockEntryItems.length > 0) {
         // 너무 많은 항목을 한 번에 올리면 에러가 날 수 있으므로 100개씩 분할 (필요시)
         const chunkSize = 200
+        const totalChunks = Math.ceil(stockEntryItems.length / chunkSize)
         for (let i = 0; i < stockEntryItems.length; i += chunkSize) {
+          migrationProgress.value = `기초재고 전표 생성 중... (${Math.floor(i/chunkSize) + 1} / ${totalChunks})`
           const chunk = stockEntryItems.slice(i, i + chunkSize)
           await frappeApi.post('/api/resource/Stock Entry', {
             docstatus: 1, // 확정(Submit) 상태로 생성
@@ -339,10 +373,11 @@ const processCsvFile = (e) => {
       alert("Migration (Import & Initial Stock) completed successfully.")
       loadProducts()
     } catch (error) {
-      alert("Error occurred during CSV processing.")
+      alert("Error occurred during CSV processing. " + error.message)
       console.error(error)
     } finally {
       isLoading.value = false
+      migrationProgress.value = ''
       e.target.value = ''
     }
   }
