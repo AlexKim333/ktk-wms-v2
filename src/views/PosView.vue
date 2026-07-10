@@ -422,20 +422,22 @@
           <div class="product-title">{{ $t('pos.grid_item_name') }} <strong>{{ activeGroup.group_name }}</strong></div>
           <button class="submit-btn" @click="submitGridSelection">{{ $t('pos.btn_sel_done') }}</button>
         </div>
-        <table class="grid-table">
-          <thead>
-            <tr><th>{{ $t('pos.th_color_pack') }}</th><th colspan="2">{{ $t('pos.th_qty_input') }}</th><th>{{ $t('pos.th_sel_total') }}</th><th>{{ $t('pos.th_cur_stock') }}</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
-              <td class="color-name">{{ v.custom_color || t('pos.default_color') }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}{{ $t('pos.pack_unit') }})</span></td>
-              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
-              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
-              <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}{{ $t('pos.unit_ea') }}</td>
-              <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div style="max-height: 60vh; overflow-y: auto; margin-top: 15px;">
+          <table class="grid-table" style="margin-top: 0;">
+            <thead>
+              <tr><th style="position: sticky; top: 0; background: #fff; z-index: 1;">{{ $t('pos.th_color_pack') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;" colspan="2">{{ $t('pos.th_qty_input') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">{{ $t('pos.th_sel_total') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">{{ $t('pos.th_cur_stock') }}</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
+                <td class="color-name">{{ v.custom_color || t('pos.default_color') }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}{{ $t('pos.pack_unit') }})</span></td>
+                <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
+                <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
+                <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}{{ $t('pos.unit_ea') }}</td>
+                <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <button class="close-text-btn" @click="isGridModalOpen = false">{{ $t('pos.btn_close') }}</button>
       </div>
     </div>
