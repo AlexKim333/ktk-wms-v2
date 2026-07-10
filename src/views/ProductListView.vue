@@ -288,6 +288,7 @@ const processCsvFile = (e) => {
       migrationProgress.value = '기존 품목 및 브랜드 정보 가져오는 중...'
       let existingBrands = new Set()
       let existingItems = new Set()
+      let stockMap = {}
       try {
         const brandsRes = await frappeApi.get('/api/resource/Brand', { params: { fields: JSON.stringify(['name']), limit_page_length: 0 } })
         if (brandsRes.data && brandsRes.data.data) {
@@ -296,6 +297,10 @@ const processCsvFile = (e) => {
         const itemsRes = await frappeApi.get('/api/resource/Item', { params: { fields: JSON.stringify(['name']), limit_page_length: 0 } })
         if (itemsRes.data && itemsRes.data.data) {
           existingItems = new Set(itemsRes.data.data.map(i => i.name))
+        }
+        const binsRes = await frappeApi.get('/api/resource/Bin', { params: { filters: JSON.stringify([['warehouse', '=', selectedWarehouse.value]]), fields: JSON.stringify(['item_code', 'actual_qty']), limit_page_length: 0 } })
+        if (binsRes.data && binsRes.data.data) {
+          binsRes.data.data.forEach(b => { stockMap[b.item_code] = b.actual_qty || 0 })
         }
       } catch (err) {
         console.warn('기존 목록 가져오기 실패, 개별 검증으로 진행합니다.', err)
@@ -345,26 +350,57 @@ const processCsvFile = (e) => {
           } catch (err) { }
         }
 
-        if (totalQty >= 0) { // 0 이상의 재고만 조정 반영
-          stockEntryItems.push({
-            item_code: finalItemCode,
-            qty: totalQty,
-            warehouse: selectedWarehouse.value
-          })
+        if (totalQty >= 0) {
+          const currentQty = stockMap[finalItemCode] || 0
+          const diff = totalQty - currentQty
+
+          if (diff > 0) {
+            stockEntryItems.push({
+              type: 'Material Receipt',
+              item_code: finalItemCode,
+              qty: diff,
+              t_warehouse: selectedWarehouse.value,
+              allow_zero_valuation_rate: 1
+            })
+          } else if (diff < 0) {
+            stockEntryItems.push({
+              type: 'Material Issue',
+              item_code: finalItemCode,
+              qty: Math.abs(diff),
+              s_warehouse: selectedWarehouse.value,
+              allow_zero_valuation_rate: 1
+            })
+          }
         }
       }
       
       if (stockEntryItems.length > 0) {
-        // 너무 많은 항목을 한 번에 올리면 에러가 날 수 있으므로 100개씩 분할 (필요시)
+        const receipts = stockEntryItems.filter(i => i.type === 'Material Receipt')
+        const issues = stockEntryItems.filter(i => i.type === 'Material Issue')
+
         const chunkSize = 200
-        const totalChunks = Math.ceil(stockEntryItems.length / chunkSize)
-        for (let i = 0; i < stockEntryItems.length; i += chunkSize) {
-          migrationProgress.value = `기초재고 설정 중... (${Math.floor(i/chunkSize) + 1} / ${totalChunks})`
-          const chunk = stockEntryItems.slice(i, i + chunkSize)
-          await frappeApi.post('/api/resource/Stock Reconciliation', {
-            docstatus: 1, // 확정(Submit) 상태로 생성
-            purpose: 'Stock Reconciliation',
-            items: chunk
+        let currentStep = 1
+        const totalSteps = Math.ceil(receipts.length / chunkSize) + Math.ceil(issues.length / chunkSize)
+
+        // 입고 (Material Receipt)
+        for (let i = 0; i < receipts.length; i += chunkSize) {
+          migrationProgress.value = `재고 입고 조정 중... (${currentStep++} / ${totalSteps})`
+          const chunk = receipts.slice(i, i + chunkSize)
+          await frappeApi.post('/api/resource/Stock Entry', {
+            docstatus: 1,
+            stock_entry_type: 'Material Receipt',
+            items: chunk.map(c => ({ item_code: c.item_code, qty: c.qty, t_warehouse: c.t_warehouse, allow_zero_valuation_rate: 1 }))
+          })
+        }
+
+        // 출고 (Material Issue)
+        for (let i = 0; i < issues.length; i += chunkSize) {
+          migrationProgress.value = `재고 출고 조정 중... (${currentStep++} / ${totalSteps})`
+          const chunk = issues.slice(i, i + chunkSize)
+          await frappeApi.post('/api/resource/Stock Entry', {
+            docstatus: 1,
+            stock_entry_type: 'Material Issue',
+            items: chunk.map(c => ({ item_code: c.item_code, qty: c.qty, s_warehouse: c.s_warehouse, allow_zero_valuation_rate: 1 }))
           })
         }
       }
