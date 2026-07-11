@@ -2,12 +2,16 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js' // 출입증 확인처
 import LoginView from '../views/LoginView.vue'
 import PosView from '../views/PosView.vue'
+import SetupView from '../views/SetupView.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', name: 'login', component: LoginView },
     { path: '/pos', name: 'pos', component: PosView },
+    { path: '/setup', name: 'setup', component: SetupView },
+    { path: '/product/:id', name: 'product-detail', component: ProductDetailView },
     { path: '/', redirect: '/login' }
   ]
 })

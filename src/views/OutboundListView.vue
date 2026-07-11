@@ -173,7 +173,7 @@ const props = defineProps({
 
 const { t } = useI18n()
 
-const emit = defineEmits(['create-new', 'edit-outbound'])
+const emit = defineEmits(['create-new', 'edit-outbound', 'refresh-items'])
 
 const frappeApi = axios.create({
   headers: {
@@ -336,6 +336,7 @@ const cancelOutbound = async (name) => {
     })
     alert(t('outbound_list.msg_cancel_success'))
     fetchOutbounds()
+    emit('refresh-items')
   } catch (error) {
     console.error('취소 에러:', error)
     alert(t('outbound_list.msg_cancel_error'))

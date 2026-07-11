@@ -66,8 +66,10 @@
             <tr v-else-if="filteredProducts.length === 0">
               <td colspan="9" class="empty-state">{{ $t('product_list.no_data') }}</td>
             </tr>
-            <tr v-else v-for="item in filteredProducts" :key="item.name" :class="{ selected: selectedItems.includes(item.name) }">
-              <td><input type="checkbox" :value="item.name" v-model="selectedItems" /></td>
+            <tr v-else v-for="item in filteredProducts" :key="item.name" 
+                :class="{ selected: selectedItems.includes(item.name), 'clickable-row': true }"
+                @click="$emit('open-detail', item.name)">
+              <td @click.stop><input type="checkbox" :value="item.name" v-model="selectedItems" /></td>
               <td class="mono">{{ item.item_code }}</td>
               <td class="font-bold">{{ item.item_name }}</td>
               <td>{{ item.brand }}</td>
@@ -124,10 +126,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth.js'
 import axios from 'axios'
-import ProductRegistrationModal from '@/components/ProductRegistrationModal.vue'
-import BarcodePrintModal from '@/components/BarcodePrintModal.vue'
+import BarcodePrintModal from '../components/BarcodePrintModal.vue'
+import ProductRegistrationModal from '../components/ProductRegistrationModal.vue'
 
+const emit = defineEmits(['open-detail'])
+
+const router = useRouter()
 const frappeApi = axios.create({
   headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
   withCredentials: true
@@ -137,6 +144,9 @@ const isLoading = ref(false)
 const products = ref([])
 const searchQuery = ref('')
 const selectedItems = ref([])
+
+const isAdmin = computed(() => authStore.isAdmin)
+const userBranch = computed(() => authStore.userBranch)
 
 const isBarcodeModalOpen = ref(false)
 const isRegModalOpen = ref(false)
@@ -151,14 +161,22 @@ const excludedWarehouses = ref(JSON.parse(localStorage.getItem('wms_excluded_war
 
 const saveExcluded = () => {
   localStorage.setItem('wms_excluded_warehouses', JSON.stringify(excludedWarehouses.value))
-  // 제외 창고가 변경되었을 때 선택된 창고가 제외 목록에 들어갔다면 All로 변경
   if (selectedWarehouse.value !== 'All' && excludedWarehouses.value.includes(selectedWarehouse.value)) {
     selectedWarehouse.value = 'All'
   }
 }
 
 const availableWarehouses = computed(() => {
-  return rawWarehouses.value.filter(wh => !excludedWarehouses.value.includes(wh.name))
+  let list = rawWarehouses.value
+  
+  if (!isAdmin.value) {
+    list = list.filter(wh => {
+      const wName = wh.name.toUpperCase()
+      return wName.includes('ALARCON') || wName === userBranch.value.toUpperCase()
+    })
+  }
+
+  return list.filter(wh => !excludedWarehouses.value.includes(wh.name))
 })
 
 const loadProducts = async () => {
@@ -209,7 +227,14 @@ const getDisplayStock = (item) => {
   const itemBins = rawBins.value.filter(b => b.item_code === item.name)
   
   itemBins.forEach(bin => {
-    if (excludedWarehouses.value.includes(bin.warehouse)) return; // 제외된 창고 재고 무시
+    if (excludedWarehouses.value.includes(bin.warehouse)) return;
+    
+    if (!isAdmin.value) {
+      const wName = bin.warehouse.toUpperCase()
+      if (!wName.includes('ALARCON') && wName !== userBranch.value.toUpperCase()) {
+        return;
+      }
+    }
     
     if (selectedWarehouse.value === 'All' || selectedWarehouse.value === bin.warehouse) {
       total += (Number(bin.actual_qty) || 0)
@@ -309,21 +334,19 @@ const processCsvFile = (e) => {
       for (let i = 1; i < rows.length; i++) {
         migrationProgress.value = `데이터 처리 중... (${i} / ${rows.length - 1})`
         const cols = rows[i].split(',').map(c => c.trim())
-        // 최소한 제품명(0), 컬러(1), 박스당낱개수량(5), 메이커(7) 컬럼이 존재할 수 있도록 길이 체크 완화
         if (cols.length < 8) continue
         
         const itemName = cols[0]
         const color = cols[1]
-        const boxQty = Number(cols[2]) || 0       // 인덱스 2: 박스재고수량
-        const pieceQty = Number(cols[3]) || 0     // 인덱스 3: 갯수재고수량
-        const safetyStock = Number(cols[4]) || 0  // 인덱스 4: 안전재고
-        const packQty = Number(cols[5]) || 1      // 인덱스 5: 박스당낱개수량
-        const brandName = cols[7]                 // 인덱스 7: 메이커(브랜드)
+        const boxQty = Number(cols[2]) || 0
+        const pieceQty = Number(cols[3]) || 0
+        const safetyStock = Number(cols[4]) || 0
+        const packQty = Number(cols[5]) || 1
+        const brandName = cols[7]
 
         let finalItemCode = `${itemName}-${color}`
         if (packQty > 1) finalItemCode += `-${packQty}`
 
-        // 총 재고 계산
         const totalQty = (boxQty * packQty) + pieceQty
 
         if (brandName && !existingBrands.has(brandName)) {
@@ -382,7 +405,6 @@ const processCsvFile = (e) => {
         let currentStep = 1
         const totalSteps = Math.ceil(receipts.length / chunkSize) + Math.ceil(issues.length / chunkSize)
 
-        // 입고 (Material Receipt)
         for (let i = 0; i < receipts.length; i += chunkSize) {
           migrationProgress.value = `재고 입고 조정 중... (${currentStep++} / ${totalSteps})`
           const chunk = receipts.slice(i, i + chunkSize)
@@ -393,7 +415,6 @@ const processCsvFile = (e) => {
           })
         }
 
-        // 출고 (Material Issue)
         for (let i = 0; i < issues.length; i += chunkSize) {
           migrationProgress.value = `재고 출고 조정 중... (${currentStep++} / ${totalSteps})`
           const chunk = issues.slice(i, i + chunkSize)
@@ -405,7 +426,7 @@ const processCsvFile = (e) => {
         }
       }
 
-      alert("Migration (Import & Initial Stock) completed successfully. 재고가 정확하게 동기화되었습니다.")
+      alert("Migration (Import & Initial Stock) completed successfully.")
       loadProducts()
     } catch (error) {
       alert("Error occurred during CSV processing. " + error.message)
@@ -425,14 +446,10 @@ const exportCSV = () => {
     return
   }
   
-  // UTF-8 BOM 추가하여 엑셀에서 한글 등 다국어가 깨지지 않게 함
   let csvContent = "data:text/csv;charset=utf-8,\uFEFF"
   csvContent += "Item Name,Color,Brand,Pack Qty,Total Stock\n"
   
-  // 현재 필터링된 데이터(filteredProducts) 기준으로 내보내거나 전체(products)를 내보낼 수 있음
-  // 여기서는 현재 필터링되어 화면에 보이는 데이터를 내보냄
   filteredProducts.value.forEach(p => {
-    // 필드 내에 콤마가 있을 경우를 대비하여 따옴표 처리
     const name = `"${p.item_name ? p.item_name.replace(/"/g, '""') : ''}"`
     const color = `"${p.custom_color ? p.custom_color.replace(/"/g, '""') : 'Standard'}"`
     const brand = `"${p.brand ? p.brand.replace(/"/g, '""') : ''}"`
@@ -446,7 +463,6 @@ const exportCSV = () => {
   const link = document.createElement("a")
   link.setAttribute("href", encodedUri)
   
-  // 날짜 포맷 (예: product_export_20260703.csv)
   const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '')
   link.setAttribute("download", `product_export_${dateStr}.csv`)
   
@@ -457,6 +473,18 @@ const exportCSV = () => {
 </script>
 
 <style scoped>
+:root {
+  --neon-teal: #00a896;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.clickable-row:hover {
+  background-color: #f1f5f9;
+}
+
 .product-list-zone {
   flex: 1;
   padding: 24px;
@@ -515,7 +543,6 @@ const exportCSV = () => {
 }
 
 .btn-action.primary {
-  background: #00a896;
   border: 1px solid #00a896;
   color: white;
 }

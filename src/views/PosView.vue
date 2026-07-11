@@ -67,10 +67,11 @@
       <!-- 🌟 신규 추가된 컴포넌트들 -->
       <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
       <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
-      <ProductListView v-else-if="activeNav === 'product-list'" />
+      <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
+      <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="activeNav = 'product-list'" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
-      <OutboundListView v-else-if="activeNav === 'outbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadOutboundToCart" list-type="Material Issue" />
-      <OutboundListView v-else-if="activeNav === 'transfer-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadTransferToCart" list-type="Material Transfer" />
+      <OutboundListView v-else-if="activeNav === 'outbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadOutboundToCart" @refresh-items="fetchFrappeItems" list-type="Material Issue" />
+      <OutboundListView v-else-if="activeNav === 'transfer-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadTransferToCart" @refresh-items="fetchFrappeItems" list-type="Material Transfer" />
       <OutboundHistoryListView v-else-if="activeNav === 'outbound-history'" :branch-list="branchList" @edit-history="loadOutboundToCart" list-type="Material Issue" />
       <OutboundHistoryListView v-else-if="activeNav === 'transfer-history'" :branch-list="branchList" @edit-history="loadTransferToCart" list-type="Material Transfer" />
       <InboundListView v-else-if="activeNav === 'inbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-inbound="loadInboundToCart" />
@@ -163,22 +164,32 @@
             </div>
           </div>
           <div class="hotkey-block">
-            <div class="block-header"><h3>{{ $t('pos.qp_customer') }}</h3></div>
+            <div class="block-header">
+              <h3>👍 
+                <span v-if="transactionMode === 'inbound'">주요 공급사 (Supplier Quick Pick)</span>
+                <span v-else-if="transactionMode === 'transfer'">주요 목적지 (Target Quick Pick)</span>
+                <span v-else>{{ $t('pos.qp_customer') }}</span>
+              </h3>
+            </div>
             <div class="grid-3x4">
               <div v-for="(slot, idx) in 8" :key="'c-slot-'+idx" class="hotkey-card">
-                <template v-if="customerPickSlots[idx]">
-                  <button class="hotkey-btn-core" @click="selectCustomer(customerPickSlots[idx])" style="background-color: #f8fafc;">
-                    <div class="line-1">{{ customerPickSlots[idx].customer_name }}</div>
-                    <div class="line-2 text-teal">{{ customerPickSlots[idx].name }}</div>
+                <template v-if="activePartnerPickSlots[idx]">
+                  <button class="hotkey-btn-core" @click="selectPartner(activePartnerPickSlots[idx])" style="background-color: #f8fafc;">
+                    <div class="line-1">{{ activePartnerPickSlots[idx].customer_name || activePartnerPickSlots[idx].supplier_name || activePartnerPickSlots[idx].warehouse_name || activePartnerPickSlots[idx].name }}</div>
+                    <div class="line-2 text-teal">{{ activePartnerPickSlots[idx].name }}</div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openCustomerSlotEdit(idx)">{{ $t('pos.btn_edit') }}</button>
+                  <button class="hotkey-sub-edit-btn" @click="openPartnerSlotEdit(idx)">{{ $t('pos.btn_edit') }}</button>
                 </template>
                 <template v-else>
-                  <button class="hotkey-btn-core empty-slot" @click="openCustomerSlotEdit(idx)">
+                  <button class="hotkey-btn-core empty-slot" @click="openPartnerSlotEdit(idx)">
                     <span class="empty-icon">➕</span>
-                    <div class="line-2">{{ $t('pos.qp_assign_customer') }}</div>
+                    <div class="line-2">
+                      <span v-if="transactionMode === 'inbound'">공급사 지정</span>
+                      <span v-else-if="transactionMode === 'transfer'">도착지 지정</span>
+                      <span v-else>{{ $t('pos.qp_assign_customer') }}</span>
+                    </div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openCustomerSlotEdit(idx)">{{ $t('pos.btn_edit') }}</button>
+                  <button class="hotkey-sub-edit-btn" @click="openPartnerSlotEdit(idx)">{{ $t('pos.btn_edit') }}</button>
                 </template>
               </div>
             </div>
@@ -411,7 +422,6 @@
               </button>
             </div>
           </div>
-
         </div>
       </div>
     </main>
@@ -491,6 +501,31 @@
       </div>
     </div>
 
+    <!-- 🌟 파트너 (고객/공급사/창고) 편집 모달 -->
+    <div class="modal-overlay" v-if="isPartnerSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">
+            <span v-if="transactionMode === 'inbound'">단축키 공급사 지정 (슬롯</span>
+            <span v-else-if="transactionMode === 'transfer'">단축키 도착지 지정 (슬롯</span>
+            <span v-else>{{ $t('pos.slot_title_customer') }}</span>
+            {{ editPartnerSlotIndex + 1 }})
+          </h3>
+          <button class="close-text-btn" @click="isPartnerSlotEditModalOpen = false" style="margin:0;">{{ $t('pos.btn_close') }}</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px;">
+          <input type="text" v-model="partnerSlotSearchQuery" :placeholder="transactionMode === 'inbound' ? '공급사 검색' : (transactionMode === 'transfer' ? '도착지 검색' : $t('pos.ph_customer_search'))" class="search-bar" />
+        </div>
+        <div class="slot-item-list">
+          <div v-for="ptn in filteredPartnerSlotItems" :key="ptn.name" class="slot-list-item" @click="assignPartnerToSlot(ptn)">
+            <div class="item-desc"><strong>{{ ptn.customer_name || ptn.supplier_name || ptn.warehouse_name || ptn.name }}</strong> ({{ ptn.name }})</div>
+          </div>
+          <div v-if="filteredPartnerSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}</div>
+        </div>
+        <button class="btn-clear-slot" @click="clearPartnerSlot">{{ $t('pos.btn_clear_slot') }}</button>
+      </div>
+    </div>
+
     <!-- 🌟 퀵 재고조정 모달 (Quick Stock Adjustment) -->
     <div class="modal-overlay" v-if="isQuickAdjustModalOpen">
       <div class="modal-content" style="max-width: 450px; padding: 24px; border-radius: 8px;">
@@ -535,37 +570,20 @@
         </div>
       </div>
     </div>
-    <!-- 🌟 고객 지정 모달 -->
-    <div class="modal-overlay" v-if="isCustomerSlotEditModalOpen">
-      <div class="modal-content slot-edit-modal">
-        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">{{ $t('pos.slot_title_customer') }} {{ editCustomerSlotIndex + 1 }})</h3>
-          <button class="close-text-btn" @click="isCustomerSlotEditModalOpen = false" style="margin:0;">{{ $t('pos.btn_close') }}</button>
-        </div>
-        <div class="search-section" style="margin-top: 15px;">
-          <input type="text" v-model="customerSlotSearchQuery" :placeholder="$t('pos.ph_customer_search')" class="search-bar" />
-        </div>
-        <div class="slot-item-list">
-          <div v-for="cust in filteredCustomerSlotItems" :key="cust.name" class="slot-list-item" @click="assignCustomerToSlot(cust)">
-            <div class="item-desc"><strong>{{ cust.customer_name || cust.name }}</strong> ({{ cust.name }})</div>
-          </div>
-          <div v-if="filteredCustomerSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('pos.empty_search') }}</div>
-        </div>
-        <button class="btn-clear-slot" @click="clearCustomerSlot">{{ $t('pos.btn_clear_slot') }}</button>
-      </div>
-    </div>
 
     <!-- 🌟 퀵 추가 모달 -->
     <QuickItemAddModal :is-open="isQuickItemModalOpen" @close="isQuickItemModalOpen = false" @success="handleItemSuccess" />
     <QuickCustomerAddModal :is-open="isQuickCustomerModalOpen" @close="isQuickCustomerModalOpen = false" @success="handleCustomerSuccess" />
     <QuickSalesPersonAddModal :is-open="isQuickSalesPersonModalOpen" :branch-list="warehouseList" :default-branch="currentTab?.selectedBranch" @close="isQuickSalesPersonModalOpen = false" @success="handleSalesPersonSuccess" />
   </div>
+  <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
 </template>
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import ReceiptPrint from '../components/ReceiptPrint.vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import axios from 'axios'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
@@ -581,8 +599,10 @@ import OutboundListView from './OutboundListView.vue'
 import OutboundHistoryListView from './OutboundHistoryListView.vue'
 import InboundListView from './InboundListView.vue'
 import InboundHistoryListView from './InboundHistoryListView.vue'
+import ProductDetailView from './ProductDetailView.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const { t } = useI18n();
 
@@ -602,6 +622,66 @@ const handleLogout = () => {
 }
 
 const searchQuery = ref('')
+
+// --- Receipt Print & Copy ---
+const receiptPrintRef = ref(null)
+const receiptPrintData = ref({ summary: {} })
+const receiptPrintItems = ref([])
+
+const triggerPrintAndCopy = async (docName, mode, source, target, branch, items) => {
+  const dateStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
+  
+  let title = 'COMPROBANTE DE SALIDA'
+  let ubicacion = target || branch || 'N/A'
+  
+  if (mode === 'inbound') {
+    title = 'COMPROBANTE DE ENTRADA'
+    ubicacion = source || 'N/A'
+  } else if (mode === 'transfer') {
+    title = 'COMPROBANTE DE TRASLADO'
+    ubicacion = `${source} -> ${target}`
+  }
+
+  const vendedor = authStore.user?.member_name || authStore.user?.full_name || 'ADMIN'
+  const solicitante = currentTab.value?.selectedResponder || 'ADMIN'
+  const creador = currentTab.value?.selectedCreator || vendedor
+  
+  let totalBulto = 0
+  let totalPzs = 0
+  items.forEach(item => {
+    totalBulto += Number(item.input_box) || 0
+    totalPzs += Number(item.input_each) || 0
+  })
+
+  receiptPrintData.value = {
+    title,
+    no: docName,
+    date: dateStr,
+    ubicacion,
+    vendedor,
+    mode,
+    solicitante,
+    creador,
+    summary: { items: items.length, bulto: totalBulto, pzs: totalPzs }
+  }
+  
+  receiptPrintItems.value = JSON.parse(JSON.stringify(items))
+  
+  await nextTick() // Wait for Vue to render the print DOM
+  
+  if (receiptPrintRef.value) {
+    const success = await receiptPrintRef.value.copyToClipboard()
+    if (success) {
+      alert("영수증이 클립보드에 자동 복사되었습니다. (와츠앱 공유 가능)")
+    } else {
+      alert("영수증 클립보드 복사에 실패했습니다.")
+    }
+  }
+  
+  // 브라우저 인쇄창 호출
+  window.print()
+}
+// ----------------------------
 const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
 const activeNav = ref('outbound')
@@ -610,6 +690,12 @@ const isProductMenuOpen = ref(false)
 const isInboundMenuOpen = ref(false)
 const isOutboundMenuOpen = ref(true)
 const isTransferMenuOpen = ref(false)
+const activeProductId = ref(null)
+
+const openProductDetail = (itemId) => {
+  activeProductId.value = itemId
+  activeNav.value = 'product-detail'
+}
 
 const barcodeQuery = ref('')
 const isSearchDropdownOpen = ref(false)
@@ -630,8 +716,17 @@ const isQuickCustomerModalOpen = ref(false)
 const isQuickSalesPersonModalOpen = ref(false)
 
 const branchList = computed(() => {
-  // 프라페 트리에 등록된 하위 지점 목록 (SCURUSAL - K 하위)
-  return warehouseList.value.filter(wh => wh.parent_warehouse === 'SCURUSAL - K')
+  // 지점 목록은 회사 산하 지점 창고 (SCURUSAL - K 하위)
+  let list = warehouseList.value.filter(wh => wh.parent_warehouse === 'SCURUSAL - K')
+  
+  if (!authStore.isAdmin) {
+    const uBranch = authStore.userBranch?.toUpperCase() || ''
+    list = list.filter(wh => {
+      const wName = wh.name.toUpperCase()
+      return wName.includes('ALARCON') || wName === uBranch
+    })
+  }
+  return list
 })
 
 const filteredSalesPersonList = computed(() => {
@@ -653,10 +748,20 @@ const userKey = authStore.user?.name || authStore.user?.email || 'default_user'
 const singleStorageKey = `wms_quick_pick_slots_${userKey}`
 const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
 const customerStorageKey = `wms_customer_quick_pick_slots_${userKey}`
+const supplierStorageKey = `wms_supplier_quick_pick_slots_${userKey}`
+const targetStorageKey = `wms_target_quick_pick_slots_${userKey}`
 
 const quickPickSlotNames = ref(JSON.parse(localStorage.getItem(singleStorageKey)) || new Array(8).fill(null))
 const gridPickSlotNames = ref(JSON.parse(localStorage.getItem(gridStorageKey)) || new Array(8).fill(null))
 const customerPickSlotNames = ref(JSON.parse(localStorage.getItem(customerStorageKey)) || new Array(8).fill(null))
+const supplierPickSlotNames = ref(JSON.parse(localStorage.getItem(supplierStorageKey)) || new Array(8).fill(null))
+const targetPickSlotNames = ref(JSON.parse(localStorage.getItem(targetStorageKey)) || new Array(8).fill(null))
+
+const activePartnerPickSlotNames = computed(() => {
+  if (transactionMode.value === 'inbound') return supplierPickSlotNames.value
+  if (transactionMode.value === 'transfer') return targetPickSlotNames.value
+  return customerPickSlotNames.value
+})
 
 const quickPickSlots = computed(() => {
   return quickPickSlotNames.value.map(name => {
@@ -672,14 +777,26 @@ const gridPickSlots = computed(() => {
   })
 })
 
-const customerPickSlots = computed(() => {
-  return customerPickSlotNames.value.map(name => {
+const activePartnerPickSlots = computed(() => {
+  return activePartnerPickSlotNames.value.map(name => {
     if (!name) return null;
+    if (transactionMode.value === 'inbound') return supplierList.value.find(s => s.name === name) || null;
+    if (transactionMode.value === 'transfer') return branchList.value.find(w => w.name === name) || null;
     return customerList.value.find(c => c.name === name) || null;
   })
 })
 
-// 🌟 가용 재고 계산 로직 (실재고 - 예약 수량)
+const binDataMap = computed(() => {
+  const map = {};
+  binData.value.forEach(bin => {
+    if (!map[bin.item_code]) map[bin.item_code] = {};
+    if (!map[bin.item_code][bin.warehouse]) map[bin.item_code][bin.warehouse] = 0;
+    map[bin.item_code][bin.warehouse] += (Number(bin.actual_qty) || 0);
+  });
+  return map;
+});
+
+// 재고 현황 계산 함수 (최적화 - 캐싱 맵 사용)
 const getAvailableStock = (itemCode, targetWarehouse = null) => {
   const warehouse = targetWarehouse || (transactionMode.value === 'inbound' 
     ? currentTab.value?.selectedTarget 
@@ -738,12 +855,24 @@ const selectSearchItem = (item) => {
 const handleBarcodeScan = () => {
   const code = barcodeQuery.value.trim()
   if (!code) return
-  const item = rawSingleItems.value.find(i => 
-    i.name.toLowerCase() === code.toLowerCase() || 
-    (i.custom_name_number && i.custom_name_number.toLowerCase() === code.toLowerCase())
-  )
+  
+  let foundItem = null
+  let foundQty = null
+
+  const item = rawSingleItems.value.find(i => {
+    if (i.custom_tier_1_barcode && i.custom_tier_1_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_1_qty || 1; return true }
+    if (i.custom_tier_2_barcode && i.custom_tier_2_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_2_qty || 12; return true }
+    if (i.custom_tier_3_barcode && i.custom_tier_3_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_3_qty || 100; return true }
+    if (i.custom_tier_4_barcode && i.custom_tier_4_toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_4_qty || 300; return true }
+    if (i.name.toLowerCase() === code.toLowerCase() || (i.custom_name_number && i.custom_name_number.toLowerCase() === code.toLowerCase())) {
+      foundQty = null // Default add 1 box
+      return true
+    }
+    return false
+  })
+
   if (item) {
-    addSingleHotkeyToCart(item)
+    addSingleHotkeyToCart(item, foundQty)
   } else {
     alert(t('pos.msg_err_barcode', { code: code }))
   }
@@ -819,48 +948,86 @@ const clearGridSlot = () => {
   isGridSlotEditModalOpen.value = false
 }
 
-// 고객 핫키 모달 관련
-const isCustomerSlotEditModalOpen = ref(false)
-const editCustomerSlotIndex = ref(-1)
-const customerSlotSearchQuery = ref('')
+// 동적 파트너 슬롯 모달 관리
+const isPartnerSlotEditModalOpen = ref(false)
+const editPartnerSlotIndex = ref(-1)
+const partnerSlotSearchQuery = ref('')
 
-const filteredCustomerSlotItems = computed(() => {
-  const currentAssigned = new Set(customerPickSlotNames.value.filter(n => n !== null))
-  const q = customerSlotSearchQuery.value.toLowerCase()
-  return customerList.value.filter(cust => {
-    if (currentAssigned.has(cust.name)) return false
-    return (cust.name && cust.name.toLowerCase().includes(q)) ||
-           (cust.customer_name && cust.customer_name.toLowerCase().includes(q))
+const filteredPartnerSlotItems = computed(() => {
+  const currentAssigned = new Set(activePartnerPickSlotNames.value.filter(n => n !== null))
+  const q = partnerSlotSearchQuery.value.toLowerCase()
+  
+  let targetList = []
+  if (transactionMode.value === 'outbound') {
+    targetList = customerList.value
+  } else if (transactionMode.value === 'inbound') {
+    targetList = supplierList.value
+  } else if (transactionMode.value === 'transfer') {
+    targetList = branchList.value
+  }
+  
+  return targetList.filter(item => {
+    if (currentAssigned.has(item.name)) return false
+    const nameStr = (item.customer_name || item.supplier_name || item.warehouse_name || item.name || '').toLowerCase()
+    const idStr = (item.name || '').toLowerCase()
+    return nameStr.includes(q) || idStr.includes(q)
   }).slice(0, 50)
 })
 
-const openCustomerSlotEdit = (idx) => {
-  editCustomerSlotIndex.value = idx
-  customerSlotSearchQuery.value = ''
-  isCustomerSlotEditModalOpen.value = true
+const openPartnerSlotEdit = (idx) => {
+  editPartnerSlotIndex.value = idx
+  partnerSlotSearchQuery.value = ''
+  isPartnerSlotEditModalOpen.value = true
 }
 
-const assignCustomerToSlot = (cust) => {
-  const newArr = [...customerPickSlotNames.value]
-  newArr[editCustomerSlotIndex.value] = cust.name
-  customerPickSlotNames.value = newArr
-  localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
-  isCustomerSlotEditModalOpen.value = false
+const assignPartnerToSlot = (ptn) => {
+  const newArr = [...activePartnerPickSlotNames.value]
+  newArr[editPartnerSlotIndex.value] = ptn.name
+  
+  if (transactionMode.value === 'inbound') {
+    supplierPickSlotNames.value = newArr
+    localStorage.setItem(supplierStorageKey, JSON.stringify(newArr))
+  } else if (transactionMode.value === 'transfer') {
+    targetPickSlotNames.value = newArr
+    localStorage.setItem(targetStorageKey, JSON.stringify(newArr))
+  } else {
+    customerPickSlotNames.value = newArr
+    localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
+  }
+  
+  isPartnerSlotEditModalOpen.value = false
 }
 
-const clearCustomerSlot = () => {
-  const newArr = [...customerPickSlotNames.value]
-  newArr[editCustomerSlotIndex.value] = null
-  customerPickSlotNames.value = newArr
-  localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
-  isCustomerSlotEditModalOpen.value = false
+const clearPartnerSlot = () => {
+  const newArr = [...activePartnerPickSlotNames.value]
+  newArr[editPartnerSlotIndex.value] = null
+  
+  if (transactionMode.value === 'inbound') {
+    supplierPickSlotNames.value = newArr
+    localStorage.setItem(supplierStorageKey, JSON.stringify(newArr))
+  } else if (transactionMode.value === 'transfer') {
+    targetPickSlotNames.value = newArr
+    localStorage.setItem(targetStorageKey, JSON.stringify(newArr))
+  } else {
+    customerPickSlotNames.value = newArr
+    localStorage.setItem(customerStorageKey, JSON.stringify(newArr))
+  }
+  
+  isPartnerSlotEditModalOpen.value = false
 }
 
-const selectCustomer = (cust) => {
+const selectPartner = (ptn) => {
   if (currentTab.value) {
-    currentTab.value.selectedCustomer = cust.name
+    if (transactionMode.value === 'inbound') {
+      currentTab.value.selectedSupplier = ptn.name
+    } else if (transactionMode.value === 'transfer') {
+      currentTab.value.selectedTarget = ptn.name
+    } else {
+      currentTab.value.selectedCustomer = ptn.name
+    }
   }
 }
+
 
 // 고객 마스터 입력칸 자동완성 로직
 const isCustomerDropdownOpen = ref(false)
@@ -939,7 +1106,11 @@ const fetchFrappeItems = async () => {
             'name', 'item_name', 'item_group', 
             'custom_color', 'custom_pack_qty',
             'custom_is_grid_item', 'custom_grid_group_id', 'custom_name_number',
-            'valuation_rate'
+            'valuation_rate',
+            'custom_tier_1_barcode', 'custom_tier_1_qty',
+            'custom_tier_2_barcode', 'custom_tier_2_qty',
+            'custom_tier_3_barcode', 'custom_tier_3_qty',
+            'custom_tier_4_barcode', 'custom_tier_4_qty'
           ]),
           limit_page_length: 0
         }
@@ -1119,6 +1290,9 @@ const fetchFrappeItems = async () => {
 }
 
 onMounted(() => {
+  if (route.query.nav) {
+    activeNav.value = route.query.nav
+  }
   fetchFrappeItems()
 })
 
@@ -1734,6 +1908,9 @@ const submitToFrappe = async () => {
       try {
         await frappeApi.put(`/api/resource/Stock Entry/${docName}`, { docstatus: 1 });
         alert(t('pos.msg_success_submit', { title: currentTab.value.title }));
+        
+        // --- 전표 복사 및 인쇄 트리거 ---
+        triggerPrintAndCopy(docName, transactionMode.value, fromWh, toWh, currentTab.value.selectedBranch, currentTab.value.cartItems);
         
         // 🌟 수정을 성공적으로 마쳤으므로 amendingStockEntry 초기화
         if (currentTab.value.amendingStockEntry) {
