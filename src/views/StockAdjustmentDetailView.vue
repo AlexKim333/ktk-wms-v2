@@ -22,7 +22,7 @@
             <span class="icon scanner-icon">🎫</span>
             
             <!-- Search Dropdown -->
-            <div v-if="isDropdownOpen && filteredItems.length > 0" class="search-dropdown">
+            <div v-if="isDropdownOpen && (filteredItems.length > 0 || searchQuery.trim())" class="search-dropdown">
               <div 
                 v-for="item in filteredItems" 
                 :key="item.name"
@@ -37,6 +37,13 @@
                 <div class="item-stock-badge">
                   {{ getBinStock(item.name) }} {{ $t('stock_adj.detail_units') }}
                 </div>
+              </div>
+              <div
+                v-if="adjSearchHasMore"
+                class="dropdown-item search-more-item"
+                @mousedown.prevent="loadMoreAdjSearch"
+              >
+                {{ $t('common.show_more', { n: adjSearchRemaining }) }}
               </div>
             </div>
           </div>
@@ -156,8 +163,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import axios from 'axios'
+import { createFlexSearcher, rankItemNameMatches } from '../composables/useItemSearch.js'
+import { usePagedList } from '../composables/usePagedList.js'
 
 const props = defineProps({
   adjustmentId: {
@@ -166,6 +175,16 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['go-back', 'saved'])
+
+/** 품명(item_name)만 검색 — POS와 동일 정책 */
+const itemSearcher = createFlexSearcher({
+  idField: 'name',
+  indexFields: ['item_name'],
+  toDoc: (item) => ({
+    name: item.name,
+    item_name: item.item_name || ''
+  })
+})
 
 const frappeApi = axios.create({
   headers: {
@@ -209,6 +228,7 @@ const fetchInitialData = async () => {
       }
     })
     allItems.value = itemRes.data.data
+    itemSearcher.rebuild(allItems.value)
 
     // 3. If editing draft, fetch draft details
     if (isDraft.value) {
@@ -285,13 +305,25 @@ const closeDropdown = (e) => {
   }
 }
 
-const filteredItems = computed(() => {
-  if (!searchQuery.value) return allItems.value.slice(0, 10) // 빈 검색어일 때 최상위 10개 표시
-  const q = searchQuery.value.toLowerCase()
-  return allItems.value.filter(i => 
-    i.item_name.toLowerCase().includes(q) || i.name.toLowerCase().includes(q)
-  ).slice(0, 10) // 검색 시에도 10개로 넉넉히 표시
+const ADJ_SEARCH_MATCH_CAP = 2000
+const adjSearchHits = computed(() => {
+  // 빈 검색어 → 상위 후보(원본 순서) / 검색 시 → 품명 매칭 전체(캡)
+  if (!searchQuery.value.trim()) return allItems.value.slice(0, 200)
+  const hits = itemSearcher.search(searchQuery.value, { limit: ADJ_SEARCH_MATCH_CAP })
+  const hitSet = new Set(hits.map((i) => i.name))
+  const matched = allItems.value.filter((i) => hitSet.has(i.name))
+  return rankItemNameMatches(matched, searchQuery.value)
 })
+
+const {
+  visible: filteredItems,
+  hasMore: adjSearchHasMore,
+  remaining: adjSearchRemaining,
+  loadMore: loadMoreAdjSearch,
+  reset: resetAdjSearchPage
+} = usePagedList(adjSearchHits, 10)
+
+watch(searchQuery, () => resetAdjSearchPage())
 
 const getBinStock = (itemCode) => {
   return binData.value[itemCode] || 0
@@ -317,6 +349,7 @@ const addItemToAdjustment = (item) => {
   }
   searchQuery.value = ''
   isDropdownOpen.value = false
+  resetAdjSearchPage()
 }
 
 const removeItem = (index) => {
@@ -555,6 +588,17 @@ const saveAdjustment = async (docstatus) => {
 }
 .dropdown-item:hover {
   background: #f8fafc;
+}
+.search-more-item {
+  justify-content: center;
+  background: #fffbeb;
+  color: #b45309;
+  font-weight: bold;
+  font-size: 13px;
+  border-bottom: none;
+}
+.search-more-item:hover {
+  background: #fef3c7;
 }
 
 .item-img-placeholder {

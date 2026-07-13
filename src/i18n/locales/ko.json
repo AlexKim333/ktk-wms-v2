@@ -60,7 +60,9 @@
     "csv_export": "CSV 파일 내보내기",
     "refresh": "새로고침",
     "loading": "데이터를 불러오는 중입니다...",
-    "done": "완료"
+    "done": "완료",
+    "show_more": "결과 더보기 (+{n})",
+    "search_shown": "{shown} / {total}건 표시"
   },
   "product_list": {
     "title": "상품 리스트 및 재고 현황",

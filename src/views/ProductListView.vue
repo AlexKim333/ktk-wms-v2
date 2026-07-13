@@ -66,19 +66,28 @@
             <tr v-else-if="filteredProducts.length === 0">
               <td colspan="9" class="empty-state">{{ $t('product_list.no_data') }}</td>
             </tr>
-            <tr v-else v-for="item in filteredProducts" :key="item.name" 
-                :class="{ selected: selectedItems.includes(item.name), 'clickable-row': true }"
-                @click="$emit('open-detail', item.name)">
-              <td @click.stop><input type="checkbox" :value="item.name" v-model="selectedItems" /></td>
-              <td class="mono">{{ item.item_code }}</td>
-              <td class="font-bold">{{ item.item_name }}</td>
-              <td>{{ item.brand }}</td>
-              <td>{{ item.custom_color || 'Standard' }}</td>
-              <td>{{ item.custom_pack_qty || 1 }}</td>
-              <td class="align-right font-bold text-teal">{{ calculateStock(item).boxes }} Box</td>
-              <td class="align-right font-bold text-teal">{{ calculateStock(item).eaches }} Pcs</td>
-              <td class="align-right font-bold bg-light">{{ getDisplayStock(item) }} Pcs</td>
-            </tr>
+            <template v-else>
+              <tr v-for="item in displayedProducts" :key="item.name" 
+                  :class="{ selected: selectedItems.includes(item.name), 'clickable-row': true }"
+                  @click="$emit('open-detail', item.name)">
+                <td @click.stop><input type="checkbox" :value="item.name" v-model="selectedItems" /></td>
+                <td class="mono">{{ item.item_code }}</td>
+                <td class="font-bold">{{ item.item_name }}</td>
+                <td>{{ item.brand }}</td>
+                <td>{{ item.custom_color || 'Standard' }}</td>
+                <td>{{ item.custom_pack_qty || 1 }}</td>
+                <td class="align-right font-bold text-teal">{{ calculateStock(item).boxes }} Box</td>
+                <td class="align-right font-bold text-teal">{{ calculateStock(item).eaches }} Pcs</td>
+                <td class="align-right font-bold bg-light">{{ getDisplayStock(item) }} Pcs</td>
+              </tr>
+              <tr v-if="productListHasMore">
+                <td colspan="9" class="show-more-cell">
+                  <button type="button" class="btn-show-more" @click="loadMoreProducts">
+                    {{ $t('common.show_more', { n: productListRemaining }) }}
+                  </button>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -125,9 +134,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { createFlexSearcher, rankItemNameMatches } from '../composables/useItemSearch.js'
+import { usePagedList } from '../composables/usePagedList.js'
 import axios from 'axios'
 import BarcodePrintModal from '../components/BarcodePrintModal.vue'
 import ProductRegistrationModal from '../components/ProductRegistrationModal.vue'
@@ -135,6 +146,18 @@ import ProductRegistrationModal from '../components/ProductRegistrationModal.vue
 const emit = defineEmits(['open-detail'])
 
 const router = useRouter()
+const authStore = useAuthStore()
+
+/** 품명(item_name)만 검색 — POS와 동일 정책 */
+const productSearcher = createFlexSearcher({
+  idField: 'name',
+  indexFields: ['item_name'],
+  toDoc: (item) => ({
+    name: item.name,
+    item_name: item.item_name || ''
+  })
+})
+
 const frappeApi = axios.create({
   headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
   withCredentials: true
@@ -146,7 +169,7 @@ const searchQuery = ref('')
 const selectedItems = ref([])
 
 const isAdmin = computed(() => authStore.isAdmin)
-const userBranch = computed(() => authStore.userBranch)
+const userBranch = computed(() => authStore.user?.branch_name || '')
 
 const isBarcodeModalOpen = ref(false)
 const isRegModalOpen = ref(false)
@@ -170,9 +193,10 @@ const availableWarehouses = computed(() => {
   let list = rawWarehouses.value
   
   if (!isAdmin.value) {
+    const branch = (userBranch.value || '').toUpperCase()
     list = list.filter(wh => {
       const wName = wh.name.toUpperCase()
-      return wName.includes('ALARCON') || wName === userBranch.value.toUpperCase()
+      return wName.includes('ALARCON') || (branch && wName === branch)
     })
   }
 
@@ -209,6 +233,7 @@ const loadProducts = async () => {
     rawItems.value = itemRes.data.data || []
     rawBins.value = binRes.data.data || []
     rawWarehouses.value = whRes.data.data || []
+    productSearcher.rebuild(rawItems.value)
     
   } catch (err) {
     console.error('Error loading products:', err)
@@ -231,7 +256,8 @@ const getDisplayStock = (item) => {
     
     if (!isAdmin.value) {
       const wName = bin.warehouse.toUpperCase()
-      if (!wName.includes('ALARCON') && wName !== userBranch.value.toUpperCase()) {
+      const branch = (userBranch.value || '').toUpperCase()
+      if (!wName.includes('ALARCON') && (!branch || wName !== branch)) {
         return;
       }
     }
@@ -253,18 +279,24 @@ const calculateStock = (item) => {
 }
 
 const filteredProducts = computed(() => {
-  let list = rawItems.value
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(p => 
-      (p.item_name && p.item_name.toLowerCase().includes(q)) || 
-      (p.custom_color && p.custom_color.toLowerCase().includes(q)) ||
-      (p.brand && p.brand.toLowerCase().includes(q)) ||
-      (p.item_code && p.item_code.toLowerCase().includes(q))
-    )
-  }
-  return list
+  // 검색어 없으면 전체 / 있으면 품명만 매칭 후 관련도 정렬
+  if (!searchQuery.value.trim()) return rawItems.value
+  const hits = productSearcher.search(searchQuery.value, { limit: null })
+  const hitSet = new Set(hits.map((p) => p.name))
+  const matched = rawItems.value.filter((p) => hitSet.has(p.name))
+  return rankItemNameMatches(matched, searchQuery.value)
 })
+
+const {
+  visible: displayedProducts,
+  hasMore: productListHasMore,
+  remaining: productListRemaining,
+  loadMore: loadMoreProducts,
+  reset: resetProductListPage
+} = usePagedList(filteredProducts, 100)
+
+watch(searchQuery, () => resetProductListPage())
+watch(rawItems, () => resetProductListPage())
 
 const isAllSelected = computed(() => {
   return filteredProducts.value.length > 0 && selectedItems.value.length === filteredProducts.value.length
@@ -644,6 +676,27 @@ const exportCSV = () => {
   text-align: center !important;
   color: #94a3b8;
   font-size: 14px;
+}
+
+.show-more-cell {
+  text-align: center !important;
+  padding: 16px !important;
+  background: #fffbeb;
+  border-top: 1px solid #fde68a;
+}
+
+.btn-show-more {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #b45309;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-show-more:hover {
+  background: #fde68a;
 }
 
 .warehouse-filter-wrapper {

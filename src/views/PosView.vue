@@ -10,8 +10,27 @@
         <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
       </div>
       <nav class="nav-menu">
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'home' }" @click.prevent="activeNav = 'home'">🏠 {{ $t('nav.home') }}</a>
-        <button class="nav-item nav-btn-inline" @click.prevent="isOutboundMenuOpen = !isOutboundMenuOpen">
+        <!-- 지점 전용 VENTA (항상 가장 먼저 노출) -->
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')" style="background-color: #38bdf8; color: #0f172a; font-weight: bold;">
+          🛒 VENTA (판매)
+        </a>
+
+        <!-- 지점 전용 메뉴 -->
+        <div class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
+          <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">지점 전용 (Branch)</span>
+          <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">재고 이동 예약</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">재고 조회</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-sales' }" @click.prevent="setActiveNav('branch-sales')">판매 내역</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-staff' }" @click.prevent="setActiveNav('branch-staff')">점원/포스 관리</a>
+          </div>
+        </div>
+
+        <template v-if="isAdmin">
+          <div style="border-top: 1px solid #334155; margin: 5px 0;"></div>
+          <span style="padding: 5px 15px; font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">메인 관리자 전용 (Admin)</span>
+          <a href="#" class="nav-item" :class="{ active: activeNav === 'home' }" @click.prevent="setActiveNav('home')">🏠 {{ $t('nav.home') }}</a>
+          <button class="nav-item nav-btn-inline" @click.prevent="isOutboundMenuOpen = !isOutboundMenuOpen">
           {{ $t('nav.outbound_group') }} <span style="float:right;">{{ isOutboundMenuOpen ? '▲' : '▼' }}</span>
         </button>
         <div v-show="isOutboundMenuOpen" class="nav-sub-menu" style="background: rgba(0,0,0,0.1); padding-left:10px;">
@@ -56,7 +75,8 @@
         <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 {{ $t('nav.node') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 {{ $t('nav.report') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 {{ $t('nav.manager') }}</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="activeNav = 'search-edit'">🔍 {{ $t('nav.search_edit') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="setActiveNav('search-edit')">🔍 {{ $t('nav.search_edit') }}</a>
+        </template>
 
         <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
         <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 {{ $t('nav.logout') }}</button>
@@ -68,8 +88,24 @@
       <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
       <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
-      <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="activeNav = 'product-list'" />
+      <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav('product-list')" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
+      
+      <!-- 지점 전용 영역 -->
+      <BranchPosView 
+        v-else-if="activeNav === 'branch-pos'" 
+        :raw-items="rawSingleItems"
+        :bin-data="binDataMap"
+        :branch-list="branchList"
+      />
+      <BranchInventoryList 
+        v-else-if="activeNav === 'branch-inventory'" 
+        :raw-items="rawSingleItems"
+        :bin-data="binDataMap"
+        @open-detail="openProductDetail"
+        @handle-migration="handleMigration"
+      />
+      
       <OutboundListView v-else-if="activeNav === 'outbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadOutboundToCart" @refresh-items="fetchFrappeItems" list-type="Material Issue" />
       <OutboundListView v-else-if="activeNav === 'transfer-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadTransferToCart" @refresh-items="fetchFrappeItems" list-type="Material Transfer" />
       <OutboundHistoryListView v-else-if="activeNav === 'outbound-history'" :branch-list="branchList" @edit-history="loadOutboundToCart" list-type="Material Issue" />
@@ -89,8 +125,17 @@
             <!-- 동적 검색 (자동완성) -->
             <div class="search-box-wrapper">
               <span class="search-icon">🔍</span>
-              <input type="text" v-model="searchQuery" @focus="isSearchDropdownOpen = true" @blur="isSearchDropdownOpen = false" :placeholder="$t('pos.ph_search')" class="search-bar" />
-              <ul v-if="isSearchDropdownOpen && filteredMainSearchItems.length > 0" class="search-dropdown">
+              <input
+                type="text"
+                v-model="searchQuery"
+                @focus="openSearchDropdown"
+                @input="openSearchDropdown"
+                @blur="closeSearchDropdown"
+                :placeholder="$t('pos.ph_search')"
+                class="search-bar"
+                autocomplete="off"
+              />
+              <ul v-if="isSearchDropdownOpen && (filteredMainSearchItems.length > 0 || searchQuery.trim())" class="search-dropdown">
                 <li v-for="item in filteredMainSearchItems" :key="item.name" 
                     :class="{ 
                       'bg-light-green': gridPickSlotNames.includes(item.custom_grid_group_id || item.item_name || t('pos.unclassified')),
@@ -105,6 +150,19 @@
                     </div>
                     <div class="search-item-stock">{{ getFormattedStockFor(item) }}</div>
                   </div>
+                </li>
+                <li
+                  v-if="searchQuery.trim() && mainSearchHits.length > 0"
+                  class="search-meta-row"
+                >
+                  <span>{{ $t('common.search_shown', { shown: filteredMainSearchItems.length, total: mainSearchHits.length }) }}</span>
+                </li>
+                <li
+                  v-if="mainSearchHasMore"
+                  class="search-more-row"
+                  @mousedown.prevent="loadMoreMainSearch"
+                >
+                  <span class="search-more-text">{{ $t('common.show_more', { n: mainSearchRemaining }) }}</span>
                 </li>
                 <li class="quick-add-btn-row" @mousedown.prevent="isQuickItemModalOpen = true">
                   <span class="quick-add-text">{{ $t('pos.btn_quick_add_item') }}</span>
@@ -575,22 +633,48 @@
     <QuickItemAddModal :is-open="isQuickItemModalOpen" @close="isQuickItemModalOpen = false" @success="handleItemSuccess" />
     <QuickCustomerAddModal :is-open="isQuickCustomerModalOpen" @close="isQuickCustomerModalOpen = false" @success="handleCustomerSuccess" />
     <QuickSalesPersonAddModal :is-open="isQuickSalesPersonModalOpen" :branch-list="warehouseList" :default-branch="currentTab?.selectedBranch" @close="isQuickSalesPersonModalOpen = false" @success="handleSalesPersonSuccess" />
+
+    <!-- 🚚 배송지 선택 모달 -->
+    <div class="modal-overlay" v-if="isShippingAddressModalOpen">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <div class="product-title">DIRECCIÓN DE ENTREGA (배송지 선택)</div>
+          <button class="close-btn" @click="cancelShippingAddress">✖</button>
+        </div>
+        <div class="modal-body" style="margin-top: 15px;">
+          <p style="margin-bottom: 10px; color: #475569;">El cliente tiene varias direcciones. Seleccione una para el comprobante.</p>
+          <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+            <li v-for="(addr, idx) in shippingAddressList" :key="idx" 
+                @click="selectShippingAddress(addr)"
+                style="padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; transition: background 0.2s; background: white;"
+                onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+              <strong>{{ addr.city }}</strong><br/>
+              <span style="color: #64748b; font-size: 0.9em;">{{ addr.address_line1 }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
   <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
 </template>
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { useItemSearch, rankItemNameMatches } from '../composables/useItemSearch.js'
+import { usePagedList } from '../composables/usePagedList.js'
 import axios from 'axios'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
 import NodeManagement from '../components/NodeManagement.vue'
 import ProductListView from './ProductListView.vue'
 import StockReconciliationMain from './StockReconciliationMain.vue'
+import BranchPosView from '../components/branch/BranchPosView.vue'
+import BranchInventoryList from '../components/branch/BranchInventoryList.vue'
 import QuickItemAddModal from '../components/QuickItemAddModal.vue'
 import QuickCustomerAddModal from '../components/QuickCustomerAddModal.vue'
 import QuickSalesPersonAddModal from '../components/QuickSalesPersonAddModal.vue'
@@ -604,7 +688,17 @@ import ProductDetailView from './ProductDetailView.vue'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.access_level === 'Admin')
 const { t } = useI18n();
+
+const {
+  rebuildItemIndex,
+  addOrUpdateItem,
+  searchItems,
+  searchItemsOrAll,
+  rebuildGridIndex,
+  searchGridsOrAll
+} = useItemSearch()
 
 const frappeApi = axios.create({
   headers: {
@@ -628,7 +722,28 @@ const receiptPrintRef = ref(null)
 const receiptPrintData = ref({ summary: {} })
 const receiptPrintItems = ref([])
 
-const triggerPrintAndCopy = async (docName, mode, source, target, branch, items) => {
+const isShippingAddressModalOpen = ref(false)
+const shippingAddressList = ref([])
+const shippingPhone = ref('')
+const pendingPrintData = ref(null)
+
+const selectShippingAddress = (addr) => {
+  isShippingAddressModalOpen.value = false;
+  if (pendingPrintData.value) {
+    const { docName, mode, fromWh, toWh, branch, items } = pendingPrintData.value;
+    triggerPrintAndCopy(docName, mode, fromWh, toWh, branch, items, { address: addr, phone: shippingPhone.value });
+  }
+}
+
+const cancelShippingAddress = () => {
+  isShippingAddressModalOpen.value = false;
+  if (pendingPrintData.value) {
+    const { docName, mode, fromWh, toWh, branch, items } = pendingPrintData.value;
+    triggerPrintAndCopy(docName, mode, fromWh, toWh, branch, items, null);
+  }
+}
+
+const triggerPrintAndCopy = async (docName, mode, source, target, branch, items, shippingInfo = null) => {
   const dateStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
   
   let title = 'COMPROBANTE DE SALIDA'
@@ -640,6 +755,10 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items)
   } else if (mode === 'transfer') {
     title = 'COMPROBANTE DE TRASLADO'
     ubicacion = `${source} -> ${target}`
+  } else if (mode === 'outbound') {
+    title = 'COMPROBANTE DE SALIDA'
+    const customer = currentTab.value?.selectedCustomer || 'N/A'
+    ubicacion = `${source || 'N/A'} -> ${customer}`
   }
 
   const vendedor = authStore.user?.member_name || authStore.user?.full_name || 'ADMIN'
@@ -662,6 +781,7 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items)
     mode,
     solicitante,
     creador,
+    shippingInfo,
     summary: { items: items.length, bulto: totalBulto, pzs: totalPzs }
   }
   
@@ -684,7 +804,7 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items)
 // ----------------------------
 const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
-const activeNav = ref('outbound')
+const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-pos')
 const transactionMode = ref('outbound')
 const isProductMenuOpen = ref(false)
 const isInboundMenuOpen = ref(false)
@@ -796,18 +916,23 @@ const binDataMap = computed(() => {
   return map;
 });
 
-// 재고 현황 계산 함수 (최적화 - 캐싱 맵 사용)
+// 재고 현황 계산 (binDataMap O(1) 조회 — 검색 드롭다운 병목 제거)
 const getAvailableStock = (itemCode, targetWarehouse = null) => {
   const warehouse = targetWarehouse || (transactionMode.value === 'inbound' 
     ? currentTab.value?.selectedTarget 
     : currentTab.value?.selectedSource);
 
   let totalActual = 0;
-  binData.value.forEach(bin => {
-    if (bin.item_code === itemCode && (!warehouse || bin.warehouse === warehouse)) {
-      totalActual += (Number(bin.actual_qty) || 0);
+  const itemBins = binDataMap.value[itemCode];
+  if (itemBins) {
+    if (warehouse) {
+      totalActual = Number(itemBins[warehouse]) || 0;
+    } else {
+      for (const wh in itemBins) {
+        totalActual += Number(itemBins[wh]) || 0;
+      }
     }
-  });
+  }
 
   let totalReserved = 0;
   if (warehouse) {
@@ -836,36 +961,58 @@ const isSlotEditModalOpen = ref(false)
 const editSlotIndex = ref(-1)
 const slotSearchQuery = ref('')
 
-const filteredMainSearchItems = computed(() => {
-  if (!searchQuery.value) return []
-  const q = searchQuery.value.toLowerCase()
-  return rawSingleItems.value.filter(item => 
-    (item.item_name && item.item_name.toLowerCase().includes(q)) ||
-    (item.custom_color && item.custom_color.toLowerCase().includes(q)) ||
-    (item.name && item.name.toLowerCase().includes(q))
-  ).slice(0, 50)
+/** FlexSearch는 충분히 찾고, 화면에는 50개씩만 렌더 (결과 더보기) */
+const MAIN_SEARCH_MATCH_CAP = 2000
+const mainSearchHits = computed(() => {
+  if (!searchQuery.value.trim()) return []
+  const hits = searchItems(searchQuery.value, { limit: MAIN_SEARCH_MATCH_CAP })
+  return rankItemNameMatches(hits, searchQuery.value)
 })
+const {
+  visible: filteredMainSearchItems,
+  hasMore: mainSearchHasMore,
+  remaining: mainSearchRemaining,
+  loadMore: loadMoreMainSearch,
+  reset: resetMainSearchPage
+} = usePagedList(mainSearchHits, 50)
+
+watch(searchQuery, () => resetMainSearchPage())
+
+let searchDropdownBlurTimer = null
+const openSearchDropdown = () => {
+  if (searchDropdownBlurTimer) {
+    clearTimeout(searchDropdownBlurTimer)
+    searchDropdownBlurTimer = null
+  }
+  isSearchDropdownOpen.value = true
+}
+const closeSearchDropdown = () => {
+  searchDropdownBlurTimer = setTimeout(() => {
+    isSearchDropdownOpen.value = false
+  }, 150)
+}
 
 const selectSearchItem = (item) => {
   addSingleHotkeyToCart(item)
   searchQuery.value = ''
   isSearchDropdownOpen.value = false
+  resetMainSearchPage()
 }
 
 const handleBarcodeScan = () => {
   const code = barcodeQuery.value.trim()
   if (!code) return
   
-  let foundItem = null
   let foundQty = null
+  const codeLower = code.toLowerCase()
 
   const item = rawSingleItems.value.find(i => {
-    if (i.custom_tier_1_barcode && i.custom_tier_1_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_1_qty || 1; return true }
-    if (i.custom_tier_2_barcode && i.custom_tier_2_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_2_qty || 12; return true }
-    if (i.custom_tier_3_barcode && i.custom_tier_3_barcode.toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_3_qty || 100; return true }
-    if (i.custom_tier_4_barcode && i.custom_tier_4_toLowerCase() === code.toLowerCase()) { foundQty = i.custom_tier_4_qty || 300; return true }
-    if (i.name.toLowerCase() === code.toLowerCase() || (i.custom_name_number && i.custom_name_number.toLowerCase() === code.toLowerCase())) {
-      foundQty = null // Default add 1 box
+    if (i.custom_tier_1_barcode && i.custom_tier_1_barcode.toLowerCase() === codeLower) { foundQty = i.custom_tier_1_qty || 1; return true }
+    if (i.custom_tier_2_barcode && i.custom_tier_2_barcode.toLowerCase() === codeLower) { foundQty = i.custom_tier_2_qty || 12; return true }
+    if (i.custom_tier_3_barcode && i.custom_tier_3_barcode.toLowerCase() === codeLower) { foundQty = i.custom_tier_3_qty || 100; return true }
+    if (i.custom_tier_4_barcode && i.custom_tier_4_barcode.toLowerCase() === codeLower) { foundQty = i.custom_tier_4_qty || 300; return true }
+    if (i.name.toLowerCase() === codeLower || (i.custom_name_number && String(i.custom_name_number).toLowerCase() === codeLower)) {
+      foundQty = null
       return true
     }
     return false
@@ -879,16 +1026,7 @@ const handleBarcodeScan = () => {
   barcodeQuery.value = ''
 }
 
-const filteredSlotItems = computed(() => {
-  const baseItems = rawSingleItems.value
-  if (!slotSearchQuery.value) return baseItems
-  const q = slotSearchQuery.value.toLowerCase()
-  return baseItems.filter(item => 
-    (item.item_name && item.item_name.toLowerCase().includes(q)) ||
-    (item.custom_color && item.custom_color.toLowerCase().includes(q)) ||
-    (item.name && item.name.toLowerCase().includes(q))
-  )
-})
+const filteredSlotItems = computed(() => searchItemsOrAll(slotSearchQuery.value, { limit: 100, allLimit: 300 }))
 
 const openSlotEdit = (idx) => {
   editSlotIndex.value = idx
@@ -916,15 +1054,7 @@ const isGridSlotEditModalOpen = ref(false)
 const editGridSlotIndex = ref(-1)
 const gridSlotSearchQuery = ref('')
 
-const filteredGridSlotItems = computed(() => {
-  const baseItems = gridHotkeys.value
-  if (!gridSlotSearchQuery.value) return baseItems
-  const q = gridSlotSearchQuery.value.toLowerCase()
-  return baseItems.filter(group => 
-    (group.group_name && group.group_name.toLowerCase().includes(q)) ||
-    (group.id && group.id.toLowerCase().includes(q))
-  )
-})
+const filteredGridSlotItems = computed(() => searchGridsOrAll(gridSlotSearchQuery.value, { limit: 100, allLimit: 300 }))
 
 const openGridSlotEdit = (idx) => {
   editGridSlotIndex.value = idx
@@ -1058,9 +1188,10 @@ const closeCustomerDropdown = () => {
 
 // 🌟 퀵 추가 모달 성공 핸들러 🌟
 const handleItemSuccess = (newItem) => {
-  // rawSingleItems 맨 앞에 추가 (검색 및 핫키 지정에서 바로 보이게)
+  // rawSingleItems 맨 앞에 추가 + FlexSearch 인덱스 즉시 반영
   rawSingleItems.value.unshift(newItem)
-  
+  addOrUpdateItem(newItem)
+
   // 성공적으로 만들었으면 즉시 장바구니에 0개로 담기
   addSingleHotkeyToCart(newItem)
   isQuickItemModalOpen.value = false
@@ -1265,6 +1396,8 @@ const fetchFrappeItems = async () => {
 
     rawSingleItems.value = newSingles;
     gridHotkeys.value = newGrids;
+    rebuildItemIndex(newSingles);
+    rebuildGridIndex(newGrids);
 
     // 만약 로컬스토리지 슬롯이 전부 비어있다면, 초기값으로 상위 8개를 자동 배정해줍니다
     const hasAnySlot = quickPickSlotNames.value.some(name => name !== null)
@@ -1909,8 +2042,39 @@ const submitToFrappe = async () => {
         await frappeApi.put(`/api/resource/Stock Entry/${docName}`, { docstatus: 1 });
         alert(t('pos.msg_success_submit', { title: currentTab.value.title }));
         
-        // --- 전표 복사 및 인쇄 트리거 ---
-        triggerPrintAndCopy(docName, transactionMode.value, fromWh, toWh, currentTab.value.selectedBranch, currentTab.value.cartItems);
+        // --- 전표 복사 및 인쇄 트리거 로직 ---
+        if (transactionMode.value === 'outbound' && currentTab.value.selectedCustomer) {
+          const customerName = currentTab.value.selectedCustomer;
+          let phone = '';
+          let addressList = [];
+          
+          try {
+            const customerRes = await frappeApi.get(`/api/resource/Customer?filters=[["name","=","${encodeURIComponent(customerName)}"]]&fields=["custom_phone"]`);
+            if (customerRes.data && customerRes.data.data && customerRes.data.data.length > 0) {
+              phone = customerRes.data.data[0].custom_phone || '';
+            }
+          } catch(e) { console.error('Error fetching customer phone:', e) }
+          
+          try {
+            const addressRes = await frappeApi.get(`/api/resource/Address?filters=[["Dynamic Link","link_name","=","${encodeURIComponent(customerName)}"],["Dynamic Link","link_doctype","=","Customer"]]&fields=["name","address_line1","city"]`);
+            if (addressRes.data && addressRes.data.data) {
+              addressList = addressRes.data.data;
+            }
+          } catch(e) { console.error('Error fetching customer addresses:', e) }
+
+          if (addressList.length > 1) {
+             pendingPrintData.value = { docName, mode: transactionMode.value, fromWh, toWh, branch: currentTab.value.selectedBranch, items: currentTab.value.cartItems };
+             shippingAddressList.value = addressList;
+             shippingPhone.value = phone;
+             isShippingAddressModalOpen.value = true;
+          } else {
+             const selectedAddr = addressList.length === 1 ? addressList[0] : null;
+             const shippingInfo = (selectedAddr || phone) ? { address: selectedAddr, phone } : null;
+             triggerPrintAndCopy(docName, transactionMode.value, fromWh, toWh, currentTab.value.selectedBranch, currentTab.value.cartItems, shippingInfo);
+          }
+        } else {
+          triggerPrintAndCopy(docName, transactionMode.value, fromWh, toWh, currentTab.value.selectedBranch, currentTab.value.cartItems, null);
+        }
         
         // 🌟 수정을 성공적으로 마쳤으므로 amendingStockEntry 초기화
         if (currentTab.value.amendingStockEntry) {
@@ -2302,6 +2466,32 @@ const submitReservation = async () => {
 .quick-add-btn-row:hover {
   background-color: #eff6ff;
   color: #2563eb;
+}
+.search-meta-row {
+  padding: 8px 15px;
+  text-align: center;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.search-more-row {
+  padding: 10px 15px;
+  text-align: center;
+  background-color: #fffbeb;
+  border-top: 1px solid #fde68a;
+  cursor: pointer;
+  font-weight: bold;
+  color: #b45309;
+}
+.search-more-row:hover {
+  background-color: #fef3c7;
+}
+.search-more-text {
+  display: block;
+  font-size: 13px;
 }
 .quick-add-text {
   display: block;

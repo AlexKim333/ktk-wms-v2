@@ -5,8 +5,8 @@
       <p>No: {{ data.no }}</p>
       <p>fecha: {{ data.date }}</p>
       <p class="bold-blue">UBICACION: {{ data.ubicacion }}</p>
-      <template v-if="data.mode === 'transfer'">
-        <p>SOLICITANTE: <span class="bold">{{ data.solicitante }}</span></p>
+      <template v-if="data.mode === 'transfer' || data.mode === 'outbound'">
+        <p>SOLICITANTE: <span class="bold" :style="data.mode === 'outbound' ? 'color: green;' : ''">{{ data.solicitante }}</span></p>
         <p>CREADOR: <span class="bold">{{ data.creador }}</span></p>
       </template>
       <template v-else>
@@ -54,6 +54,18 @@
         </tr>
       </tbody>
     </table>
+
+    <!-- Shipping Address (Only on last page) -->
+    <div v-if="page === total && data.shippingInfo" class="shipping-address-zone" style="margin-top: 15px; border-top: 1px dashed #333; padding-top: 10px; font-size: 13px;">
+      <p class="bold-blue" style="margin-bottom: 5px;">DIRECCIÓN DE ENTREGA</p>
+      <p v-if="data.shippingInfo.address" style="margin: 0; line-height: 1.3;">
+        {{ data.shippingInfo.address.city }}<br/>
+        {{ data.shippingInfo.address.address_line1 }}
+      </p>
+      <p v-if="data.shippingInfo.phone" style="margin: 5px 0 0 0; line-height: 1.3;">
+        Tel: {{ data.shippingInfo.phone }}
+      </p>
+    </div>
 
     <div class="receipt-footer">
       <span class="footer-note">ANIMO!!!</span>

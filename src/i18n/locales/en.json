@@ -60,7 +60,9 @@
     "csv_export": "CSV Export",
     "refresh": "Refresh",
     "loading": "Loading data...",
-    "done": "Done"
+    "done": "Done",
+    "show_more": "Show more (+{n})",
+    "search_shown": "Showing {shown} / {total}"
   },
   "product_list": {
     "title": "Product List & Inventory",

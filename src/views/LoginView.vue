@@ -141,7 +141,7 @@ const handleLogin = async () => {
       authStore.user = { 
         member_name: username.value, 
         access_level: 'Admin',
-        branch_name: 'Centro'
+        branch_name: 'TIENDA - K'
       }
       
       router.push('/pos')

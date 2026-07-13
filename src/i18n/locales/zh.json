@@ -60,7 +60,9 @@
     "csv_export": "导出 CSV",
     "refresh": "刷新",
     "loading": "数据加载中...",
-    "done": "完成"
+    "done": "完成",
+    "show_more": "显示更多 (+{n})",
+    "search_shown": "显示 {shown} / {total}"
   },
   "product_list": {
     "title": "商品列表与库存",
