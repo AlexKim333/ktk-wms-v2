@@ -19,7 +19,8 @@
         <div class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
           <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">지점 전용 (Branch)</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">재고 이동 예약</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">재고 이동 작성 (입력)</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">재고 이동 예약 현황</a>
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">재고 조회</a>
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-sales' }" @click.prevent="setActiveNav('branch-sales')">판매 내역</a>
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-staff' }" @click.prevent="setActiveNav('branch-staff')">점원/포스 관리</a>
@@ -34,7 +35,7 @@
           {{ $t('nav.outbound_group') }} <span style="float:right;">{{ isOutboundMenuOpen ? '▲' : '▼' }}</span>
         </button>
         <div v-show="isOutboundMenuOpen" class="nav-sub-menu" style="background: rgba(0,0,0,0.1); padding-left:10px;">
-          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'outbound' }" @click.prevent="setActiveNav('outbound'); setTransactionMode('outbound')">{{ $t('nav.outbound_entry') }}</a>
+          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'outbound' && !currentTab?.activeReservationId && !currentTab?.amendingStockEntry }" @click.prevent="setActiveNav('outbound', 'outbound')">{{ $t('nav.outbound_entry') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'outbound-reservation' }" @click.prevent="setActiveNav('outbound-reservation'); setTransactionMode('outbound')">{{ $t('nav.outbound_res') }} <span v-if="incompleteReservationCount > 0" class="res-badge">{{ incompleteReservationCount }}</span></a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'outbound-list' }" @click.prevent="setActiveNav('outbound-list'); setTransactionMode('outbound')">{{ $t('nav.outbound_list') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'outbound-history' }" @click.prevent="setActiveNav('outbound-history'); setTransactionMode('outbound')">{{ $t('nav.outbound_history') }}</a>
@@ -43,7 +44,7 @@
           {{ $t('nav.inbound_group') }} <span style="float:right;">{{ isInboundMenuOpen ? '▲' : '▼' }}</span>
         </button>
         <div v-show="isInboundMenuOpen" class="nav-sub-menu" style="background: rgba(0,0,0,0.1); padding-left:10px;">
-          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'inbound' }" @click.prevent="setActiveNav('inbound'); setTransactionMode('inbound')">{{ $t('nav.inbound_entry') }}</a>
+          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'inbound' && !currentTab?.activeReservationId && !currentTab?.amendingStockEntry }" @click.prevent="setActiveNav('inbound', 'inbound')">{{ $t('nav.inbound_entry') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'inbound-list' }" @click.prevent="setActiveNav('inbound-list'); setTransactionMode('inbound')">{{ $t('nav.inbound_list') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'inbound-history' }" @click.prevent="setActiveNav('inbound-history'); setTransactionMode('inbound')">{{ $t('nav.inbound_history') }}</a>
         </div>
@@ -51,7 +52,7 @@
           {{ $t('nav.move_group') }} <span style="float:right;">{{ isTransferMenuOpen ? '▲' : '▼' }}</span>
         </button>
         <div v-show="isTransferMenuOpen" class="nav-sub-menu" style="background: rgba(0,0,0,0.1); padding-left:10px;">
-          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer' }" @click.prevent="setActiveNav('transfer'); setTransactionMode('transfer')">{{ $t('nav.move_entry') }}</a>
+          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer' && !currentTab?.activeReservationId && !currentTab?.amendingStockEntry }" @click.prevent="setActiveNav('transfer', 'transfer')">{{ $t('nav.move_entry') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-reservation' }" @click.prevent="setActiveNav('transfer-reservation'); setTransactionMode('transfer')">{{ $t('nav.move_res') }} <span v-if="incompleteTransferReservationCount > 0" class="res-badge">{{ incompleteTransferReservationCount }}</span></a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-list' }" @click.prevent="setActiveNav('transfer-list'); setTransactionMode('transfer')">{{ $t('nav.move_list') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-history' }" @click.prevent="setActiveNav('transfer-history'); setTransactionMode('transfer')">{{ $t('nav.move_history') }}</a>
@@ -78,7 +79,13 @@
         <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="setActiveNav('search-edit')">🔍 {{ $t('nav.search_edit') }}</a>
         </template>
 
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
+        <template v-if="isAdmin">
+          <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
+          <a href="#" class="nav-item" :class="{ active: activeNav === 'staff-management' }" @click.prevent="activeNav = 'staff-management'">👨‍👩‍👧 가족 관리</a>
+        </template>
+        <template v-else>
+          <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
+        </template>
         <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 {{ $t('nav.logout') }}</button>
       </nav>
     </aside>
@@ -96,12 +103,31 @@
         v-else-if="activeNav === 'branch-pos'" 
         :raw-items="rawSingleItems"
         :bin-data="binDataMap"
+        :pending-reserved="pendingReservedMap"
         :branch-list="branchList"
+        @refresh-items="fetchFrappeItems"
+      />
+      <!-- 지점 재고 이동 예약 -->
+      <BranchTransferView 
+        v-else-if="activeNav === 'branch-transfer'" 
+        :raw-items="rawSingleItems"
+        :bin-data="binDataMap"
+        :pending-reserved="pendingReservedMap"
+        :branch-list="branchList"
+        @refresh-items="fetchFrappeItems"
+      />
+      <!-- 지점 예약 리스트 (DRAFT) -->
+      <BranchTransferReservationList 
+        v-else-if="activeNav === 'branch-reservation'" 
+        @create-new="setActiveNav('branch-transfer')"
+        @edit-reservation="handleBranchEditReservation"
+        @refresh-items="fetchFrappeItems"
       />
       <BranchInventoryList 
         v-else-if="activeNav === 'branch-inventory'" 
         :raw-items="rawSingleItems"
         :bin-data="binDataMap"
+        :pending-reserved="pendingReservedMap"
         @open-detail="openProductDetail"
         @handle-migration="handleMigration"
       />
@@ -115,8 +141,10 @@
       
       <!-- 보존된 기존 컴포넌트 -->
       <ProductRegistrationPanel v-else-if="activeNav === 'product'" />
-
+      
       <NodeManagement v-else-if="activeNav === 'node'" />
+      
+      <StaffManagementView v-else-if="activeNav === 'staff-management'" />
 
       <div v-else class="workspace-body">
         
@@ -439,45 +467,57 @@
               </div>
             </div>
             
-            <div class="action-btn-double-group">
-              <!-- 예약 출고 모드: 취소 버튼 -->
-              <button
-                v-if="transactionMode !== 'inbound' && currentTab?.activeReservationId && !currentTab?.amendingStockEntry"
-                class="btn-outbound-reserve"
-                style="background:#ef4444"
-                @click="cancelReservationCheckout()"
-              >
-                {{ $t('pos.btn_cancel_res') }}
-              </button>
-              <!-- 수정 취소 버튼 -->
-              <button
-                v-else-if="transactionMode !== 'inbound' && currentTab?.amendingStockEntry"
-                class="btn-outbound-reserve"
-                style="background:#ef4444"
-                @click="cancelAmend()"
-              >
-                {{ $t('pos.btn_cancel_edit') }}
-              </button>
-              <!-- 일반 예약 등록 버튼 -->
-              <button
-                v-else-if="transactionMode !== 'inbound'"
-                class="btn-outbound-reserve"
-                @click="submitReservation()"
-              >
-                {{ $t('pos.btn_reg_res') }}
-              </button>
-              <!-- 입고 수정 취소 버튼 -->
-              <button
-                v-else-if="currentTab?.amendingStockEntry"
-                class="btn-outbound-reserve"
-                style="background:#ef4444"
-                @click="cancelAmend()"
-              >
-                {{ $t('pos.btn_cancel_edit') }}
-              </button>
-              <button class="btn-final-submit" @click="submitToFrappe">
-                {{ currentTab?.amendingStockEntry ? $t('pos.btn_submit_edit') : $t('pos.btn_submit_new') }}
-              </button>
+            <div :class="(transactionMode !== 'inbound' && currentTab?.activeReservationId && !currentTab?.amendingStockEntry) ? 'action-btn-triple-group' : 'action-btn-double-group'">
+              <template v-if="transactionMode !== 'inbound' && currentTab?.activeReservationId && !currentTab?.amendingStockEntry">
+                <button
+                  class="btn-outbound-reserve"
+                  style="background:#ef4444"
+                  @click="cancelReservationCheckout()"
+                >
+                  {{ transactionMode === 'transfer' ? '❌ 예약이동 취소' : $t('pos.btn_cancel_res') }}
+                </button>
+                <button
+                  class="btn-outbound-reserve"
+                  style="background:#f59e0b"
+                  @click="submitReservation()"
+                >
+                  {{ transactionMode === 'transfer' ? '📝 이동예약 수정' : '📝 출고예약 수정' }}
+                </button>
+                <button class="btn-final-submit" @click="submitToFrappe">
+                  {{ transactionMode === 'transfer' ? '✅ 이동전표 발행' : '✅ 출고전표 발행' }}
+                </button>
+              </template>
+              <template v-else>
+                <!-- 수정 취소 버튼 -->
+                <button
+                  v-if="transactionMode !== 'inbound' && currentTab?.amendingStockEntry"
+                  class="btn-outbound-reserve"
+                  style="background:#ef4444"
+                  @click="cancelAmend()"
+                >
+                  {{ $t('pos.btn_cancel_edit') }}
+                </button>
+                <!-- 일반 예약 등록 버튼 -->
+                <button
+                  v-else-if="transactionMode !== 'inbound'"
+                  class="btn-outbound-reserve"
+                  @click="submitReservation()"
+                >
+                  {{ $t('pos.btn_reg_res') }}
+                </button>
+                <!-- 입고 수정 취소 버튼 -->
+                <button
+                  v-else-if="currentTab?.amendingStockEntry"
+                  class="btn-outbound-reserve"
+                  style="background:#ef4444"
+                  @click="cancelAmend()"
+                >
+                  {{ $t('pos.btn_cancel_edit') }}
+                </button>
+                <button class="btn-final-submit" @click="submitToFrappe">
+                  {{ currentTab?.amendingStockEntry ? $t('pos.btn_submit_edit') : $t('pos.btn_submit_new') }}
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -671,9 +711,12 @@ import axios from 'axios'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
 import NodeManagement from '../components/NodeManagement.vue'
+import StaffManagementView from '../components/StaffManagementView.vue'
 import ProductListView from './ProductListView.vue'
 import StockReconciliationMain from './StockReconciliationMain.vue'
 import BranchPosView from '../components/branch/BranchPosView.vue'
+import BranchTransferView from '../components/branch/BranchTransferView.vue'
+import BranchTransferReservationList from '../components/branch/BranchTransferReservationList.vue'
 import BranchInventoryList from '../components/branch/BranchInventoryList.vue'
 import QuickItemAddModal from '../components/QuickItemAddModal.vue'
 import QuickCustomerAddModal from '../components/QuickCustomerAddModal.vue'
@@ -688,7 +731,7 @@ import ProductDetailView from './ProductDetailView.vue'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.user?.access_level === 'Admin')
+const isAdmin = computed(() => authStore.isAdmin)
 const { t } = useI18n();
 
 const {
@@ -1224,7 +1267,7 @@ const handleSalesPersonChange = () => {
 const fetchFrappeItems = async () => {
   try {
     // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원, 예약 건수)
-    const [whRes, itemRes, binRes, custRes, spRes, reqRes, supRes] = await Promise.all([
+    const [whRes, itemRes, binRes, custRes, spRes, reqRes, supRes, reqDraftRes] = await Promise.all([
       frappeApi.get('/api/resource/Warehouse', {
         params: { 
           fields: JSON.stringify(['name', 'warehouse_name', 'parent_warehouse']),
@@ -1278,7 +1321,14 @@ const fetchFrappeItems = async () => {
           fields: JSON.stringify(['name', 'supplier_name']),
           limit_page_length: 0
         }
-      })
+      }),
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name']),
+          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
+          limit_page_length: 0
+        }
+      }).catch(() => ({ data: { data: [] } }))
     ]);
 
     warehouseList.value = whRes.data.data
@@ -1287,7 +1337,10 @@ const fetchFrappeItems = async () => {
     salesPersonList.value = spRes.data.data || []
     supplierList.value = supRes.data.data || []
     
-    const reqList = reqRes.data.data || [];
+    // 🌟 합치기: (docstatus 1인 승인건) + (docstatus 0이면서 지점장 승인 단계인 예약건)
+    const reqList1 = reqRes.data.data || [];
+    const reqList2 = reqDraftRes.data.data || [];
+    const reqList = [...reqList1, ...reqList2];
 
     // 🌟 2. 예약 내역 상세 조회하여 예약 맵 구축 (가용재고 차감용)
     if (reqList.length > 0) {
@@ -1433,8 +1486,41 @@ const setTransactionMode = (mode) => {
   transactionMode.value = mode
 }
 
-const setActiveNav = (nav) => {
+const setActiveNav = (nav, mode = null) => {
+  if (currentTab.value && (currentTab.value.activeReservationId || currentTab.value.amendingStockEntry)) {
+    const isEntryView = activeNav.value === 'outbound' || activeNav.value === 'inbound' || activeNav.value === 'transfer' || activeNav.value === 'branch-transfer'
+    if (isEntryView) {
+      if (!confirm("진행 중인 예약/전표 수정을 취소하시겠습니까?\\n(확인 시 장바구니가 비워지고 수정이 취소됩니다.)")) {
+        return
+      }
+      currentTab.value.activeReservationId = null
+      currentTab.value.amendingStockEntry = null
+      currentTab.value.amendSourceNav = null
+      currentTab.value.cartItems = []
+      currentTab.value.selectedCustomer = ''
+      currentTab.value.selectedResponder = ''
+      currentTab.value.selectedSource = ''
+      currentTab.value.selectedTarget = ''
+    }
+  }
+  
   activeNav.value = nav
+  if (mode) {
+    setTransactionMode(mode)
+  }
+  
+  if (currentTab.value && !currentTab.value.activeReservationId && !currentTab.value.amendingStockEntry) {
+    currentTab.value.title = transactionMode.value === 'inbound' ? t('pos.msg_new_inbound')
+      : transactionMode.value === 'transfer' ? t('pos.msg_new_transfer')
+      : t('pos.msg_new_outbound')
+  }
+}
+
+// 지점 전용 예약 수정 연동 함수
+const handleBranchEditReservation = (reservationName) => {
+  setActiveNav('branch-transfer')
+  // 향후 BranchTransferView에서 예약을 로드하는 로직을 추가할 수 있습니다.
+  alert(`예약(${reservationName}) 수정 모드로 진입했습니다. (기능 구현 예정)`)
 }
 
 // 🌟 탭 리스트 및 활성 탭 (모드별 독립 캐시 지원)
@@ -2521,4 +2607,5 @@ const submitReservation = async () => {
   background: #ef4444; color: white; font-size: 11px; font-weight: bold;
   padding: 2px 6px; border-radius: 10px; margin-left: auto;
 }
+.action-btn-triple-group { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; }
 </style>

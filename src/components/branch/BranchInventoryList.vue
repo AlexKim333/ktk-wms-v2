@@ -19,7 +19,7 @@
           <input 
             type="text" 
             v-model="searchQuery" 
-            placeholder="상품명 또는 속성 검색..." 
+            placeholder="상품명 검색..." 
             class="search-input" 
           />
         </div>
@@ -30,19 +30,17 @@
         <table class="product-table">
           <thead>
             <tr>
-              <!-- 지점 요청: 상품코드 숨김, 품명/카테고리/재고 위주 -->
               <th>품명 (상품명)</th>
               <th>카테고리</th>
               <th>컬러/속성</th>
               <th>팩 수량<br/>(Pack Qty)</th>
-              <!-- 지점 재고 & 메인 재고 표시 -->
               <th class="stock-col highlight-branch">내 지점 재고<br/>({{ authStore.user?.branch_name }})</th>
               <th class="stock-col highlight-main">메인 재고<br/>([MAIN] ALARCON - K)</th>
               <th>상세 보기 / 주문</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredItems" :key="item.name" class="inventory-row">
+            <tr v-for="item in displayedItems" :key="item.name" class="inventory-row">
               <td class="name-cell">{{ item.item_name }}</td>
               <td>{{ item.item_group }}</td>
               <td>{{ item.custom_color || '-' }}</td>
@@ -57,17 +55,24 @@
               </td>
               <td class="action-cell">
                 <div style="display: flex; gap: 8px; justify-content: center;">
-                  <button class="btn-detail" @click="$emit('open-detail', item.name)">
-                    상세 ➔
-                  </button>
-                  <button class="btn-order" @click="$emit('add-to-transfer', item.name)">
-                    주문 ➕
-                  </button>
-                </div>
+                    <button class="btn-detail" @click="$emit('open-detail', item.name)">
+                      상세 정보
+                    </button>
+                    <button class="btn-order" @click="handleAddOrder(item)">
+                      주문 ➕
+                    </button>
+                  </div>
               </td>
             </tr>
-            <tr v-if="filteredItems.length === 0">
-              <td colspan="6" class="empty-state">검색된 상품이 없습니다.</td>
+            <tr v-if="listHasMore">
+              <td colspan="7" style="text-align:center; padding: 16px; background:#fffbeb;">
+                <button type="button" class="btn-show-more" @click="loadMoreItems">
+                  결과 더보기 (+{{ listRemaining }})
+                </button>
+              </td>
+            </tr>
+            <tr v-if="displayedItems.length === 0">
+              <td colspan="7" class="empty-state">검색된 상품이 없습니다.</td>
             </tr>
           </tbody>
         </table>
@@ -77,16 +82,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
-import { useItemSearch } from '../../composables/useItemSearch.js'
+import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
+import { usePagedList } from '../../composables/usePagedList.js'
 
 const authStore = useAuthStore()
-const emit = defineEmits(['open-detail', 'handle-migration'])
+const emit = defineEmits(['open-detail', 'handle-migration', 'add-to-transfer'])
 
 const props = defineProps({
   rawItems: { type: Array, default: () => [] },
-  binData: { type: Object, default: () => ({}) }
+  binData: { type: Object, default: () => ({}) },
+  pendingReserved: { type: Object, default: () => ({}) }
 })
 
 const searchQuery = ref('')
@@ -99,16 +106,42 @@ watch(() => props.rawItems, (newVal) => {
 }, { immediate: true })
 
 const filteredItems = computed(() => {
-  return searchItemsOrAll(searchQuery.value, { limit: null, allLimit: 99999 })
+  const q = searchQuery.value.trim()
+  if (!q) return searchItemsOrAll('', { limit: null, allLimit: 99999 })
+  const hits = searchItemsOrAll(q, { limit: null, allLimit: 99999 })
+  return rankItemNameMatches(hits, q)
 })
 
+const {
+  visible: displayedItems,
+  hasMore: listHasMore,
+  remaining: listRemaining,
+  loadMore: loadMoreItems,
+  reset: resetListPage
+} = usePagedList(filteredItems, 100)
+
+watch(searchQuery, () => resetListPage())
+watch(() => props.rawItems, () => resetListPage())
+
 const getStock = (itemCode, warehouse) => {
-  if (!props.binData[itemCode] || !warehouse) return 0
-  return props.binData[itemCode][warehouse] || 0
+  if (!warehouse) return 0
+  const actual = (props.binData[itemCode] && props.binData[itemCode][warehouse]) || 0
+  const reserved = (props.pendingReserved[warehouse] && props.pendingReserved[warehouse][itemCode]) || 0
+  return actual - reserved
+}
+
+const handleAddOrder = (item) => {
+  const mainStock = getStock(item.name, '[MAIN] ALARCON - K')
+  if (mainStock <= 0) {
+    alert('메인 창고([MAIN] ALARCON - K)에 해당 상품의 재고가 없습니다.\n주문을 추가할 수 없습니다.')
+    return
+  }
+  emit('add-to-transfer', item.name)
 }
 
 const loadInventory = () => {
   rebuildItemIndex(props.rawItems)
+  resetListPage()
 }
 
 const exportCSV = () => {
@@ -145,41 +178,27 @@ const exportCSV = () => {
 .btn-action.outline { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
 .btn-action.outline:hover { background: #f8fafc; border-color: #94a3b8; }
 
-.table-container { flex: 1; display: flex; flex-direction: column; background: white; padding: 15px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; }
-.filter-bar { display: flex; gap: 15px; margin-bottom: 15px; }
-.search-wrapper { position: relative; flex: 1; max-width: 400px; display: flex; align-items: center; }
-.search-icon { position: absolute; left: 12px; font-size: 14px; }
-.search-input { width: 100%; padding: 10px 10px 10px 35px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
-.search-input:focus { border-color: #00a896; }
-.btn-refresh { padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569; }
-.btn-refresh:hover { background: #f1f5f9; }
-
-.table-scroll { flex: 1; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
-.product-table { width: 100%; border-collapse: collapse; text-align: left; }
-.product-table th, .product-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13.5px; vertical-align: middle; }
-.product-table th { background: #f8fafc; font-weight: bold; position: sticky; top: 0; z-index: 10; color: #475569; }
-
-.name-cell { font-weight: bold; color: #0f172a; }
-.stock-col { text-align: center; }
-.stock-cell { text-align: center; font-size: 15px; }
-.highlight-branch { background: #f0fdf4 !important; color: #166534 !important; border-bottom: 2px solid #86efac; }
-.highlight-main { background: #f8fafc !important; color: #334155 !important; border-bottom: 2px solid #cbd5e1; }
-.branch-stock strong { color: #166534; font-size: 16px; }
-.main-stock strong { color: #475569; font-size: 16px; }
-
-.btn-detail { background: #00a896; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-.btn-detail:hover { background: #059669; }
-
-.empty-state { text-align: center; padding: 40px; color: #64748b; font-size: 15px; }
-
-/* 호버 반전 효과 */
-.inventory-row { transition: background-color 0.15s ease, color 0.15s ease; }
-.inventory-row:hover { background-color: #334155; color: #f8fafc; }
-.inventory-row:hover .stock-cell strong { color: #38bdf8; }
-.inventory-row:hover .name-cell { color: #ffffff; }
-.inventory-row:hover td { border-color: #475569; }
-
-.action-cell { min-width: 140px; }
-.btn-order { background: #0f172a; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 12px; }
-.btn-order:hover { background: #334155; transform: translateY(-1px); }
+.table-container { flex: 1; background: white; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; display: flex; flex-direction: column; overflow: hidden; }
+.filter-bar { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; background: #fcfcfc; }
+.search-wrapper { position: relative; flex: 1; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.search-input { width: 100%; padding: 10px 12px 10px 36px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+.btn-refresh { background: white; border: 1px solid #cbd5e1; padding: 8px 14px; border-radius: 6px; font-weight: bold; color: #64748b; cursor: pointer; }
+.table-scroll { flex: 1; overflow: auto; }
+.product-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.product-table th { position: sticky; top: 0; background: #f1f5f9; padding: 10px 8px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 12px; }
+.product-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; }
+.inventory-row:hover { background: #f8fafc; }
+.name-cell { font-weight: bold; color: #1e293b; }
+.stock-col { text-align: center !important; }
+.stock-cell { text-align: center; }
+.branch-stock { color: #0f766e; }
+.main-stock { color: #0369a1; }
+.highlight-branch { background: #ecfdf5 !important; }
+.highlight-main { background: #e0f2fe !important; }
+.btn-detail, .btn-order { border: 1px solid #cbd5e1; background: white; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; }
+.btn-order { background: #00a896; color: white; border-color: #00a896; }
+.empty-state { text-align: center; padding: 40px; color: #94a3b8; }
+.btn-show-more { background: #fef3c7; border: 1px solid #f59e0b; color: #b45309; font-weight: bold; font-size: 13px; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+.btn-show-more:hover { background: #fde68a; }
 </style>

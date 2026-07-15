@@ -137,13 +137,51 @@ const handleLogin = async () => {
         localStorage.removeItem('lady_polo_usr')
         localStorage.removeItem('lady_polo_pwd')
       }
+        // Fetch user data (roles and permissions)
+        let roles = [];
+        let branch = null;
+        let accessLevel = 'Representative'; // default
 
-      authStore.user = { 
-        member_name: username.value, 
-        access_level: 'Admin',
-        branch_name: 'TIENDA - K'
-      }
-      
+        try {
+          const userRes = await frappeApi.get(`/api/resource/User/${username.value}`);
+          if (userRes.data && userRes.data.data) {
+            const userData = userRes.data.data;
+            roles = userData.roles ? userData.roles.map(r => r.role) : [];
+            
+            if (roles.includes('System Manager')) {
+              accessLevel = 'Admin';
+            } else if (roles.includes('Branch Manager')) {
+              accessLevel = 'Manager';
+            }
+          }
+          
+          // Fetch User Permission for Warehouse
+          const permRes = await frappeApi.get('/api/resource/User Permission', {
+            params: {
+              filters: JSON.stringify([['user', '=', username.value], ['allow', '=', 'Warehouse']]),
+              fields: JSON.stringify(['for_value']),
+              limit_page_length: 1
+            }
+          });
+          
+          if (permRes.data && permRes.data.data && permRes.data.data.length > 0) {
+            branch = permRes.data.data[0].for_value;
+          }
+        } catch (e) {
+          console.error('Failed to fetch user permissions', e);
+        }
+
+        // Fallback for Admin
+        if (accessLevel === 'Admin' && !branch) {
+          branch = 'TIENDA - K'; // Default branch for admin if no permission is set
+        }
+
+        authStore.user = { 
+          member_name: username.value, 
+          access_level: accessLevel,
+          branch_name: branch,
+          roles: roles
+        }
       router.push('/pos')
     }
   } catch (error) {

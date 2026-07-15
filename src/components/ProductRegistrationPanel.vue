@@ -286,7 +286,7 @@ const saveProduct = async () => {
       params: { 
         filters: JSON.stringify([['item_name', '=', itemName]]), 
         fields: JSON.stringify(['name', 'custom_is_grid_item']),
-        limit_page_length: 0 
+        limit_page_length: 999 
       }
     });
     

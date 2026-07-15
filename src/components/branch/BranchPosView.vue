@@ -200,6 +200,10 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
+  pendingReserved: {
+    type: Object,
+    default: () => ({})
+  },
   branchList: {
     type: Array,
     default: () => []

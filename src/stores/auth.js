@@ -7,7 +7,9 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (state) => !!state.user,
-    isAdmin: (state) => true // 임시로 모두 관리자 권한
+    isAdmin: (state) => state.user?.roles?.includes('System Manager') || state.user?.access_level === 'Admin',
+    isBranchManager: (state) => state.user?.roles?.includes('Branch Manager') || state.user?.access_level === 'Manager',
+    isBranchClerk: (state) => state.user?.roles?.includes('Branch Clerk') || state.user?.access_level === 'Representative'
   },
   actions: {
     async logout() {

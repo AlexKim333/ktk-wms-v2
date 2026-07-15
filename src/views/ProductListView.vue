@@ -224,7 +224,7 @@ const loadProducts = async () => {
       frappeApi.get('/api/resource/Warehouse', {
         params: { 
           fields: JSON.stringify(['name', 'warehouse_name']),
-          filters: JSON.stringify([['disabled', '=', 0]]),
+          
           limit_page_length: 0
         }
       })
