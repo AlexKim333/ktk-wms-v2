@@ -126,9 +126,15 @@
       </div>
     </div>
 
+    <QuickClerkAddModal 
+      :is-open="isQuickClerkModalOpen" 
+      @close="isQuickClerkModalOpen = false" 
+      @success="handleClerkAdded" 
+    />
+
     <!-- Right Pane: Cart & Header -->
     <div class="workspace-right" style="flex: 1.05; background: white; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden;">
-      
+
       <!-- 탭 컨트롤 헤더 (일관성 유지 - VENTA와 동일한 스타일) -->
       <div class="tabs-control-header" style="display: flex; justify-content: space-between; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; padding: 6px 10px 0 10px;">
         <div class="tabs-list" style="display: flex; gap: 4px;">
@@ -138,6 +144,8 @@
           </div>
         </div>
         <div class="tabs-header-actions" style="display: flex; align-items: center; gap: 10px; padding-bottom: 6px;">
+          <button v-if="!isClerk" class="add-tab-action-btn" @click="fetchPendingDrafts" style="background: none; border: none; color: #f59e0b; font-weight: bold; cursor: pointer; font-size: 13px; margin-right: 5px;">🔄 대기열 불러오기</button>
+          <span v-if="!isClerk && pendingDraftCount > 0" style="font-size: 11px; color: #64748b; font-weight: bold;">(표시: {{ tabs.filter(t => t.docName).length }} / 총 대기: {{ pendingDraftCount }})</span>
           <button class="add-tab-action-btn" @click="addNewTab" style="background: none; border: none; color: #00a896; font-weight: bold; cursor: pointer; font-size: 13px;">＋ 탭추가</button>
         </div>
       </div>
@@ -154,24 +162,30 @@
             <input type="text" :value="authStore.user?.branch_name" disabled class="form-input" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 13px; background: #f8fafc; color: #94a3b8;" />
           </div>
           <div class="field-group">
-            <label style="display: block; font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px;">🙋‍♂️ 지점 요청자 (점원):</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label style="font-size: 11px; color: #64748b; font-weight: bold;">🙋‍♂️ 지점 요청자 (점원):</label>
+              <button v-if="!isClerk" @click="isQuickClerkModalOpen = true" style="background: none; border: none; color: #3b82f6; font-size: 11px; font-weight: bold; cursor: pointer;">+ 점원 추가</button>
+            </div>
             <select v-if="currentTab" v-model="currentTab.selectedRequester" class="form-select" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; background: white;">
               <option value="">-- 점원 선택 --</option>
-              <option v-for="user in branchUsers" :key="user.email" :value="user.email">{{ user.full_name }}</option>
+              <option v-for="user in branchUsers" :key="user.email" :value="user.name">{{ user.full_name }}</option>
             </select>
           </div>
           <div class="field-group">
             <label style="display: block; font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px;">✍️ 작성자 (지점장):</label>
             <select v-if="currentTab" v-model="currentTab.selectedCreator" class="form-select" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; background: white;">
               <option value="">-- 지점장 선택 --</option>
-              <option v-for="user in branchUsers" :key="user.email" :value="user.email">{{ user.full_name }}</option>
+              <option v-for="user in branchUsers" :key="user.email" :value="user.name">{{ user.full_name }}</option>
             </select>
           </div>
         </div>
       </div>
 
       <!-- Cart Table -->
-      <div class="cart-table-wrapper" style="flex: 1; overflow-y: auto; padding: 15px;">
+      <div class="cart-table-wrapper" style="flex: 1; overflow-y: auto; padding: 15px; position: relative;">
+        <div v-if="currentTab && currentTab.docName && !isClerk" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
+          <button @click="rejectDraft(currentTab.docName)" style="background: white; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">🗑️ 일괄 취소 (반려)</button>
+        </div>
         <table class="pos-cart-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
@@ -197,16 +211,16 @@
                 </div>
               </td>
               <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 60px;">
-                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
+                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
               <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 60px;">
-                <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
+                <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
                 <strong style="color: #00a896; font-size: 14px;">{{ cartItem.totalQty }}</strong>
               </td>
               <td class="action-cell" style="border: 1px solid #e2e8f0; padding: 4px !important; text-align: center; vertical-align: middle;">
-                <button @click="removeItem(idx)" class="btn-more-options" style="background: none; border: none; font-size: 18px; font-weight: bold; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 4px;">🗑️</button>
+                <button @click="removeItem(idx)" :disabled="isClerk && currentTab.docName" class="btn-more-options" style="background: none; border: none; font-size: 18px; font-weight: bold; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 4px;">🗑️</button>
               </td>
             </tr>
             <tr v-if="currentTab.cartItems.length === 0">
@@ -227,13 +241,26 @@
           </div>
         </div>
         
-        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;">
-          <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="clearCart">
-            장바구니 비우기
-          </button>
-          <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="submitTransfer" :disabled="currentTab.cartItems.length === 0 || isSubmitting">
-            {{ isSubmitting ? '전송 중...' : (userRole === 'Representative' ? '1차 DRAFT 요청 (점원)' : (userRole === 'Manager' ? '2차 DRAFT 전송 (지점장)' : '최종 예약 발행 (관리자)')) }}
-          </button>
+        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
+          <template v-if="currentTab.docName && !isClerk">
+            <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(false)" :disabled="isSubmitting">
+              {{ isSubmitting ? '처리 중...' : '수정 내역 저장' }}
+            </button>
+            <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(true)" :disabled="isSubmitting">
+              {{ isSubmitting ? '처리 중...' : '2차 DRAFT 승인 (지점장)' }}
+            </button>
+          </template>
+          <template v-else>
+            <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="clearCart">
+              장바구니 비우기
+            </button>
+            <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="submitTransfer" :disabled="currentTab.cartItems.length === 0 || isSubmitting">
+              {{ isSubmitting ? '전송 중...' : (isClerk ? '1차 DRAFT 요청 (점원)' : 'DRAFT 즉시 발행 (지점장)') }}
+            </button>
+          </template>
+        </div>
+        <div v-else style="text-align: center; padding: 15px; color: #64748b; font-weight: bold; background: #f1f5f9; border-radius: 6px;">
+          🚫 제출이 완료된 DRAFT 탭입니다. 수정할 수 없습니다.
         </div>
       </div>
     </div>
@@ -243,6 +270,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
+import QuickClerkAddModal from '../QuickClerkAddModal.vue'
 import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
 import { usePagedList } from '../../composables/usePagedList.js'
 import axios from 'axios'
@@ -258,6 +286,10 @@ const frappeApi = axios.create({
 
 const authStore = useAuthStore()
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
+const isClerk = computed(() => userRole.value === 'Representative')
+const isManager = computed(() => userRole.value === 'Manager')
+const isAdmin = computed(() => ['Admin', 'Monitor'].includes(userRole.value))
+const pendingDraftCount = ref(0)
 const props = defineProps({
   rawItems: { type: Array, default: () => [] },
   binData: { type: Object, default: () => ({}) },
@@ -278,8 +310,9 @@ const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 const tabs = ref([{
   id: 1,
   title: '이동 1',
-  selectedRequester: '',
-  selectedCreator: authStore.user?.email || '',
+  selectedRequester: authStore.user?.member_name || '',
+  selectedCreator: authStore.user?.member_name || '',
+  docName: null,
   cartItems: []
 }])
 const currentTabIndex = ref(0)
@@ -291,8 +324,9 @@ const addNewTab = () => {
   tabs.value.push({
     id: nextTabId.value++,
     title: `이동 ${tabs.value.length + 1}`,
-    selectedRequester: '',
-    selectedCreator: authStore.user?.email || '',
+    selectedRequester: authStore.user?.member_name || '',
+    selectedCreator: authStore.user?.member_name || '',
+    docName: null,
     cartItems: []
   })
   currentTabIndex.value = tabs.value.length - 1
@@ -309,6 +343,14 @@ const removeTab = (idx) => {
 // Branch Users
 const branchUsers = ref([])
 const isSubmitting = ref(false)
+const isQuickClerkModalOpen = ref(false)
+const handleClerkAdded = (newClerk) => {
+  fetchBranchUsers().then(() => {
+    if (currentTab.value) {
+      currentTab.value.selectedRequester = newClerk.email
+    }
+  })
+}
 
 // Init Search Index
 watch(() => props.rawItems, (newVal) => {
@@ -350,21 +392,45 @@ const cancelSearch = () => {
 // Fetch Branch Users
 const fetchBranchUsers = async () => {
   try {
-    const res = await frappeApi.get(`/api/resource/User`, {
+    const adminApi = axios.create({
+      baseURL: import.meta.env.VITE_ERPNEXT_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      headers: {
+        'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    const filters = [
+      ['enabled', '=', 1],
+      ['user_type', '=', 'System User']
+    ];
+    
+    // 현재 로그인한 사용자의 지점과 동일한 사용자만 가져옵니다.
+    if (authStore.user?.branch_name) {
+      filters.push(['location', '=', authStore.user.branch_name]);
+    }
+
+    const res = await adminApi.get(`/api/resource/User`, {
       params: {
-        filters: JSON.stringify([
-          ['enabled', '=', 1],
-          ['user_type', '=', 'System User']
-        ]),
+        filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'email', 'full_name']),
         limit_page_length: 999
       }
     })
+    
     if (res.data && res.data.data) {
       branchUsers.value = res.data.data
     }
-  } catch (error) {
-    console.error('Error fetching branch users:', error)
+  } catch (e) {
+    console.error('Failed to fetch branch users', e)
+  } finally {
+    if (authStore.user && !branchUsers.value.find(u => u.name === authStore.user.member_name)) {
+      branchUsers.value.push({
+        name: authStore.user.member_name,
+        email: authStore.user.member_name,
+        full_name: authStore.user.full_name || authStore.user.member_name
+      })
+    }
   }
 }
 
@@ -375,6 +441,10 @@ onMounted(() => {
 // Cart Logic
 const addToCart = (item) => {
   if (!currentTab.value) return
+  if (isClerk.value && currentTab.value.docName) {
+    alert('이미 제출된 DRAFT는 수정할 수 없습니다.')
+    return
+  }
   
   const mainQty = getStock(item.name, '[MAIN] ALARCON - K')
   const packQty = item.custom_pack_qty || 1
@@ -453,6 +523,116 @@ const totalEachCount = computed(() => {
 })
 
 // Submit to Frappe
+
+// ----------------------------------------------------
+// Draft Management (Fetch, Update, Reject)
+// ----------------------------------------------------
+const fetchPendingDrafts = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Material Request', {
+      params: {
+        filters: JSON.stringify([
+          ['docstatus', '=', 0],
+          ['custom_approval_stage', '=', '1차 DRAFT (점원)'],
+          ['custom_branch', '=', authStore.user?.branch_name || '']
+        ]),
+        fields: JSON.stringify(['name', 'custom_branch_requester', 'owner']),
+        limit_page_length: 999
+      }
+    })
+    
+    if (res.data && res.data.data) {
+      const drafts = res.data.data
+      pendingDraftCount.value = drafts.length
+      
+      for (const draft of drafts) {
+        if (!tabs.value.find(t => t.docName === draft.name)) {
+          const detailRes = await frappeApi.get(`/api/resource/Material Request/${draft.name}`)
+          const doc = detailRes.data.data
+          
+          tabs.value.push({
+            id: nextTabId.value++,
+            title: doc.custom_branch_requester || '알 수 없는 점원',
+            docName: doc.name,
+            selectedRequester: doc.custom_branch_requester || '',
+            selectedCreator: doc.owner || '',
+            cartItems: doc.items.map(i => {
+              const rawItem = props.rawItems.find(r => r.name === i.item_code) || {}
+              const packQty = rawItem.custom_pack_qty || 1
+              return {
+                item_code: i.item_code,
+                item_name: rawItem.item_name || i.item_name,
+                custom_color: rawItem.custom_color || '',
+                pack_qty: packQty,
+                boxQty: Math.floor(i.qty / packQty),
+                eachQty: i.qty % packQty,
+                totalQty: i.qty
+              }
+            })
+          })
+        }
+      }
+    }
+  } catch(e) {
+    console.error('Error fetching drafts:', e)
+    alert('대기열을 불러오는 중 오류가 발생했습니다.')
+  }
+}
+
+const rejectDraft = async (docName) => {
+  if(!confirm('이 요청을 정말 일괄 취소(반려)하시겠습니까?\n(해당 프라페 문서는 삭제되며 즉시 가용 재고가 롤백됩니다.)')) return
+  
+  try {
+    await frappeApi.delete(`/api/resource/Material Request/${docName}`)
+    alert('성공적으로 반려(삭제)되었습니다.')
+    const idx = tabs.value.findIndex(t => t.docName === docName)
+    if(idx !== -1) removeTab(idx)
+    emit('refresh-items')
+    fetchPendingDrafts()
+  } catch(e) {
+    console.error(e)
+    alert('반려 처리 중 오류가 발생했습니다.')
+  }
+}
+
+const updateDraft = async (isFinalApproval) => {
+  if (!currentTab.value || !currentTab.value.docName) return
+  isSubmitting.value = true
+  
+  try {
+    const payload = {
+      custom_approval_stage: isFinalApproval ? '2차 DRAFT (지점장)' : '1차 DRAFT (점원)',
+      items: currentTab.value.cartItems.map(item => ({
+        item_code: item.item_code,
+        qty: item.totalQty,
+        s_warehouse: '[MAIN] ALARCON - K',
+        t_warehouse: authStore.user?.branch_name,
+        uom: 'Pza',
+        conversion_factor: 1
+      }))
+    }
+    
+    await frappeApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
+    
+    if (isFinalApproval) {
+      alert(`성공적으로 2차 DRAFT 승인이 완료되었습니다.\n본부 관리자 예약 현황에 등록됩니다.`)
+      const idx = tabs.value.findIndex(t => t.id === currentTab.value.id)
+      if(idx !== -1) removeTab(idx)
+    } else {
+      alert('성공적으로 수정 내용이 저장되었습니다.')
+    }
+    emit('refresh-items')
+    if (isFinalApproval) fetchPendingDrafts()
+  } catch(e) {
+    console.error(e)
+    alert('업데이트 중 오류가 발생했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// ----------------------------------------------------
+
 const submitTransfer = async () => {
   if (!currentTab.value || currentTab.value.cartItems.length === 0) return
   if (!currentTab.value.selectedRequester) {
@@ -479,7 +659,7 @@ const submitTransfer = async () => {
       owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 드롭다운 반영
       custom_branch: authStore.user?.branch_name,
       custom_branch_requester: currentTab.value.selectedRequester,
-      custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
+      custom_approval_stage: isClerk.value ? '1차 DRAFT (점원)' : '2차 DRAFT (지점장)',
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
         qty: item.totalQty,
@@ -494,16 +674,18 @@ const submitTransfer = async () => {
     const docName = res.data.data.name
     
     // Auto submit if Admin
-    if (isAdmin) {
+    if (isAdmin.value) {
       await frappeApi.put(`/api/resource/Material Request/${docName}`, { docstatus: 1 })
       alert(`성공적으로 관리자 직권으로 예약 전표가 발행되었습니다: ${docName}`)
-    } else if (isManager) {
-      alert(`지점장 승인(2차 DRAFT) 상태로 예약이 전송되었습니다: ${docName}`)
+    } else if (isManager.value) {
+      alert(`지점장 DRAFT 즉시 발행이 완료되었습니다.\n본부 예약 현황에 등록됩니다.`)
     } else {
-      alert(`점원 DRAFT 요청이 성공적으로 전송되었습니다: ${docName}`)
+      alert(`점원 1차 DRAFT 요청이 성공적으로 전송되었습니다!\n이제 이 탭은 읽기 전용으로 전환됩니다.`)
+      currentTab.value.docName = docName
+      currentTab.value.title = authStore.user?.member_name || '내 요청'
     }
     
-    currentTab.value.cartItems = []
+    if(!isClerk.value) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
   } catch (error) {
     console.error('Submit error:', error)

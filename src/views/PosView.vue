@@ -873,6 +873,7 @@ const salesPersonList = ref([])
 const supplierList = ref([])
 const incompleteReservationCount = ref(0)
 const incompleteTransferReservationCount = ref(0)
+const branchDraftWaitCount = ref(0)
 
 const isQuickItemModalOpen = ref(false)
 const isQuickCustomerModalOpen = ref(false)
@@ -1499,6 +1500,7 @@ const setActiveNav = (nav, mode = null) => {
       currentTab.value.cartItems = []
       currentTab.value.selectedCustomer = ''
       currentTab.value.selectedResponder = ''
+      currentTab.value.selectedRequester = authStore.user?.member_name || ''
       currentTab.value.selectedSource = ''
       currentTab.value.selectedTarget = ''
     }
@@ -1536,6 +1538,7 @@ const tabList = ref([
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
+    selectedRequester: authStore.user?.member_name || '',
     cartItems: []
   },
   { 
@@ -1549,6 +1552,7 @@ const tabList = ref([
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
+    selectedRequester: authStore.user?.member_name || '',
     cartItems: []
   },
   { 
@@ -1562,6 +1566,7 @@ const tabList = ref([
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
+    selectedRequester: authStore.user?.member_name || '',
     cartItems: []
   }
 ])
@@ -1613,6 +1618,7 @@ const addNewTab = () => {
     selectedCreator: authStore.user?.member_name || authStore.user?.full_name || '',
     selectedBranch: authStore.user?.branch_name || '',
     selectedResponder: '',
+    selectedRequester: authStore.user?.member_name || '',
     cartItems: []
   })
   activeTabIds.value[currentMode] = newId;
@@ -1740,6 +1746,7 @@ const cancelReservationCheckout = () => {
     currentTab.value.cartItems = []
     currentTab.value.selectedCustomer = ''
     currentTab.value.selectedResponder = ''
+    currentTab.value.selectedRequester = authStore.user?.member_name || ''
     currentTab.value.selectedSource = ''
     currentTab.value.selectedTarget = ''
     currentTab.value.title = transactionMode.value === 'transfer' ? t('pos.msg_new_transfer') : t('pos.msg_new_outbound')

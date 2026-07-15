@@ -133,27 +133,11 @@ const fetchStaff = async () => {
     if (res.data?.data) {
       const users = res.data.data
       
-      let permMap = {}
-      try {
-        const permRes = await frappeApi.get('/api/resource/User Permission', {
-          params: {
-            fields: JSON.stringify(['user', 'for_value']),
-            filters: JSON.stringify([['allow', '=', 'Warehouse']]),
-            limit_page_length: 999
-          }
-        })
-        if (permRes.data?.data) {
-          permRes.data.data.forEach(p => {
-            permMap[p.user] = p.for_value
-          })
-        }
-      } catch (err) {
-        console.warn('Failed to fetch User Permissions', err)
-      }
+
       
       let roleMap = {}
+      let branchMap = {}
       try {
-        // 하위 테이블(Has Role) 권한 문제로 조회가 안 될 수 있으므로, 확실하게 개별 User 문서를 조회합니다.
         const userDetailPromises = users.map(u => frappeApi.get(`/api/resource/User/${u.name}`));
         const userDetailsRes = await Promise.all(userDetailPromises);
         
@@ -161,10 +145,11 @@ const fetchStaff = async () => {
           if (res.data?.data) {
             const ud = res.data.data;
             roleMap[ud.name] = ud.roles ? ud.roles.map(r => r.role) : [];
+            branchMap[ud.name] = ud.location || '';
           }
         });
       } catch (err) {
-        console.warn('Failed to fetch individual User Roles', err)
+        console.warn('Failed to fetch individual User Roles and Location', err)
       }
       
       staffList.value = users.map(u => {
@@ -177,7 +162,7 @@ const fetchStaff = async () => {
         
         return {
           ...u,
-          branch: permMap[u.name] || '',
+          branch: branchMap[u.name] || '',
           role: bestRole
         }
       })
@@ -248,6 +233,7 @@ const saveUser = async () => {
       first_name: form.value.full_name,
       middle_name: '',
       last_name: '',
+      location: form.value.branch || '',
       roles: finalRoles.map(r => ({ role: r }))
     };
     
@@ -260,36 +246,6 @@ const saveUser = async () => {
       userPayload.send_welcome_email = 0;
       userPayload.new_password = form.value.password;
       await frappeApi.post('/api/resource/User', userPayload);
-    }
-    
-    // User Permission 처리
-    const permRes = await frappeApi.get('/api/resource/User Permission', {
-      params: {
-        fields: JSON.stringify(['name', 'for_value']),
-        filters: JSON.stringify([['user', '=', userEmail], ['allow', '=', 'Warehouse']])
-      }
-    });
-    
-    const existingPerm = permRes.data?.data && permRes.data.data.length > 0 ? permRes.data.data[0] : null;
-    
-    if (form.value.role === 'System Manager' || form.value.branch === 'ALL') {
-      if (existingPerm) {
-        await frappeApi.delete(`/api/resource/User Permission/${existingPerm.name}`);
-      }
-    } else if (form.value.branch) {
-      if (existingPerm) {
-        if (existingPerm.for_value !== form.value.branch) {
-          await frappeApi.put(`/api/resource/User Permission/${existingPerm.name}`, {
-            for_value: form.value.branch
-          });
-        }
-      } else {
-        await frappeApi.post('/api/resource/User Permission', {
-          user: userEmail,
-          allow: 'Warehouse',
-          for_value: form.value.branch
-        });
-      }
     }
     
     alert(`가족 정보가 성공적으로 ${isEditing.value ? '수정' : '저장'}되었습니다!`);

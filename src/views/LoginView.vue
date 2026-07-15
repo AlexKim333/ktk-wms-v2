@@ -142,30 +142,46 @@ const handleLogin = async () => {
         let branch = null;
         let accessLevel = 'Representative'; // default
 
-        try {
-          const userRes = await frappeApi.get(`/api/resource/User/${username.value}`);
-          if (userRes.data && userRes.data.data) {
-            const userData = userRes.data.data;
-            roles = userData.roles ? userData.roles.map(r => r.role) : [];
+          try {
+            // 프라페는 일반 유저가 자신의 Role을 조회하는 것을 차단하므로,
+            // .env에 저장된 Admin 토큰을 사용하여 강제로 Role을 읽어옵니다.
+            const adminApi = axios.create({
+              baseURL: import.meta.env.VITE_ERPNEXT_URL,
+              headers: {
+                'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const userRes = await adminApi.get(`/api/resource/User/${username.value}`);
             
-            if (roles.includes('System Manager')) {
+            if (userRes.data && userRes.data.data) {
+              const userData = userRes.data.data;
+              roles = userData.roles ? userData.roles.map(r => r.role) : [];
+              branch = userData.location || null; // 1. 우선 User의 location(지점) 필드에서 가져옴
+              
+              if (roles.includes('System Manager')) {
               accessLevel = 'Admin';
+            } else if (roles.includes('Branch Clerk')) {
+              accessLevel = 'Representative';
             } else if (roles.includes('Branch Manager')) {
               accessLevel = 'Manager';
             }
           }
           
-          // Fetch User Permission for Warehouse
-          const permRes = await frappeApi.get('/api/resource/User Permission', {
-            params: {
-              filters: JSON.stringify([['user', '=', username.value], ['allow', '=', 'Warehouse']]),
-              fields: JSON.stringify(['for_value']),
-              limit_page_length: 1
-            }
-          });
           
-          if (permRes.data && permRes.data.data && permRes.data.data.length > 0) {
-            branch = permRes.data.data[0].for_value;
+          // 2. 만약 User의 location이 비어있다면, 기존처럼 User Permission을 조회하여 창고 권한을 찾음
+          if (!branch) {
+            const permRes = await adminApi.get('/api/resource/User Permission', {
+              params: {
+                filters: JSON.stringify([['user', '=', username.value], ['allow', '=', 'Warehouse']]),
+                fields: JSON.stringify(['for_value']),
+                limit_page_length: 1
+              }
+            });
+            
+            if (permRes.data && permRes.data.data && permRes.data.data.length > 0) {
+              branch = permRes.data.data[0].for_value;
+            }
           }
         } catch (e) {
           console.error('Failed to fetch user permissions', e);

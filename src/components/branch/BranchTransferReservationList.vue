@@ -9,8 +9,8 @@
       <input type="text" v-model="searchQuery" placeholder="검색 (예약번호 등)" class="filter-input" />
       <select v-model="statusFilter" class="filter-select">
         <option value="all">전체 단계</option>
-        <option value="점원 요청">점원 요청 (1차)</option>
-        <option value="지점장 승인">지점장 승인 (2차)</option>
+        <option value="1차 DRAFT (점원)">1차 DRAFT (점원) (1차)</option>
+        <option value="2차 DRAFT (지점장)">2차 DRAFT (지점장) (2차)</option>
       </select>
       <button class="btn-refresh" @click="fetchReservations" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
         🔄 새로고침
@@ -186,7 +186,7 @@ const approveDraft = async (res) => {
   if (!confirm('지점장 승인(2차 DRAFT)을 진행하시겠습니까?')) return
   try {
     await frappeApi.put(`/api/resource/Material Request/${res.name}`, {
-      custom_approval_stage: '지점장 승인'
+      custom_approval_stage: '2차 DRAFT (지점장)'
     })
     alert('승인되었습니다.')
     fetchReservations()

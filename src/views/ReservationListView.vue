@@ -56,7 +56,7 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button class="btn-delete" @click="cancelReservation(res)" :title="res.status === 'Pending' ? $t('reservation_list.btn_cancel') : $t('reservation_list.btn_terminate')">
+              <button class="btn-delete" @click="cancelReservation(res)" :title="res.docstatus === 0 ? '반려(삭제)' : (res.status === 'Pending' ? $t('reservation_list.btn_cancel') : $t('reservation_list.btn_terminate'))">
                 🗑️
               </button>
             </td>
