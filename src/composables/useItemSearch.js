@@ -58,11 +58,19 @@ export function rankItemNameMatches(items, query) {
   const q = (query || '').trim().toLowerCase()
   if (!q || !items?.length) return items || []
 
-  const scored = items.map((item, idx) => ({
-    item,
-    idx,
-    score: scoreItemNameMatch(item.item_name || '', q)
-  }))
+  const scored = []
+  items.forEach((item, idx) => {
+    let score = scoreItemNameMatch(item.item_name || '', q)
+    if (score === 0) {
+      // 품명에 매칭 안 되면 품목코드(name)도 검사
+      score = scoreItemNameMatch(item.name || '', q)
+    }
+    
+    if (score > 0) { // 정확히 부분 일치하는 것만 포함 (CECIK23 필터링)
+      scored.push({ item, idx, score })
+    }
+  })
+  
   scored.sort((a, b) => b.score - a.score || a.idx - b.idx)
   return scored.map((s) => s.item)
 }
@@ -193,7 +201,13 @@ export function useItemSearch() {
     const raw = itemIndex.search(q, { limit })
     const ids = flattenSearchIds(raw, limit)
     const map = itemById.value
-    return ids.map((id) => map.get(id)).filter(Boolean)
+    const matched = ids.map((id) => map.get(id)).filter(Boolean)
+    
+    // rankItemNameMatches 안에서 score > 0 만 필터링하므로,
+    // FlexSearch가 가져온 퍼지 매칭(CECIK23 등)이 여기서 모두 걸러집니다.
+    const ranked = rankItemNameMatches(matched, q)
+    if (limit != null) return ranked.slice(0, limit)
+    return ranked
   }
 
   /** 슬롯 모달: 빈 검색어면 목록 일부 반환 */

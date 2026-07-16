@@ -192,6 +192,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
+import { usePendingReservations } from '../composables/usePendingReservations.js'
 import axios from 'axios'
 
 const props = defineProps({
@@ -216,6 +217,8 @@ const frappeApi = axios.create({
 // 상태 변수
 const item = ref(null)
 const binList = ref([])
+
+const { fetchPendingReservations, getAvailableStock } = usePendingReservations()
 const sleList = ref([])
 const itemPrice = ref({
   name: null,
@@ -287,7 +290,8 @@ const loadData = async (itemId) => {
     if(!item.value.custom_tier_3_qty) item.value.custom_tier_3_qty = 100
     if(!item.value.custom_tier_4_qty) item.value.custom_tier_4_qty = 300
 
-    // 2. 재고(Bin) 현황 가져오기
+    // 2. 예약 현황(Material Request) 및 재고(Bin) 현황 가져오기
+    await fetchPendingReservations()
     const resBin = await frappeApi.get('/api/resource/Bin', {
       params: {
         filters: JSON.stringify([['item_code', '=', itemId]]),
@@ -295,7 +299,11 @@ const loadData = async (itemId) => {
         limit_page_length: 50
       }
     })
-    binList.value = resBin.data.data
+    binList.value = resBin.data.data.map(bin => ({
+      ...bin,
+      actual_qty: getAvailableStock(itemId, bin.warehouse, Number(bin.actual_qty) || 0)
+    }))
+    
     allWarehouses.value = Array.from(new Set(binList.value.map(b => b.warehouse)))
 
     // 3. 단가표(Item Price) 가져오기

@@ -139,6 +139,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { createFlexSearcher, rankItemNameMatches } from '../composables/useItemSearch.js'
 import { usePagedList } from '../composables/usePagedList.js'
+import { usePendingReservations } from '../composables/usePendingReservations.js'
 import axios from 'axios'
 import BarcodePrintModal from '../components/BarcodePrintModal.vue'
 import ProductRegistrationModal from '../components/ProductRegistrationModal.vue'
@@ -178,6 +179,8 @@ const isExcludeModalOpen = ref(false)
 const rawItems = ref([])
 const rawBins = ref([])
 const rawWarehouses = ref([])
+
+const { fetchPendingReservations, getAvailableStock } = usePendingReservations()
 
 const selectedWarehouse = ref('All')
 const excludedWarehouses = ref(JSON.parse(localStorage.getItem('wms_excluded_warehouses') || '[]'))
@@ -235,6 +238,8 @@ const loadProducts = async () => {
     rawWarehouses.value = whRes.data.data || []
     productSearcher.rebuild(rawItems.value)
     
+    await fetchPendingReservations()
+    
   } catch (err) {
     console.error('Error loading products:', err)
     alert('Failed to load product data.')
@@ -263,7 +268,8 @@ const getDisplayStock = (item) => {
     }
     
     if (selectedWarehouse.value === 'All' || selectedWarehouse.value === bin.warehouse) {
-      total += (Number(bin.actual_qty) || 0)
+      const available = getAvailableStock(bin.item_code, bin.warehouse, Number(bin.actual_qty) || 0)
+      total += available
     }
   })
   return total
@@ -355,9 +361,12 @@ const processCsvFile = (e) => {
         if (itemsRes.data && itemsRes.data.data) {
           existingItems = new Set(itemsRes.data.data.map(i => i.name))
         }
-        const binsRes = await frappeApi.get('/api/resource/Bin', { params: { filters: JSON.stringify([['warehouse', '=', selectedWarehouse.value]]), fields: JSON.stringify(['item_code', 'actual_qty']), limit_page_length: 0 } })
+        const binsRes = await frappeApi.get('/api/resource/Bin', { params: { filters: JSON.stringify([['warehouse', '=', selectedWarehouse.value]]), fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']), limit_page_length: 0 } })
         if (binsRes.data && binsRes.data.data) {
-          binsRes.data.data.forEach(b => { stockMap[b.item_code] = b.actual_qty || 0 })
+          binsRes.data.data.forEach(b => { 
+            const actual = b.actual_qty || 0
+            stockMap[b.item_code] = getAvailableStock(b.item_code, b.warehouse, actual) 
+          })
         }
       } catch (err) {
         console.warn('기존 목록 가져오기 실패, 개별 검증으로 진행합니다.', err)
