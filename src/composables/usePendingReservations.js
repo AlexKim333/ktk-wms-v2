@@ -15,7 +15,7 @@ export function usePendingReservations() {
         frappeApi.get('/api/resource/Material Request', {
           params: {
             fields: JSON.stringify(['name']),
-            filters: JSON.stringify([['docstatus', '=', 1], ['status', 'in', ['Pending', 'Partially Ordered', 'Partially Issued', 'Partially Received', 'Partial']]]),
+            filters: JSON.stringify([['docstatus', '=', 1], ['status', 'in', ['Pending', 'Draft', 'Partially Ordered', 'Partially Issued', 'Partially Received', 'Partial']]]),
             limit_page_length: 0
           }
         }).catch(() => ({ data: { data: [] } })),

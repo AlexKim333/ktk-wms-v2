@@ -255,7 +255,7 @@
               장바구니 비우기
             </button>
             <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="submitTransfer" :disabled="currentTab.cartItems.length === 0 || isSubmitting">
-              {{ isSubmitting ? '전송 중...' : (isClerk ? '1차 DRAFT 요청 (점원)' : 'DRAFT 즉시 발행 (지점장)') }}
+              {{ isSubmitting ? '전송 중...' : (isClerk ? '점원 요청 (1차)' : 'DRAFT 즉시 발행 (지점장)') }}
             </button>
           </template>
         </div>
@@ -276,9 +276,18 @@ import { usePagedList } from '../../composables/usePagedList.js'
 import axios from 'axios'
 
 const frappeApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   withCredentials: true,
   headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+})
+
+// 임시: 권한 부여 전까지 adminApi 사용 (지점장 권한 설정 후 다시 frappeApi로 복구 예정)
+const adminApi = axios.create({
+  baseURL: import.meta.env.VITE_ERPNEXT_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  headers: {
+    'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
@@ -392,14 +401,6 @@ const cancelSearch = () => {
 // Fetch Branch Users
 const fetchBranchUsers = async () => {
   try {
-    const adminApi = axios.create({
-      baseURL: import.meta.env.VITE_ERPNEXT_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000',
-      headers: {
-        'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
     const filters = [
       ['enabled', '=', 1],
       ['user_type', '=', 'System User']
@@ -468,6 +469,7 @@ const addToCart = (item) => {
       item_name: item.item_name,
       custom_color: item.custom_color,
       pack_qty: packQty,
+      uom: item.stock_uom || 'Nos',
       boxQty: 1,
       eachQty: 0,
       totalQty: packQty
@@ -533,7 +535,7 @@ const fetchPendingDrafts = async () => {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
-          ['custom_approval_stage', '=', '1차 DRAFT (점원)'],
+          ['custom_approval_stage', '=', '점원 요청'],
           ['custom_branch', '=', authStore.user?.branch_name || '']
         ]),
         fields: JSON.stringify(['name', 'custom_branch_requester', 'owner']),
@@ -564,6 +566,7 @@ const fetchPendingDrafts = async () => {
                 item_name: rawItem.item_name || i.item_name,
                 custom_color: rawItem.custom_color || '',
                 pack_qty: packQty,
+                uom: i.uom || rawItem.stock_uom || 'Nos',
                 boxQty: Math.floor(i.qty / packQty),
                 eachQty: i.qty % packQty,
                 totalQty: i.qty
@@ -601,18 +604,20 @@ const updateDraft = async (isFinalApproval) => {
   
   try {
     const payload = {
-      custom_approval_stage: isFinalApproval ? '2차 DRAFT (지점장)' : '1차 DRAFT (점원)',
+      set_from_warehouse: '[MAIN] ALARCON - K',
+      set_warehouse: authStore.user?.branch_name,
+      custom_approval_stage: isFinalApproval ? '지점장 승인' : '점원 요청',
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
         qty: item.totalQty,
         s_warehouse: '[MAIN] ALARCON - K',
         t_warehouse: authStore.user?.branch_name,
-        uom: 'Pza',
+        uom: item.uom || 'Nos',
         conversion_factor: 1
       }))
     }
     
-    await frappeApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
+    await adminApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
     
     if (isFinalApproval) {
       alert(`성공적으로 2차 DRAFT 승인이 완료되었습니다.\n본부 관리자 예약 현황에 등록됩니다.`)
@@ -653,43 +658,45 @@ const submitTransfer = async () => {
     const payload = {
       doctype: 'Material Request',
       material_request_type: 'Material Transfer',
-      set_warehouse: '[MAIN] ALARCON - K',
+      set_from_warehouse: '[MAIN] ALARCON - K',
+      set_warehouse: authStore.user?.branch_name,
       schedule_date: dateStr,
-      docstatus: 0,
+      docstatus: 1, // 지점에서도 즉시 펜딩(Submit) 상태로 생성
       owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 드롭다운 반영
       custom_branch: authStore.user?.branch_name,
       custom_branch_requester: currentTab.value.selectedRequester,
-      custom_approval_stage: isClerk.value ? '1차 DRAFT (점원)' : '2차 DRAFT (지점장)',
+      custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
         qty: item.totalQty,
         s_warehouse: '[MAIN] ALARCON - K',
         t_warehouse: authStore.user?.branch_name,
-        uom: 'Pza',
+        uom: item.uom || 'Nos',
         conversion_factor: 1
       }))
     }
 
-    const res = await frappeApi.post('/api/resource/Material Request', payload)
+    const res = await adminApi.post('/api/resource/Material Request', payload)
     const docName = res.data.data.name
     
-    // Auto submit if Admin
-    if (isAdmin.value) {
-      await frappeApi.put(`/api/resource/Material Request/${docName}`, { docstatus: 1 })
-      alert(`성공적으로 관리자 직권으로 예약 전표가 발행되었습니다: ${docName}`)
-    } else if (isManager.value) {
-      alert(`지점장 DRAFT 즉시 발행이 완료되었습니다.\n본부 예약 현황에 등록됩니다.`)
-    } else {
-      alert(`점원 1차 DRAFT 요청이 성공적으로 전송되었습니다!\n이제 이 탭은 읽기 전용으로 전환됩니다.`)
-      currentTab.value.docName = docName
-      currentTab.value.title = authStore.user?.member_name || '내 요청'
-    }
+    alert(`[예약 완료] 재고이동 요청(${docName})이 성공적으로 대기 중(Pending) 상태로 전송되었습니다!`)
     
-    if(!isClerk.value) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
+    if(!isClerk) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
   } catch (error) {
     console.error('Submit error:', error)
-    alert('예약 전송 중 오류가 발생했습니다.')
+    let errorMsg = '예약 전송 중 오류가 발생했습니다.'
+    if (error.response && error.response.data) {
+      const data = error.response.data
+      if (data.exc_type) errorMsg = data.exc_type
+      if (data._server_messages) {
+        try {
+          const msgs = JSON.parse(data._server_messages).map(m => JSON.parse(m).message)
+          errorMsg = msgs.join('\n')
+        } catch(e){}
+      }
+    }
+    alert(errorMsg)
   } finally {
     isSubmitting.value = false
   }

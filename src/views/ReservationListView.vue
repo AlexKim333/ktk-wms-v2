@@ -46,7 +46,7 @@
               <div style="font-size: 11px; color: #64748b;">{{ res.custom_orderer || res.owner || '-' }}</div>
             </td>
             <td>
-              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status) }}</span>
+              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus) }}</span>
             </td>
             <td>{{ totalQtyMap[res.name] || 0 }} {{ $t('reservation_list.ea') }}</td>
             <td>
@@ -56,6 +56,9 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td class="action-cell" @click.stop>
+              <button v-if="res.docstatus === 0" class="btn-submit" @click="submitDraft(res)" title="예약 확정(Submit)" style="background:none; border:none; cursor:pointer; font-size:1.1em; margin-right:5px;">
+                ✅
+              </button>
               <button class="btn-delete" @click="cancelReservation(res)" :title="res.docstatus === 0 ? '반려(삭제)' : (res.status === 'Pending' ? $t('reservation_list.btn_cancel') : $t('reservation_list.btn_terminate'))">
                 🗑️
               </button>
@@ -79,7 +82,7 @@
           <div class="detail-grid">
             <div class="detail-card">
               <label>{{ $t('reservation_list.modal_status') }}</label>
-              <div class="val"><span class="status-badge" :class="getStatusClass(selectedReservation)">{{ translateStatus(selectedReservation.status) }}</span></div>
+              <div class="val"><span class="status-badge" :class="getStatusClass(selectedReservation)">{{ translateStatus(selectedReservation.status, selectedReservation.docstatus) }}</span></div>
             </div>
             <div class="detail-card">
               <label>{{ reservationType === 'Material Transfer' ? $t('pos.lbl_src_wh') : $t('reservation_list.modal_customer') }}</label>
@@ -134,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
@@ -171,19 +174,33 @@ const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
   try {
-    const resWithProgress = await frappeApi.get('/api/resource/Material Request', {
-      params: {
-        fields: JSON.stringify(['name', 'status', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'per_ordered', 'per_received', 'owner']),
-        filters: JSON.stringify([
-          ['docstatus', '=', 1],
-          ['material_request_type', '=', props.reservationType]
-        ]),
-        limit_page_length: 100,
-        order_by: 'creation desc'
-      }
-    })
+    const [resPending, resDraft] = await Promise.all([
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          filters: JSON.stringify([
+            ['docstatus', '=', 1],
+            ['material_request_type', '=', props.reservationType]
+          ]),
+          limit_page_length: 100,
+          order_by: 'creation desc'
+        }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          filters: JSON.stringify([
+            ['docstatus', '=', 0],
+            ['material_request_type', '=', props.reservationType],
+            ['custom_approval_stage', '=', '지점장 승인']
+          ]),
+          limit_page_length: 100,
+          order_by: 'creation desc'
+        }
+      }).catch(() => ({ data: { data: [] } }))
+    ])
     
-    reservations.value = resWithProgress.data.data || []
+    reservations.value = [...(resPending.data?.data || []), ...(resDraft.data?.data || [])]
     
     // 예약 총 수량 계산을 위해 각 예약 문서 상세 조회
     if (reservations.value.length > 0) {
@@ -209,8 +226,15 @@ const fetchReservations = async () => {
   }
 }
 
+let pollInterval = null
+
 onMounted(() => {
   fetchReservations()
+  pollInterval = setInterval(fetchReservations, 10000) // 10초마다 실시간 갱신(Polling)
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
 })
 
 const filteredReservations = computed(() => {
@@ -224,7 +248,7 @@ const filteredReservations = computed(() => {
     // 2. Status Filter
     let matchStatus = true
     if (statusFilter.value === 'incomplete') {
-      matchStatus = res.status === 'Pending' || res.status === 'Partially Ordered' || res.status === 'Partially Issued' || res.status === 'Partially Received' || res.status === 'Partial'
+      matchStatus = res.docstatus === 0 || res.status === 'Draft' || res.status === 'Pending' || res.status === 'Partially Ordered' || res.status === 'Partially Issued' || res.status === 'Partially Received' || res.status === 'Partial'
     } else if (statusFilter.value === 'completed') {
       matchStatus = res.status === 'Completed' || res.status === 'Transferred' || res.status === 'Issued' || res.status === 'Received'
     }
@@ -240,15 +264,32 @@ const filteredReservations = computed(() => {
   })
 })
 
-const translateStatus = (status) => {
+const translateStatus = (status, docstatus) => {
+  if (docstatus === 0) return 'Draft(지점장 승인)'
+  if (docstatus === 1 && status === 'Draft') return t('status.pending') // 억까 방지: 실제로는 docstatus 1 인데 상태값이 Draft로 내려온 경우
   if (!status) return ''
   const key = 'status.' + status.toLowerCase().replace(/ /g, '_')
   const translated = t(key)
   return translated !== key ? translated : status
 }
 
+const getStatusLabel = (res) => {
+  if (res.docstatus === 0) {
+    if (res.custom_approval_stage) return `Draft(${res.custom_approval_stage})`
+    return 'Draft'
+  }
+  
+  if (res.docstatus === 2) return '취소됨'
+  
+  if (res.status === 'Pending' || res.status === 'Draft') return '대기 중'
+  if (res.status === 'Partially Ordered') return '부분 주문됨'
+  if (res.status === 'Ordered') return '주문 완료'
+  return res.status
+}
+
 const getStatusClass = (res) => {
-  if (res.status === 'Pending') return 'status-pending'
+  if (res.docstatus === 0) return 'status-default'
+  if (res.status === 'Pending' || (res.docstatus === 1 && res.status === 'Draft')) return 'status-pending'
   if (res.status.includes('Partial')) return 'status-partial'
   if (res.status === 'Completed' || res.status === 'Issued' || res.status === 'Transferred' || res.status === 'Received') return 'status-completed'
   if (res.status === 'Cancelled') return 'status-cancelled'
@@ -284,14 +325,33 @@ const loadToCart = () => {
   selectedReservation.value = null
 }
 
+const submitDraft = async (res) => {
+  if (!confirm(`[예약 확정] 지점장이 요청한 드래프트(${res.name})를 승인(Submit)하시겠습니까?\n승인 후에는 취소 전까지 내용을 수정할 수 없습니다.`)) return
+  try {
+    await frappeApi.put(`/api/resource/Material Request/${res.name}`, { docstatus: 1 })
+    alert('✅ 예약이 성공적으로 확정되었습니다.')
+    fetchReservations()
+    emit('refresh-items')
+  } catch (error) {
+    console.error('확정 에러:', error)
+    alert('확정 처리 중 오류가 발생했습니다.')
+  }
+}
+
 const cancelReservation = async (res) => {
-  if (res.status === 'Pending') {
+  const isPending = res.status === 'Pending' || (res.docstatus === 1 && res.status === 'Draft');
+  
+  if (res.docstatus === 0 || isPending) {
     if (!confirm(t('reservation_list.msg_confirm_cancel', { name: res.name }))) return
     try {
-      await frappeApi.post(`/api/method/frappe.client.cancel`, {
-        doctype: 'Material Request',
-        name: res.name
-      })
+      if (res.docstatus === 0) {
+        await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
+      } else {
+        await frappeApi.post(`/api/method/frappe.client.cancel`, {
+          doctype: 'Material Request',
+          name: res.name
+        })
+      }
       alert(t('reservation_list.msg_cancel_success'))
       fetchReservations()
       emit('refresh-items')

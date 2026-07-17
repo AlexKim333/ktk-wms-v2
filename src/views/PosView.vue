@@ -662,6 +662,33 @@
         
         <div class="modal-footer" style="margin-top: 25px; display:flex; justify-content:flex-end; gap:10px;">
           <button style="padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="isQuickAdjustModalOpen = false" :disabled="isAdjusting">{{ $t('pos.qa_btn_cancel') }}</button>
+     <!-- 배송지 선택 모달 -->
+    <div class="modal-overlay" v-if="isShippingAddressModalOpen">
+      <div class="modal-content">
+        <h3>{{ $t('pos.lbl_sel_addr') }}</h3>
+        <ul class="address-list">
+          <li v-for="addr in shippingAddressList" :key="addr.name" @click="selectShippingAddress(addr)">
+            <strong>{{ addr.name }}</strong><br/>
+            {{ addr.address_line1 }} {{ addr.city }}
+          </li>
+        </ul>
+        <button class="btn btn-secondary" @click="isShippingAddressModalOpen = false">{{ $t('common.cancel') }}</button>
+      </div>
+    </div>
+
+    <!-- 잔여 예약 종결 모달 -->
+    <div class="modal-overlay" v-if="isPartialCloseModalOpen">
+      <div class="modal-content partial-close-modal" style="text-align:center; padding:30px; border-radius:12px; max-width:400px;">
+        <h3 style="margin-bottom:20px; font-size:1.4em; color:#333;">잔여 예약 처리</h3>
+        <p style="font-size:1.1em; line-height:1.5; margin-bottom:30px;">
+          <strong>{{ partialCloseReservationId }}</strong>번 예약<br>부분출고 했습니다.<br><br>잔여분을 예약으로 유지하시겠습니까?
+        </p>
+        <div class="modal-actions" style="display:flex; gap:15px; justify-content:center;">
+          <button class="btn btn-secondary" style="flex:1; padding:12px; font-size:1.1em; background-color:#10b981; color:white; border:none; border-radius:6px; cursor:pointer;" @click="cancelPartialClose">유지 (계속 대기)</button>
+          <button class="btn btn-danger" style="flex:1; padding:12px; font-size:1.1em; background-color:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;" @click="confirmPartialClose">취소(삭제)</button>
+        </div>
+      </div>
+    </div>
           <button style="padding:10px 20px; background:#00a896; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="submitQuickAdjust" :disabled="isAdjusting">
             {{ isAdjusting ? $t('pos.qa_btn_adjusting') : $t('pos.qa_btn_submit') }}
           </button>
@@ -701,7 +728,7 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
@@ -769,6 +796,39 @@ const isShippingAddressModalOpen = ref(false)
 const shippingAddressList = ref([])
 const shippingPhone = ref('')
 const pendingPrintData = ref(null)
+
+const isPartialCloseModalOpen = ref(false)
+const partialCloseReservationId = ref(null)
+
+const confirmPartialClose = async () => {
+  if (!partialCloseReservationId.value) return;
+  isPartialCloseModalOpen.value = false;
+  try {
+    await frappeApi.post('/api/method/erpnext.stock.doctype.material_request.material_request.update_status', {
+      status: 'Stopped',
+      name: partialCloseReservationId.value
+    })
+    alert('잔여분이 성공적으로 취소(종결)되었습니다.');
+  } catch (e) {
+    console.warn('Stopped 메서드 호출 실패, set_value 로 백업 시도', e);
+    try {
+      await frappeApi.post('/api/method/frappe.client.set_value', {
+        doctype: 'Material Request',
+        name: partialCloseReservationId.value,
+        fieldname: 'status',
+        value: 'Stopped'
+      })
+      alert('잔여분이 성공적으로 취소(종결)되었습니다.');
+    } catch (e2) {
+      console.error('잔여분 종결 실패', e2)
+    }
+  }
+}
+
+const cancelPartialClose = () => {
+  isPartialCloseModalOpen.value = false;
+  partialCloseReservationId.value = null;
+}
 
 const selectShippingAddress = (addr) => {
   isShippingAddressModalOpen.value = false;
@@ -1265,10 +1325,89 @@ const handleSalesPersonChange = () => {
 }
 
 // Frappe API 호출 로직 (컴포넌트 로드 시 자동 실행)
+const pollReservations = async () => {
+  try {
+    const [reqRes, reqDraftRes] = await Promise.all([
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name']),
+          filters: JSON.stringify([['docstatus', '=', 1], ['status', 'in', ['Pending', 'Draft', 'Partially Ordered', 'Partially Issued', 'Partially Received', 'Partial']]]),
+          limit_page_length: 0
+        }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name']),
+          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
+          limit_page_length: 0
+        }
+      }).catch(() => ({ data: { data: [] } }))
+    ]);
+
+    const reqList1 = reqRes.data?.data || [];
+    const reqList2 = reqDraftRes.data?.data || [];
+    const reqList = [...reqList1, ...reqList2];
+
+    if (reqList.length > 0) {
+      const mrDetailsPromises = reqList.map(req =>
+        frappeApi.get(`/api/resource/Material Request/${req.name}`)
+      );
+      const mrDetailsRes = await Promise.all(mrDetailsPromises);
+      
+      const reservedMap = {};
+      let outboundResCount = 0;
+      let transferResCount = 0;
+
+      mrDetailsRes.forEach(res => {
+         const doc = res.data.data;
+         if (doc.material_request_type === 'Material Issue') outboundResCount++;
+         else if (doc.material_request_type === 'Material Transfer') transferResCount++;
+
+         let sourceWh = null;
+         if (doc.material_request_type === 'Material Issue') {
+           sourceWh = doc.set_warehouse;
+         } else if (doc.material_request_type === 'Material Transfer') {
+           sourceWh = doc.set_from_warehouse;
+         }
+           
+         if (!sourceWh) return;
+
+         if (!reservedMap[sourceWh]) reservedMap[sourceWh] = {};
+
+         doc.items.forEach(item => {
+            const fulfilledQty = Number(item.ordered_qty || item.received_qty || item.issued_qty || 0);
+            const rem = item.qty - fulfilledQty;
+            if (rem > 0) {
+               let itemWh = sourceWh;
+               if (doc.material_request_type === 'Material Issue') {
+                 itemWh = item.warehouse || sourceWh;
+               } else if (doc.material_request_type === 'Material Transfer') {
+                 itemWh = item.s_warehouse || item.from_warehouse || sourceWh;
+               }
+
+               if (!reservedMap[itemWh]) reservedMap[itemWh] = {};
+               reservedMap[itemWh][item.item_code] = (reservedMap[itemWh][item.item_code] || 0) + rem;
+            }
+         });
+      });
+
+      incompleteReservationCount.value = outboundResCount;
+      incompleteTransferReservationCount.value = transferResCount;
+      pendingReservedMap.value = reservedMap;
+    } else {
+      incompleteReservationCount.value = 0;
+      incompleteTransferReservationCount.value = 0;
+      pendingReservedMap.value = {};
+    }
+  } catch (error) {
+    console.error('Badge polling error:', error);
+  }
+}
+
 const fetchFrappeItems = async () => {
   try {
     // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원, 예약 건수)
-    const [whRes, itemRes, binRes, custRes, spRes, reqRes, supRes, reqDraftRes] = await Promise.all([
+    const [whRes, itemRes, binRes, custRes, spRes, supRes] = await Promise.all([
       frappeApi.get('/api/resource/Warehouse', {
         params: { 
           fields: JSON.stringify(['name', 'warehouse_name', 'parent_warehouse']),
@@ -1310,26 +1449,12 @@ const fetchFrappeItems = async () => {
           limit_page_length: 0
         }
       }),
-      frappeApi.get('/api/resource/Material Request', {
-        params: {
-          fields: JSON.stringify(['name']),
-          filters: JSON.stringify([['docstatus', '=', 1], ['status', 'in', ['Pending', 'Partially Ordered', 'Partially Issued', 'Partially Received', 'Partial']]]),
-          limit_page_length: 0
-        }
-      }),
       frappeApi.get('/api/resource/Supplier', {
         params: {
           fields: JSON.stringify(['name', 'supplier_name']),
           limit_page_length: 0
         }
-      }),
-      frappeApi.get('/api/resource/Material Request', {
-        params: {
-          fields: JSON.stringify(['name']),
-          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
-          limit_page_length: 0
-        }
-      }).catch(() => ({ data: { data: [] } }))
+      })
     ]);
 
     warehouseList.value = whRes.data.data
@@ -1338,72 +1463,9 @@ const fetchFrappeItems = async () => {
     salesPersonList.value = spRes.data.data || []
     supplierList.value = supRes.data.data || []
     
-    // 🌟 합치기: (docstatus 1인 승인건) + (docstatus 0이면서 지점장 승인 단계인 예약건)
-    const reqList1 = reqRes.data.data || [];
-    const reqList2 = reqDraftRes.data.data || [];
-    const reqList = [...reqList1, ...reqList2];
-
-    // 🌟 2. 예약 내역 상세 조회하여 예약 맵 구축 (가용재고 차감용)
-    if (reqList.length > 0) {
-      const mrDetailsPromises = reqList.map(req =>
-        frappeApi.get(`/api/resource/Material Request/${req.name}`)
-      );
-      const mrDetailsRes = await Promise.all(mrDetailsPromises);
-      
-      const reservedMap = {};
-      let outboundResCount = 0;
-      let transferResCount = 0;
-
-      mrDetailsRes.forEach(res => {
-         const doc = res.data.data;
-
-         // 뱃지 카운트 분리
-         if (doc.material_request_type === 'Material Issue') outboundResCount++;
-         else if (doc.material_request_type === 'Material Transfer') transferResCount++;
-
-         // 출발 창고 결정
-         // - Material Issue: set_warehouse (출고 소스)
-         // - Material Transfer: set_from_warehouse (이동 출발지)
-         // ⚠️ custom_ordering_branch는 지점 브랜치 링크필드이므로 창고 키로 사용 불가
-         let sourceWh = null;
-         if (doc.material_request_type === 'Material Issue') {
-           sourceWh = doc.set_warehouse;
-         } else if (doc.material_request_type === 'Material Transfer') {
-           sourceWh = doc.set_from_warehouse;
-         }
-           
-         if (!sourceWh) return;
-
-         if (!reservedMap[sourceWh]) reservedMap[sourceWh] = {};
-
-         doc.items.forEach(item => {
-            const fulfilledQty = Number(item.ordered_qty || item.received_qty || item.issued_qty || 0);
-            const rem = item.qty - fulfilledQty;
-            if (rem > 0) {
-               // 출고(Issue)는 item.warehouse가 소스이지만, 이동(Transfer)은 item.warehouse가 목적지임.
-               let itemWh = sourceWh;
-               if (doc.material_request_type === 'Material Issue') {
-                 itemWh = item.warehouse || sourceWh;
-               } else if (doc.material_request_type === 'Material Transfer') {
-                 itemWh = item.s_warehouse || item.from_warehouse || sourceWh;
-               }
-
-               if (!reservedMap[itemWh]) reservedMap[itemWh] = {};
-               reservedMap[itemWh][item.item_code] = (reservedMap[itemWh][item.item_code] || 0) + rem;
-            }
-         });
-      });
-
-      incompleteReservationCount.value = outboundResCount;
-      incompleteTransferReservationCount.value = transferResCount;
-      pendingReservedMap.value = reservedMap;
-    } else {
-      incompleteReservationCount.value = 0;
-      incompleteTransferReservationCount.value = 0;
-      pendingReservedMap.value = {};
-    }
-
+    await pollReservations()
     
+
     // 3. 단일 품목(Single)과 묶음 품목(Grid) 자동 분류 로직
     const fetchedItems = itemRes.data.data;
     const groupedByName = {};
@@ -1476,11 +1538,18 @@ const fetchFrappeItems = async () => {
   }
 }
 
+let pollInterval = null
+
 onMounted(() => {
   if (route.query.nav) {
     activeNav.value = route.query.nav
   }
   fetchFrappeItems()
+  pollInterval = setInterval(pollReservations, 10000) // 10초마다 뱃지 갱신
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
 })
 
 const setTransactionMode = (mode) => {
@@ -2082,7 +2151,7 @@ const submitToFrappe = async () => {
       
       
       custom_ordering_branch: transactionMode.value === 'outbound' ? (currentTab.value.selectedBranch || undefined) : undefined,
-      custom_orderer: currentTab.value.selectedResponder || currentTab.value.selectedCreator || undefined,
+      custom_orderer: currentTab.value.selectedResponder || undefined,
       custom_customer: transactionMode.value === 'outbound' ? currentTab.value.selectedCustomer || undefined : undefined,
       supplier: transactionMode.value === 'inbound' ? currentTab.value.selectedSupplier || undefined : undefined,
 
@@ -2193,35 +2262,33 @@ const submitToFrappe = async () => {
       // 🌟 잔여분 취소 자동화 UI (앱 퀄리티 업그레이드)
       if (currentTab.value.activeReservationId) {
         try {
-          // 방금 발행된 전표로 인해 예약이 완전히 종료(Completed)되었는지 상태 확인
-          const mrStatusRes = await frappeApi.get(`/api/resource/Material Request/${currentTab.value.activeReservationId}?fields=["status"]`);
-          const mrStatus = mrStatusRes.data.data.status;
+          // 약간의 지연을 주어 Frappe 백엔드가 상태를 업데이트할 시간을 줌
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          if (mrStatus !== 'Completed' && mrStatus !== 'Transferred' && mrStatus !== 'Issued' && mrStatus !== 'Received') {
-            if (confirm(t('pos.msg_res_close_cfm'))) {
-              try {
-                await frappeApi.post('/api/method/erpnext.stock.doctype.material_request.material_request.update_status', {
-                  status: 'Stopped',
-                  name: currentTab.value.activeReservationId
-                })
-                alert(t('pos.msg_success_stopped'));
-              } catch (e) {
-                console.warn('Stopped 메서드 호출 실패, set_value 로 백업 시도', e);
-                try {
-                  await frappeApi.post('/api/method/frappe.client.set_value', {
-                    doctype: 'Material Request',
-                    name: currentTab.value.activeReservationId,
-                    fieldname: 'status',
-                    value: 'Stopped'
-                  })
-                } catch (e2) {
-                  console.error('잔여분 종결 실패', e2)
-                }
-              }
+          // 방금 발행된 전표로 인해 예약이 완전히 종료(Completed)되었는지 상태 확인
+          const mrStatusRes = await frappeApi.get(`/api/resource/Material Request/${currentTab.value.activeReservationId}?fields=["status", "per_ordered", "per_received", "material_request_type"]`);
+          const mrData = mrStatusRes.data.data;
+          const mrStatus = mrData.status;
+          
+          // 실제 수량 진행률로 완전히 완료되었는지 교차 검증 (안전 장치)
+          let isFullyFulfilled = false;
+          if (mrStatus === 'Completed' || mrStatus === 'Transferred' || mrStatus === 'Issued' || mrStatus === 'Received') {
+            isFullyFulfilled = true;
+          } else {
+            // Frappe 상태 업데이트가 지연되었을 경우, 퍼센트로 판단
+            if (mrData.material_request_type === 'Material Transfer' || mrData.material_request_type === 'Material Issue') {
+               if (Number(mrData.per_ordered) >= 100) isFullyFulfilled = true;
+            } else if (mrData.material_request_type === 'Material Receipt') {
+               if (Number(mrData.per_received) >= 100) isFullyFulfilled = true;
             }
           }
-        } catch(e) {
-           console.error("MR 상태 조회 실패", e);
+          
+          if (!isFullyFulfilled) {
+             partialCloseReservationId.value = currentTab.value.activeReservationId;
+             isPartialCloseModalOpen.value = true;
+          }
+        } catch (e) {
+          console.error('잔여분 확인 에러', e)
         }
       }
       currentTab.value.cartItems = []; // 장바구니 비우기
@@ -2293,6 +2360,7 @@ const submitReservation = async () => {
     }
 
     const payload = {
+      docstatus: 1, // 생성과 동시에 Submit 처리
       material_request_type: reqType,
       schedule_date: dateStr,
       set_from_warehouse: payloadSetFromWh,
@@ -2301,7 +2369,7 @@ const submitReservation = async () => {
       custom_customer: currentTab.value.selectedCustomer || undefined,
       
       custom_ordering_branch: transactionMode.value === 'outbound' ? (currentTab.value.selectedBranch || undefined) : undefined,
-      custom_orderer: currentTab.value.selectedResponder || currentTab.value.selectedCreator || undefined,
+      custom_orderer: currentTab.value.selectedResponder || undefined,
       
       items: currentTab.value.cartItems.map(item => {
         const totalQty = (Number(item.input_box) * (item.custom_pack_qty || 1)) + Number(item.input_each);
@@ -2331,8 +2399,6 @@ const submitReservation = async () => {
     
     if (draftRes.data && draftRes.data.data) {
       const docName = draftRes.data.data.name;
-      // 3. 제출(Submit)하여 대기(Pending) 상태로 만듦
-      await frappeApi.put(`/api/resource/Material Request/${docName}`, { docstatus: 1 });
       
       alert(t('pos.msg_success_res', { docName: docName }));
       currentTab.value.cartItems = []; // 장바구니 비우기
@@ -2392,6 +2458,36 @@ const submitReservation = async () => {
 
 .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 100; list-style: none; padding: 0; }
 .search-dropdown li { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+.address-list li:hover {
+  background: #f1f5f9;
+}
+
+.partial-close-modal {
+  text-align: center;
+  max-width: 400px;
+}
+.partial-close-modal h3 {
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+.partial-close-modal p {
+  color: #475569;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+}
+.btn-danger:hover {
+  background-color: #dc2626;
+}
+
 .search-dropdown li:hover { background: #f8fafc; }
 .search-dropdown li .item-name { font-weight: bold; color: #1e293b; }
 .search-dropdown li .item-color { color: #64748b; font-size: 12px; }
