@@ -189,14 +189,14 @@
         <table class="pos-cart-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
-              <th rowspan="2" style="width: 45%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">품명(컬러)</th>
-              <th colspan="2" class="sub-th" style="background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">수량 입력</th>
+              <th rowspan="2" style="width: 40%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">품명(컬러)</th>
+              <th colspan="2" class="sub-th" style="width: 35%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">수량 입력</th>
               <th rowspan="2" style="width: 15%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">총 수량</th>
               <th rowspan="2" style="width: 10%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">삭제</th>
             </tr>
             <tr>
-              <th class="sub-th" style="background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Caja (박스)</th>
-              <th class="sub-th" style="background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Pza (낱장)</th>
+              <th class="sub-th" style="width: 35%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Caja (박스)</th>
+              <th class="sub-th" style="width: 65%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Pza (낱장)</th>
             </tr>
           </thead>
           <tbody v-if="currentTab">
@@ -213,8 +213,16 @@
               <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 68px;">
                 <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
-              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 68px;">
-                <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
+              <td class="input-green pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dcfce7 !important; width: 100px;">
+                <div style="display: flex; width: 100%; height: 100%;">
+                  <!-- 왼쪽 10단위 스피너 -->
+                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; background: #bbf7d0; border-right: 1px solid #86efac;">
+                    <button @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
+                    <button @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #86efac; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
+                  </div>
+                  <!-- 기존 1단위 (오른쪽 native 스피너) -->
+                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="flex: 1; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669; min-width: 0;" />
+                </div>
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
                 <strong style="color: #00a896; font-size: 14px;">{{ cartItem.totalQty }}</strong>
@@ -498,6 +506,16 @@ const updateTotalQty = (cartItem) => {
   }
   
   cartItem.totalQty = (cartItem.boxQty * cartItem.pack_qty) + cartItem.eachQty
+}
+
+const changeQtyBy10 = (cartItem, amount) => {
+  const newQty = (cartItem.eachQty || 0) + amount
+  if (newQty < 0) {
+    cartItem.eachQty = 0
+  } else {
+    cartItem.eachQty = newQty
+  }
+  updateTotalQty(cartItem)
 }
 
 // Inject Item from other views (BranchInventoryList)
