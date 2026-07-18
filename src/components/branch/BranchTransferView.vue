@@ -748,5 +748,15 @@ const submitTransfer = async () => {
 .text-teal { color: #00a896 !important; }
 .hotkey-sub-edit-btn { background: #f1f5f9; border: none; border-top: 1px solid #e2e8f0; padding: 4px 0; font-size: 10.5px; color: #64748b; cursor: pointer; text-align: center; }
 .hotkey-sub-edit-btn:hover:not(:disabled) { background: #e2e8f0; color: black; }
+
+/* Enlarge number input spin buttons */
+.input-green input[type="number"]::-webkit-inner-spin-button,
+.input-green input[type="number"]::-webkit-outer-spin-button {
+  width: 24px !important;
+  height: 40px !important;
+  opacity: 1 !important;
+  cursor: pointer;
+  margin-right: -2px;
+}
 .empty-slot { opacity: 0.5; }
 </style>
