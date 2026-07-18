@@ -662,17 +662,10 @@
         
         <div class="modal-footer" style="margin-top: 25px; display:flex; justify-content:flex-end; gap:10px;">
           <button style="padding:10px 16px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="isQuickAdjustModalOpen = false" :disabled="isAdjusting">{{ $t('pos.qa_btn_cancel') }}</button>
-     <!-- 배송지 선택 모달 -->
-    <div class="modal-overlay" v-if="isShippingAddressModalOpen">
-      <div class="modal-content">
-        <h3>{{ $t('pos.lbl_sel_addr') }}</h3>
-        <ul class="address-list">
-          <li v-for="addr in shippingAddressList" :key="addr.name" @click="selectShippingAddress(addr)">
-            <strong>{{ addr.name }}</strong><br/>
-            {{ addr.address_line1 }} {{ addr.city }}
-          </li>
-        </ul>
-        <button class="btn btn-secondary" @click="isShippingAddressModalOpen = false">{{ $t('common.cancel') }}</button>
+          <button style="padding:10px 20px; background:#00a896; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="submitQuickAdjust" :disabled="isAdjusting">
+            {{ isAdjusting ? $t('pos.qa_btn_adjusting') : $t('pos.qa_btn_submit') }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -686,12 +679,6 @@
         <div class="modal-actions" style="display:flex; gap:15px; justify-content:center;">
           <button class="btn btn-secondary" style="flex:1; padding:12px; font-size:1.1em; background-color:#10b981; color:white; border:none; border-radius:6px; cursor:pointer;" @click="cancelPartialClose">유지 (계속 대기)</button>
           <button class="btn btn-danger" style="flex:1; padding:12px; font-size:1.1em; background-color:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;" @click="confirmPartialClose">취소(삭제)</button>
-        </div>
-      </div>
-    </div>
-          <button style="padding:10px 20px; background:#00a896; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" @click="submitQuickAdjust" :disabled="isAdjusting">
-            {{ isAdjusting ? $t('pos.qa_btn_adjusting') : $t('pos.qa_btn_submit') }}
-          </button>
         </div>
       </div>
     </div>
@@ -1327,7 +1314,7 @@ const handleSalesPersonChange = () => {
 // Frappe API 호출 로직 (컴포넌트 로드 시 자동 실행)
 const pollReservations = async () => {
   try {
-    const [reqRes, reqDraftRes] = await Promise.all([
+    const [reqRes, reqDraftRes, binRes] = await Promise.all([
       frappeApi.get('/api/resource/Material Request', {
         params: {
           fields: JSON.stringify(['name']),
@@ -1339,6 +1326,12 @@ const pollReservations = async () => {
         params: {
           fields: JSON.stringify(['name']),
           filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
+          limit_page_length: 0
+        }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Bin', {
+        params: {
+          fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
           limit_page_length: 0
         }
       }).catch(() => ({ data: { data: [] } }))
@@ -1399,6 +1392,17 @@ const pollReservations = async () => {
       incompleteTransferReservationCount.value = 0;
       pendingReservedMap.value = {};
     }
+
+    // 🌟 10초마다 실제 가용재고(Bin)도 동기화하여 지점 화면 자동 갱신
+    if (binRes && binRes.data && binRes.data.data) {
+      const binMap = {};
+      binRes.data.data.forEach(b => {
+        if (!binMap[b.item_code]) binMap[b.item_code] = {};
+        binMap[b.item_code][b.warehouse] = b.actual_qty;
+      });
+      binDataMap.value = binMap;
+    }
+
   } catch (error) {
     console.error('Badge polling error:', error);
   }
