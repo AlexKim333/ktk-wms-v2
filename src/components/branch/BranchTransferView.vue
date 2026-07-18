@@ -186,23 +186,23 @@
         <div v-if="currentTab && currentTab.docName && !isClerk" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
           <button @click="rejectDraft(currentTab.docName)" style="background: white; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">🗑️ 일괄 취소 (반려)</button>
         </div>
-        <table class="pos-cart-table" style="width: 100%; border-collapse: collapse;">
+        <table class="pos-cart-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
           <thead>
             <tr>
-              <th rowspan="2" style="width: 40%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">품명(컬러)</th>
-              <th colspan="2" class="sub-th" style="width: 35%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">수량 입력</th>
+              <th rowspan="2" style="width: 50%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">품명(컬러)</th>
+              <th colspan="2" class="sub-th" style="width: 25%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">수량 입력</th>
               <th rowspan="2" style="width: 15%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">총 수량</th>
               <th rowspan="2" style="width: 10%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">삭제</th>
             </tr>
             <tr>
-              <th class="sub-th" style="width: 35%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Caja (박스)</th>
-              <th class="sub-th" style="width: 65%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Pza (낱장)</th>
+              <th class="sub-th" style="width: 40%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Caja(박스)</th>
+              <th class="sub-th" style="width: 60%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Pza(낱장)</th>
             </tr>
           </thead>
           <tbody v-if="currentTab">
             <tr v-for="(cartItem, idx) in currentTab.cartItems" :key="idx">
-              <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle;">
-                <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a;">
+              <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
+                <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
                   {{ cartItem.item_name }}
                   <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getStock(cartItem.item_code, '[MAIN] ALARCON - K') / (cartItem.pack_qty || 1)) }} 박스]</span>
                 </div>
@@ -210,24 +210,25 @@
                   {{ cartItem.custom_color || '-' }} | 1박스 = {{ cartItem.pack_qty }}개
                 </div>
               </td>
-              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 68px;">
-                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
+              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important;">
+                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="9999" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
-              <td class="input-green pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dcfce7 !important; width: 100px;">
+              <td class="input-green pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dcfce7 !important;">
                 <div style="display: flex; width: 100%; height: 100%;">
                   <!-- 왼쪽 10단위 스피너 -->
-                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; background: #bbf7d0; border-right: 1px solid #86efac;">
-                    <button @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
-                    <button @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #86efac; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
+                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; flex-shrink: 0; background: #bbf7d0; border-right: 1px solid #86efac;">
+                    <button type="button" @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
+                    <button type="button" @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #86efac; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
                   </div>
                   <!-- 기존 1단위 (오른쪽 native 스피너) -->
-                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="flex: 1; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669; min-width: 0;" />
+                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="99999" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669; min-width: 0;" />
                 </div>
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
-                <strong style="color: #00a896; font-size: 14px;">{{ cartItem.totalQty }}</strong>
+                <strong style="color: #00a896; font-size: 14px; word-break: break-all;">{{ cartItem.totalQty }}</strong>
               </td>
               <td class="action-cell" style="border: 1px solid #e2e8f0; padding: 4px !important; text-align: center; vertical-align: middle;">
+
                 <button @click="removeItem(idx)" :disabled="isClerk && currentTab.docName" class="btn-more-options" style="background: none; border: none; font-size: 18px; font-weight: bold; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 4px;">🗑️</button>
               </td>
             </tr>
