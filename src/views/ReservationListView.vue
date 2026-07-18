@@ -41,7 +41,7 @@
             <td class="customer-name">
               <div>{{ reservationType === 'Material Transfer' ? (res.set_from_warehouse || '-') : (res.custom_customer || res.customer || '-') }}</div>
               <div v-if="reservationType === 'Material Transfer'" style="font-size: 11px; color: #64748b; margin-top: 2px;">
-                {{ res.custom_branch_requester || res.custom_orderer || res.owner || '-' }}
+                {{ res.custom_orderer || res.owner || '-' }}
               </div>
             </td>
             <td>
@@ -202,7 +202,7 @@ const fetchReservations = async () => {
     const [resPending, resDraft] = await Promise.all([
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'custom_branch_requester', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
           filters: JSON.stringify([
             ['docstatus', '=', 1],
             ['material_request_type', '=', props.reservationType]
@@ -213,7 +213,7 @@ const fetchReservations = async () => {
       }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'custom_branch_requester', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
           filters: JSON.stringify([
             ['docstatus', '=', 0],
             ['material_request_type', '=', props.reservationType],

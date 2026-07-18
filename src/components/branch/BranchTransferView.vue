@@ -664,7 +664,7 @@ const submitTransfer = async () => {
       docstatus: 1, // 지점에서도 즉시 펜딩(Submit) 상태로 생성
       owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 드롭다운 반영
       custom_branch: authStore.user?.branch_name,
-      custom_branch_requester: currentTab.value.selectedRequester,
+      custom_orderer: currentTab.value.selectedRequester,
       custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
