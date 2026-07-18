@@ -133,20 +133,20 @@
     />
 
     <!-- Right Pane: Cart & Header -->
-    <div class="workspace-right" style="flex: 1.05; background: white; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="workspace-right" style="flex: 1.05; background: white; border-radius: 8px; border: 2px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden;">
 
       <!-- 탭 컨트롤 헤더 (일관성 유지 - VENTA와 동일한 스타일) -->
-      <div class="tabs-control-header" style="display: flex; justify-content: space-between; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; padding: 6px 10px 0 10px;">
-        <div class="tabs-list" style="display: flex; gap: 4px;">
-          <div v-for="(tab, idx) in tabs" :key="tab.id" class="tab-wrapper-item" :class="{ active: currentTabIndex === idx }" @click="currentTabIndex = idx" style="display: flex; align-items: center; gap: 6px; background: #e2e8f0; border: 1px solid #cbd5e1; border-bottom: none; padding: 8px 12px; border-radius: 6px 6px 0 0; font-size: 12.5px; font-weight: bold; cursor: pointer; color: #64748b;">
+      <div class="tabs-control-header" style="display: flex; justify-content: space-between; background: #e0f2fe; border-bottom: 2px solid #3b82f6; padding: 8px 10px 0 10px;">
+        <div class="tabs-list" style="display: flex; gap: 4px; align-items: flex-end;">
+          <div v-for="(tab, idx) in tabs" :key="tab.id" class="tab-wrapper-item" :class="{ active: currentTabIndex === idx }" @click="currentTabIndex = idx" style="display: flex; align-items: center; gap: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-bottom: none; padding: 10px 15px; border-radius: 8px 8px 0 0; font-size: 13.5px; font-weight: bold; cursor: pointer; color: #475569; transition: 0.2s;">
             <span class="tab-title-text">{{ tab.title }}</span>
-            <button v-if="tabs.length > 1" class="tab-close-x-btn" @click.stop="removeTab(idx)" style="background: none; border: none; font-size: 14px; font-weight: bold; color: #94a3b8; cursor: pointer; padding: 0 2px; line-height: 1;">×</button>
+            <button v-if="tabs.length > 1" class="tab-close-x-btn" @click.stop="removeTab(idx)" style="background: none; border: none; font-size: 16px; font-weight: bold; color: #94a3b8; cursor: pointer; padding: 0 2px; line-height: 1;">×</button>
           </div>
         </div>
-        <div class="tabs-header-actions" style="display: flex; align-items: center; gap: 10px; padding-bottom: 6px;">
-          <button v-if="!isClerk" class="add-tab-action-btn" @click="fetchPendingDrafts" style="background: none; border: none; color: #f59e0b; font-weight: bold; cursor: pointer; font-size: 13px; margin-right: 5px;">🔄 대기열 불러오기</button>
-          <span v-if="!isClerk && pendingDraftCount > 0" style="font-size: 11px; color: #64748b; font-weight: bold;">(표시: {{ tabs.filter(t => t.docName).length }} / 총 대기: {{ pendingDraftCount }})</span>
-          <button class="add-tab-action-btn" @click="addNewTab" style="background: none; border: none; color: #00a896; font-weight: bold; cursor: pointer; font-size: 13px;">＋ 탭추가</button>
+        <div class="tabs-header-actions" style="display: flex; align-items: center; gap: 10px; padding-bottom: 8px;">
+          <button v-if="!isClerk" class="add-tab-action-btn" @click="fetchPendingDrafts" style="background: none; border: none; color: #f59e0b; font-weight: bold; cursor: pointer; font-size: 13.5px; margin-right: 5px;">🔄 대기열 불러오기</button>
+          <span v-if="!isClerk && pendingDraftCount > 0" style="font-size: 11.5px; color: #64748b; font-weight: bold;">(표시: {{ tabs.filter(t => t.docName).length }} / 총 대기: {{ pendingDraftCount }})</span>
+          <button class="add-tab-action-btn" @click="addNewTab" style="background: none; border: none; color: #2563eb; font-weight: bold; cursor: pointer; font-size: 13.5px;">＋ 탭추가</button>
         </div>
       </div>
 
@@ -741,10 +741,12 @@ const submitTransfer = async () => {
 /* Custom Tab styling overrides for active state */
 .tab-wrapper-item.active {
   background: white !important;
-  color: #00a896 !important;
-  border-color: #cbd5e1 !important;
-  border-bottom-color: white !important;
-  margin-bottom: -1px;
+  color: #1e40af !important;
+  border: 2px solid #3b82f6 !important;
+  border-bottom: 2px solid white !important;
+  margin-bottom: -2px;
+  z-index: 10;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.02);
 }
 .tab-close-x-btn:hover { background: #ef4444; color: white !important; border-radius: 50%; }
 
