@@ -1836,7 +1836,7 @@ const loadReservationToCart = (res) => {
     
     currentTab.value.selectedCustomer = res.custom_customer || res.customer || ''
     currentTab.value.selectedBranch = res.custom_ordering_branch || (!isTransfer && res.material_request_type !== 'Material Issue' ? res.set_warehouse : '') || ''
-    currentTab.value.selectedResponder = res.custom_orderer || ''
+    currentTab.value.selectedResponder = res.custom_branch_requester || res.custom_orderer || ''
     currentTab.value.selectedSource = res.set_from_warehouse || (res.material_request_type === 'Material Issue' ? res.set_warehouse : '') || ''
     currentTab.value.reservationOriginalSource = currentTab.value.selectedSource
     currentTab.value.selectedTarget = isTransfer ? res.set_warehouse : ''
