@@ -40,7 +40,7 @@
             </td>
             <td @click="openDetail(res)">
               <div>{{ res.set_warehouse || '-' }}</div>
-              <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_branch_requester || res.owner || '-' }}</div>
+              <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_orderer || res.owner || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
               <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage) }}</span>
@@ -88,7 +88,7 @@
             </div>
             <div class="detail-card">
               <label>담당 지점장</label>
-              <div class="val">{{ selectedReservation.custom_branch_requester }}</div>
+              <div class="val">{{ selectedReservation.custom_orderer }}</div>
             </div>
           </div>
           
@@ -148,7 +148,7 @@ const fetchReservations = async () => {
   try {
     const res = await frappeApi.get('/api/resource/Material Request', {
       params: {
-        fields: JSON.stringify(['name', 'creation', 'schedule_date', 'set_warehouse', 'set_from_warehouse', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus', 'status', 'per_ordered', 'per_received']),
+        fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
         filters: JSON.stringify([
           ['docstatus', 'in', [0, 1]],
           ['material_request_type', '=', 'Material Transfer'],
