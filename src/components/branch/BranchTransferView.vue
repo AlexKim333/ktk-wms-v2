@@ -319,7 +319,7 @@ const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 const tabs = ref([{
   id: 1,
   title: '이동 1',
-  selectedRequester: authStore.user?.member_name || '',
+  selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
   selectedCreator: authStore.user?.member_name || '',
   docName: null,
   cartItems: []
@@ -333,7 +333,7 @@ const addNewTab = () => {
   tabs.value.push({
     id: nextTabId.value++,
     title: `이동 ${tabs.value.length + 1}`,
-    selectedRequester: authStore.user?.member_name || '',
+    selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
     selectedCreator: authStore.user?.member_name || '',
     docName: null,
     cartItems: []
@@ -356,7 +356,7 @@ const isQuickClerkModalOpen = ref(false)
 const handleClerkAdded = (newClerk) => {
   fetchBranchUsers().then(() => {
     if (currentTab.value) {
-      currentTab.value.selectedRequester = newClerk.email
+      currentTab.value.selectedRequester = newClerk.full_name || newClerk.name || newClerk.email
     }
   })
 }
