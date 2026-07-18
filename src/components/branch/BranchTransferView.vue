@@ -210,10 +210,10 @@
                   {{ cartItem.custom_color || '-' }} | 1박스 = {{ cartItem.pack_qty }}개
                 </div>
               </td>
-              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 60px;">
+              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 68px;">
                 <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
-              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 60px;">
+              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important; width: 68px;">
                 <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
@@ -750,13 +750,21 @@ const submitTransfer = async () => {
 .hotkey-sub-edit-btn:hover:not(:disabled) { background: #e2e8f0; color: black; }
 
 /* Enlarge number input spin buttons */
+.input-green {
+  height: 48px !important; /* Increase row height slightly to give arrows more room */
+}
+.input-green input[type="number"] {
+  height: 100% !important;
+  font-size: 16px !important;
+}
 .input-green input[type="number"]::-webkit-inner-spin-button,
 .input-green input[type="number"]::-webkit-outer-spin-button {
-  width: 24px !important;
-  height: 40px !important;
+  width: 20px !important;
+  height: 100% !important;
+  transform: scale(1.5);
+  transform-origin: center right;
   opacity: 1 !important;
   cursor: pointer;
-  margin-right: -2px;
 }
 .empty-slot { opacity: 0.5; }
 </style>
