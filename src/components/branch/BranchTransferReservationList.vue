@@ -22,37 +22,46 @@
         <thead>
           <tr>
             <th>예약 번호</th>
-            <th>생성 일자</th>
-            <th>작성자</th>
-            <th>출발 ➔ 도착 창고</th>
-            <th>결재 단계</th>
+            <th>날짜</th>
+            <th>소스 (출발 창고)</th>
+            <th>타겟 (도착 창고)</th>
+            <th>상태</th>
+            <th>총 수량</th>
+            <th>진행률</th>
             <th class="action-cell">작업</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row">
             <td class="res-id" @click="openDetail(res)">{{ res.name }}</td>
-            <td @click="openDetail(res)">{{ res.creation?.split(' ')[0] }}</td>
-            <td class="customer-name" @click="openDetail(res)">{{ res.owner }}</td>
-            <td @click="openDetail(res)">
-              <div style="font-weight: bold; color: #334155;">{{ res.set_from_warehouse }} ➔ {{ res.set_warehouse }}</div>
-              <div style="font-size: 11.5px; color: #0ea5e9; margin-top: 4px; font-weight: bold;">👤 요청자: {{ res.custom_branch_requester || '-' }}</div>
+            <td @click="openDetail(res)">{{ res.schedule_date || res.creation?.split(' ')[0] }}</td>
+            <td class="customer-name" @click="openDetail(res)">
+              <div>{{ res.set_from_warehouse || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
-              <span v-if="res.custom_approval_stage === '점원 요청'" class="status-badge status-pending">점원 요청</span>
-              <span v-else-if="res.custom_approval_stage === '지점장 승인'" class="status-badge status-completed">지점장 승인</span>
-              <span v-else class="status-badge status-cancelled">{{ res.custom_approval_stage || 'N/A' }}</span>
+              <div>{{ res.set_warehouse || res.custom_branch || '-' }}</div>
+              <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_branch_requester || res.owner || '-' }}</div>
+            </td>
+            <td @click="openDetail(res)">
+              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage) }}</span>
+            </td>
+            <td @click="openDetail(res)">{{ totalQtyMap[res.name] || 0 }} 개</td>
+            <td @click="openDetail(res)">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: getProgressPercent(res) + '%' }"></div>
+              </div>
+              <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td>
-              <button v-if="userRole === 'Manager' && res.custom_approval_stage === '점원 요청'" class="btn-approve" @click.stop="approveDraft(res)">
+              <button v-if="userRole === 'Manager' && res.custom_approval_stage === '점원 요청' && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
                 ✅ 승인
               </button>
-              <button class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
+              <button v-if="res.docstatus === 0" class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
               <button class="btn-delete" @click.stop="cancelReservation(res)" title="삭제" style="margin-left:5px;">🗑️</button>
             </td>
           </tr>
           <tr v-if="filteredReservations.length === 0">
-            <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
+            <td colspan="8" style="text-align: center; padding: 30px; color: #94a3b8;">
               진행 중인 예약 내역이 없습니다.
             </td>
           </tr>
@@ -133,12 +142,13 @@ const selectedReservationItems = ref([])
 
 const searchQuery = ref('')
 const statusFilter = ref('all')
+const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
   try {
     const res = await frappeApi.get('/api/resource/Material Request', {
       params: {
-        fields: JSON.stringify(['name', 'creation', 'set_warehouse', 'set_from_warehouse', 'custom_branch', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus']),
+        fields: JSON.stringify(['name', 'creation', 'schedule_date', 'set_warehouse', 'set_from_warehouse', 'custom_branch', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus', 'status', 'per_ordered', 'per_received']),
         filters: JSON.stringify([
           ['docstatus', 'in', [0, 1]],
           ['material_request_type', '=', 'Material Transfer'],
@@ -149,10 +159,56 @@ const fetchReservations = async () => {
       }
     })
     reservations.value = res.data.data || []
+    
+    // 예약 총 수량 계산
+    if (reservations.value.length > 0) {
+      const detailPromises = reservations.value.map(r => 
+        frappeApi.get(`/api/resource/Material Request/${r.name}`)
+      )
+      const detailResArray = await Promise.all(detailPromises)
+      
+      const qtyMap = {}
+      detailResArray.forEach(resp => {
+        const doc = resp.data.data
+        if (doc && doc.items) {
+          const total = doc.items.reduce((sum, item) => sum + (item.qty || 0), 0)
+          qtyMap[doc.name] = total
+        }
+      })
+      totalQtyMap.value = qtyMap
+    } else {
+      totalQtyMap.value = {}
+    }
+
     applyFilters()
   } catch (error) {
     console.error('Fetch reservations error:', error)
   }
+}
+
+const translateStatus = (status, docstatus, approval_stage) => {
+  if (docstatus === 0) {
+    if (approval_stage) return `Draft(${approval_stage})`
+    return 'Draft'
+  }
+  if (docstatus === 2) return '취소됨'
+  if (status === 'Pending' || status === 'Draft') return '대기 중'
+  if (status === 'Partially Ordered') return '부분 주문됨'
+  if (status === 'Ordered') return '주문 완료'
+  return status || '알 수 없음'
+}
+
+const getStatusClass = (res) => {
+  if (res.docstatus === 0) return 'status-default'
+  if (res.status === 'Pending' || (res.docstatus === 1 && res.status === 'Draft')) return 'status-pending'
+  if (res.status?.includes('Partial')) return 'status-partial'
+  if (res.status === 'Completed' || res.status === 'Issued' || res.status === 'Transferred' || res.status === 'Received') return 'status-completed'
+  if (res.status === 'Cancelled') return 'status-cancelled'
+  return 'status-default'
+}
+
+const getProgressPercent = (res) => {
+  return Math.round(res.per_ordered || res.per_received || 0)
 }
 
 const applyFilters = () => {
@@ -238,9 +294,15 @@ onMounted(() => {
 
 .res-id { color: #3b82f6; font-weight: bold; text-decoration: underline; }
 .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+.status-default { background: #f1f5f9; color: #475569; }
 .status-pending { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
+.status-partial { background: #fed7aa; color: #9a3412; border: 1px solid #fdba74; }
 .status-completed { background: #bbf7d0; color: #166534; border: 1px solid #86efac; }
 .status-cancelled { background: #e2e8f0; color: #475569; }
+
+.progress-bar { width: 100%; background-color: #e2e8f0; border-radius: 4px; height: 6px; margin-bottom: 4px; overflow: hidden; }
+.progress-fill { background-color: #3b82f6; height: 100%; border-radius: 4px; transition: width 0.3s; }
+.progress-text { font-size: 11px; font-weight: bold; color: #64748b; }
 
 .btn-approve { background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
 .btn-edit { background: none; border: none; font-size: 16px; cursor: pointer; opacity: 0.7; }
