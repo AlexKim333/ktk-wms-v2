@@ -210,22 +210,22 @@
                   {{ cartItem.custom_color || '-' }} | 1박스 = {{ cartItem.pack_qty }}개
                 </div>
               </td>
-              <td class="input-green" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dcfce7 !important;">
-                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="9999" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669;" />
+              <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dbeafe !important;">
+                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="9999" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb;" />
               </td>
-              <td class="input-green pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dcfce7 !important;">
+              <td class="input-blue pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
                 <div style="display: flex; width: 100%; height: 100%;">
                   <!-- 왼쪽 10단위 스피너 -->
-                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; flex-shrink: 0; background: #bbf7d0; border-right: 1px solid #86efac;">
-                    <button type="button" @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
-                    <button type="button" @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #86efac; background: transparent; cursor: pointer; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
+                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; flex-shrink: 0; background: #bfdbfe; border-right: 1px solid #93c5fd;">
+                    <button type="button" @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
+                    <button type="button" @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #93c5fd; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
                   </div>
                   <!-- 기존 1단위 (오른쪽 native 스피너) -->
-                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="99999" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #059669; min-width: 0;" />
+                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="99999" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb; min-width: 0;" />
                 </div>
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
-                <strong style="color: #00a896; font-size: 14px; word-break: break-all;">{{ cartItem.totalQty }}</strong>
+                <strong style="color: #3b82f6; font-size: 14px; word-break: break-all;">{{ cartItem.totalQty }}</strong>
               </td>
               <td class="action-cell" style="border: 1px solid #e2e8f0; padding: 4px !important; text-align: center; vertical-align: middle;">
 
@@ -243,10 +243,10 @@
       <div class="right-footer-action-zone" style="border-top: 2px solid #e2e8f0; padding: 15px; background: #f8fafc; display: flex; flex-direction: column; gap: 12px;" v-if="currentTab">
         <div class="truck-counter-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="summary-label-box" style="background: white; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #334155; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            📦 박스 총 갯수: <strong style="font-size: 16px; color: #00a896; margin-left: 4px;">{{ totalBoxCount }} 상자</strong>
+            📦 박스 총 갯수: <strong style="font-size: 16px; color: #3b82f6; margin-left: 4px;">{{ totalBoxCount }} 상자</strong>
           </div>
           <div class="summary-label-box" style="background: white; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #334155; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            🔢 낱장 총 갯수: <strong style="font-size: 16px; color: #00a896; margin-left: 4px;">{{ totalEachCount }} 개</strong>
+            🔢 낱장 총 갯수: <strong style="font-size: 16px; color: #3b82f6; margin-left: 4px;">{{ totalEachCount }} 개</strong>
           </div>
         </div>
         
@@ -769,15 +769,15 @@ const submitTransfer = async () => {
 .hotkey-sub-edit-btn:hover:not(:disabled) { background: #e2e8f0; color: black; }
 
 /* Enlarge number input spin buttons */
-.input-green {
+.input-blue {
   height: 48px !important; /* Increase row height slightly to give arrows more room */
 }
-.input-green input[type="number"] {
+.input-blue input[type="number"] {
   height: 100% !important;
   font-size: 18px !important; /* Make number bigger */
 }
-.input-green input[type="number"]::-webkit-inner-spin-button,
-.input-green input[type="number"]::-webkit-outer-spin-button {
+.input-blue input[type="number"]::-webkit-inner-spin-button,
+.input-blue input[type="number"]::-webkit-outer-spin-button {
   width: 20px !important;
   height: 30px !important; /* Fixed height is required for pseudo-elements */
   transform: scale(1.5);
