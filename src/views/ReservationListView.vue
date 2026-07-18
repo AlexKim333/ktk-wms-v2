@@ -117,7 +117,12 @@
             </thead>
             <tbody>
               <tr v-for="item in selectedReservationItems" :key="item.name">
-                <td style="text-align: left; font-weight: bold;">{{ item.item_name || item.item_code }}</td>
+                <td style="text-align: left;">
+                  <div style="font-weight: bold;">{{ item.item_name || item.item_code }}</div>
+                  <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
+                    {{ getCustomColor(item.item_code) }} | 1박스 = {{ getPackQty(item.item_code) }}개
+                  </div>
+                </td>
                 <td>{{ item.qty }}</td>
                 <td style="color: #0ea5e9; font-weight: bold;">{{ Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
                 <td style="color: #ef4444; font-weight: bold;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
@@ -146,6 +151,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  rawItems: {
+    type: Array,
+    default: () => []
+  },
   reservationType: {
     type: String,
     default: 'Material Issue'
@@ -163,6 +172,17 @@ const frappeApi = axios.create({
   },
   withCredentials: true
 })
+
+const getCustomColor = (itemCode) => {
+  const item = props.rawItems.find(i => i.name === itemCode)
+  return item ? (item.custom_color || '-') : '-'
+}
+
+const getPackQty = (itemCode) => {
+  const item = props.rawItems.find(i => i.name === itemCode)
+  return item ? (item.custom_pack_qty || 1) : 1
+}
+
 
 const reservations = ref([])
 const searchQuery = ref('')

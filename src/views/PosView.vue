@@ -92,8 +92,8 @@
 
     <main class="main-content-zone">
       <!-- 🌟 신규 추가된 컴포넌트들 -->
-      <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
-      <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
+      <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
+      <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
       <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav('product-list')" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
