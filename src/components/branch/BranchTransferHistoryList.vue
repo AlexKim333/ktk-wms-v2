@@ -109,20 +109,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import frappeApi from '../../api/frappe.js'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 const emit = defineEmits(['create-new'])
-
-const frappeApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-})
 
 const historys = ref([])
 const searchQuery = ref('')
@@ -156,6 +147,7 @@ const fetchHistory = async () => {
     historys.value = res.data.data || []
   } catch (error) {
     console.error('재고 이동 이력을 불러오는 중 오류 발생:', error)
+    alert('재고 이동 이력을 불러오지 못했습니다. 네트워크/권한을 확인하세요.')
   }
 }
 

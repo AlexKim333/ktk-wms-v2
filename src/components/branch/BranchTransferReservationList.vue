@@ -118,18 +118,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, computed, onMounted, watch } from 'vue'
+import frappeApi from '../../api/frappe.js'
 import { useAuthStore } from '../../stores/auth.js'
-
-const frappeApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-})
 
 const authStore = useAuthStore()
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
@@ -145,14 +136,24 @@ const statusFilter = ref('incomplete')
 const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
+  const branch = authStore.user?.branch_name
+  if (!branch) {
+    console.warn('BranchTransferReservationList: branch_name 없음 — 로그인 지점 정보 확인 필요')
+    reservations.value = []
+    applyFilters()
+    return
+  }
+
   try {
+    // 관리자 ReservationListView 와 동일: Vite 프록시 상대경로 `/api` + 세션 쿠키
+    // (과거 localhost:8000 직접 호출은 쿠키/CORS로 실패 → 빈 목록)
     const res = await frappeApi.get('/api/resource/Material Request', {
       params: {
         fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
         filters: JSON.stringify([
           ['docstatus', 'in', [0, 1]],
           ['material_request_type', '=', 'Material Transfer'],
-          ['set_warehouse', '=', authStore.user?.branch_name]
+          ['set_warehouse', '=', branch] // 도착 창고 = 로그인한 지점
         ]),
         limit_page_length: 500,
         order_by: 'creation desc'
@@ -183,6 +184,7 @@ const fetchReservations = async () => {
     applyFilters()
   } catch (error) {
     console.error('Fetch reservations error:', error)
+    alert('예약 목록을 불러오지 못했습니다. 네트워크/권한을 확인하세요.')
   }
 }
 
@@ -272,6 +274,8 @@ const cancelReservation = async (res) => {
     alert('삭제 중 오류가 발생했습니다.')
   }
 }
+
+watch([statusFilter, searchQuery], () => applyFilters())
 
 onMounted(() => {
   fetchReservations()
