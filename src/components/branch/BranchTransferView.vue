@@ -755,12 +755,12 @@ const submitTransfer = async () => {
 }
 .input-green input[type="number"] {
   height: 100% !important;
-  font-size: 16px !important;
+  font-size: 18px !important; /* Make number bigger */
 }
 .input-green input[type="number"]::-webkit-inner-spin-button,
 .input-green input[type="number"]::-webkit-outer-spin-button {
   width: 20px !important;
-  height: 100% !important;
+  height: 30px !important; /* Fixed height is required for pseudo-elements */
   transform: scale(1.5);
   transform-origin: center right;
   opacity: 1 !important;
