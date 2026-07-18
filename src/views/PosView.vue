@@ -1395,12 +1395,7 @@ const pollReservations = async () => {
 
     // 🌟 10초마다 실제 가용재고(Bin)도 동기화하여 지점 화면 자동 갱신
     if (binRes && binRes.data && binRes.data.data) {
-      const binMap = {};
-      binRes.data.data.forEach(b => {
-        if (!binMap[b.item_code]) binMap[b.item_code] = {};
-        binMap[b.item_code][b.warehouse] = b.actual_qty;
-      });
-      binDataMap.value = binMap;
+      binData.value = binRes.data.data || [];
     }
 
   } catch (error) {
