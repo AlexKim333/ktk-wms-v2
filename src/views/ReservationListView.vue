@@ -40,13 +40,10 @@
             <td>{{ res.schedule_date }}</td>
             <td class="customer-name">
               <div>{{ reservationType === 'Material Transfer' ? (res.set_from_warehouse || '-') : (res.custom_customer || res.customer || '-') }}</div>
-              <div v-if="reservationType === 'Material Transfer'" style="font-size: 11px; color: #64748b; margin-top: 2px;">
-                {{ res.custom_orderer || res.owner || '-' }}
-              </div>
             </td>
             <td>
               <div>{{ reservationType === 'Material Transfer' ? (res.set_warehouse || '-') : (res.custom_ordering_branch || res.set_warehouse || '-') }}</div>
-              <div v-if="reservationType !== 'Material Transfer'" style="font-size: 11px; color: #64748b;">
+              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
                 {{ res.custom_orderer || res.owner || '-' }}
               </div>
             </td>
