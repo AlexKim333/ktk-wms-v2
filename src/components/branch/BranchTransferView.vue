@@ -168,7 +168,7 @@
             </div>
             <select v-if="currentTab" v-model="currentTab.selectedRequester" class="form-select" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; background: white;">
               <option value="">-- 점원 선택 --</option>
-              <option v-for="user in branchUsers" :key="user.email" :value="user.name">{{ user.full_name }}</option>
+              <option v-for="user in branchUsers" :key="user.email" :value="user.full_name">{{ user.full_name }}</option>
             </select>
           </div>
           <div class="field-group">
@@ -554,9 +554,9 @@ const fetchPendingDrafts = async () => {
           
           tabs.value.push({
             id: nextTabId.value++,
-            title: doc.custom_branch_requester || '알 수 없는 점원',
+            title: doc.custom_orderer || '알 수 없는 점원',
             docName: doc.name,
-            selectedRequester: doc.custom_branch_requester || '',
+            selectedRequester: doc.custom_orderer || '',
             selectedCreator: doc.owner || '',
             cartItems: doc.items.map(i => {
               const rawItem = props.rawItems.find(r => r.name === i.item_code) || {}
