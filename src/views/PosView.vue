@@ -1841,6 +1841,7 @@ const loadReservationToCart = (res) => {
       salesPersonList.value.push({ name: responder, sales_person_name: responder })
     }
     currentTab.value.selectedResponder = responder
+    currentTab.value.selectedRequester = res.custom_branch_requester || ''
     currentTab.value.selectedSource = res.set_from_warehouse || (res.material_request_type === 'Material Issue' ? res.set_warehouse : '') || ''
     currentTab.value.reservationOriginalSource = currentTab.value.selectedSource
     currentTab.value.selectedTarget = isTransfer ? res.set_warehouse : ''

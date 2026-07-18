@@ -23,7 +23,7 @@
           <tr>
             <th>예약 번호</th>
             <th>생성 일자</th>
-            <th>작성자 / 요청자</th>
+            <th>작성자</th>
             <th>출발 ➔ 도착 창고</th>
             <th>결재 단계</th>
             <th class="action-cell">작업</th>
@@ -33,9 +33,10 @@
           <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row">
             <td class="res-id" @click="openDetail(res)">{{ res.name }}</td>
             <td @click="openDetail(res)">{{ res.creation?.split(' ')[0] }}</td>
-            <td class="customer-name" @click="openDetail(res)">{{ res.owner }} <br/> <span style="font-size:11px;color:#94a3b8">{{ res.custom_branch_requester }}</span></td>
+            <td class="customer-name" @click="openDetail(res)">{{ res.owner }}</td>
             <td @click="openDetail(res)">
-              {{ res.set_from_warehouse }} ➔ {{ res.set_warehouse }}
+              <div style="font-weight: bold; color: #334155;">{{ res.set_from_warehouse }} ➔ {{ res.set_warehouse }}</div>
+              <div style="font-size: 11.5px; color: #0ea5e9; margin-top: 4px; font-weight: bold;">👤 요청자: {{ res.custom_branch_requester || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
               <span v-if="res.custom_approval_stage === '점원 요청'" class="status-badge status-pending">점원 요청</span>
