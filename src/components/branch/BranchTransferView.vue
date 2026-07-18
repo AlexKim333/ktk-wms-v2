@@ -435,8 +435,18 @@ const fetchBranchUsers = async () => {
   }
 }
 
-onMounted(() => {
-  fetchBranchUsers()
+onMounted(async () => {
+  await fetchBranchUsers()
+  
+  // Fetch 이후 실제 사용자 이름을 찾아 기본값(이메일)을 이름으로 덮어씌움
+  const defaultUser = branchUsers.value.find(u => u.email === authStore.user?.member_name || u.name === authStore.user?.member_name)
+  if (defaultUser && defaultUser.full_name) {
+    tabs.value.forEach(tab => {
+      if (tab.selectedRequester === authStore.user?.member_name) {
+        tab.selectedRequester = defaultUser.full_name
+      }
+    })
+  }
 })
 
 // Cart Logic
