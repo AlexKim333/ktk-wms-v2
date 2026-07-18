@@ -8,9 +8,9 @@
     <div class="filters">
       <input type="text" v-model="searchQuery" placeholder="검색 (예약번호 등)" class="filter-input" />
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 단계</option>
-        <option value="점원 요청">점원 요청 (1차)</option>
-        <option value="지점장 승인">지점장 승인 (2차)</option>
+        <option value="all">모든 상태 (All)</option>
+        <option value="incomplete">진행 중 (Incomplete)</option>
+        <option value="completed">완료 (Completed)</option>
       </select>
       <button class="btn-refresh" @click="fetchReservations" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
         🔄 새로고침
@@ -39,7 +39,7 @@
               <div>{{ res.set_from_warehouse || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
-              <div>{{ res.set_warehouse || res.custom_branch || '-' }}</div>
+              <div>{{ res.set_warehouse || '-' }}</div>
               <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_branch_requester || res.owner || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
@@ -141,18 +141,18 @@ const selectedReservation = ref(null)
 const selectedReservationItems = ref([])
 
 const searchQuery = ref('')
-const statusFilter = ref('all')
+const statusFilter = ref('incomplete')
 const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
   try {
     const res = await frappeApi.get('/api/resource/Material Request', {
       params: {
-        fields: JSON.stringify(['name', 'creation', 'schedule_date', 'set_warehouse', 'set_from_warehouse', 'custom_branch', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus', 'status', 'per_ordered', 'per_received']),
+        fields: JSON.stringify(['name', 'creation', 'schedule_date', 'set_warehouse', 'set_from_warehouse', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus', 'status', 'per_ordered', 'per_received']),
         filters: JSON.stringify([
           ['docstatus', 'in', [0, 1]],
           ['material_request_type', '=', 'Material Transfer'],
-          ['custom_branch', '=', authStore.user?.branch_name]
+          ['set_warehouse', '=', authStore.user?.branch_name]
         ]),
         limit_page_length: 500,
         order_by: 'creation desc'
@@ -215,7 +215,11 @@ const applyFilters = () => {
   let result = reservations.value
   
   if (statusFilter.value !== 'all') {
-    result = result.filter(r => r.custom_approval_stage === statusFilter.value)
+    if (statusFilter.value === 'incomplete') {
+      result = result.filter(res => res.docstatus === 0 || res.status === 'Draft' || res.status === 'Pending' || res.status === 'Partially Ordered' || res.status === 'Partially Issued' || res.status === 'Partially Received' || res.status === 'Partial')
+    } else if (statusFilter.value === 'completed') {
+      result = result.filter(res => res.status === 'Completed' || res.status === 'Transferred' || res.status === 'Issued' || res.status === 'Received')
+    }
   }
   
   if (searchQuery.value) {
