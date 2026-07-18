@@ -140,7 +140,7 @@ const fetchReservations = async () => {
       params: {
         fields: JSON.stringify(['name', 'creation', 'set_warehouse', 'set_from_warehouse', 'custom_branch', 'custom_branch_requester', 'custom_approval_stage', 'owner', 'docstatus']),
         filters: JSON.stringify([
-          ['docstatus', '=', 0],
+          ['docstatus', 'in', [0, 1]],
           ['material_request_type', '=', 'Material Transfer'],
           ['custom_branch', '=', authStore.user?.branch_name]
         ]),
