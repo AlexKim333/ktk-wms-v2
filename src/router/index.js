@@ -5,11 +5,21 @@ import PosView from '../views/PosView.vue'
 import SetupView from '../views/SetupView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 
+const isMobile = () => window.innerWidth <= 768
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/login', name: 'login', component: LoginView },
-    { path: '/pos', name: 'pos', component: PosView },
+    { 
+      path: '/login', 
+      name: 'login', 
+      component: () => isMobile() ? import('../views/mobile/MobileLoginView.vue') : import('../views/LoginView.vue') 
+    },
+    { 
+      path: '/pos', 
+      name: 'pos', 
+      component: () => import('../views/PosView.vue') 
+    },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/product/:id', name: 'product-detail', component: ProductDetailView },
     { path: '/', redirect: '/login' }

@@ -1,5 +1,13 @@
 <template>
-  <div class="pos-app-layout">
+  <MobilePosLayout 
+    v-if="isMobile" 
+    :raw-items="rawSingleItems"
+    :bin-data="binDataMap"
+    :pending-reserved="pendingReservedMap"
+    :branch-list="branchList"
+    @refresh-items="fetchFrappeItems"
+  />
+  <div v-else class="pos-app-layout">
     <aside class="sidebar-nav">
       <div class="nav-logo">🏆 WMS PRO</div>
       <div v-if="authStore.user" class="nav-user-info">
@@ -746,6 +754,7 @@ import ProductDetailView from './ProductDetailView.vue'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const { isMobile } = useMobile()
 const isAdmin = computed(() => authStore.isAdmin)
 const { t } = useI18n();
 
