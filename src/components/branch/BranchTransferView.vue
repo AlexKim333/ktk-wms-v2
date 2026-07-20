@@ -81,13 +81,22 @@
               <h3>⚡ Quick Pick (단일 베스트)</h3>
             </div>
             <div class="grid-3x4">
-              <div class="hotkey-card" v-for="i in 8" :key="i">
-                <button class="hotkey-btn-core" disabled>
-                  <div class="line-1">AD2015</div>
-                  <div class="line-2">(SURTIDO - 100入)</div>
-                  <div class="line-2 text-teal" style="font-weight: bold; margin-top: 4px;">📦 7 상자 / 10 개</div>
-                </button>
-                <button class="hotkey-sub-edit-btn" disabled>⚙ edit</button>
+              <div v-for="(slot, idx) in 8" :key="'slot-'+idx" class="hotkey-card">
+                <template v-if="quickPickSlots[idx]">
+                  <button class="hotkey-btn-core" @click="addSingleHotkeyToCart(quickPickSlots[idx])">
+                    <div class="line-1">{{ quickPickSlots[idx].item_name }}</div>
+                    <div class="line-2">({{ quickPickSlots[idx].custom_color || '기본' }} · {{ quickPickSlots[idx].custom_pack_qty || 1 }}入)</div>
+                    <div class="line-3 stock-info">{{ getFormattedStockFor(quickPickSlots[idx]) }}</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙ edit</button>
+                </template>
+                <template v-else>
+                  <button class="hotkey-btn-core empty-slot" @click="openSlotEdit(idx)">
+                    <span class="empty-icon">➕</span>
+                    <div class="line-2">상품 지정</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙ edit</button>
+                </template>
               </div>
             </div>
           </div>
@@ -97,31 +106,76 @@
               <h3 style="color: #00a896;">🌐 Grid Quick Pick (묶음 품목)</h3>
             </div>
             <div class="grid-3x4">
-              <div class="hotkey-card" v-for="i in 8" :key="'grid-'+i">
-                <button class="hotkey-btn-core empty-slot" disabled>
-                  <div class="line-1" style="font-size: 18px; color: #8b5cf6;">+</div>
-                  <div class="line-2" style="font-size: 11px;">상품 지정</div>
-                </button>
-                <button class="hotkey-sub-edit-btn" disabled>⚙ edit</button>
+              <div v-for="(slot, idx) in 8" :key="'g-slot-'+idx" class="hotkey-card">
+                <template v-if="gridPickSlots[idx]">
+                  <button class="hotkey-btn-core grid-style" @click="openGridModal(gridPickSlots[idx])">
+                    <div class="line-1">{{ gridPickSlots[idx].group_name }}</div>
+                    <div class="line-2 text-teal">({{ gridPickSlots[idx].variants.length }} Colors)</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙ edit</button>
+                </template>
+                <template v-else>
+                  <button class="hotkey-btn-core empty-slot" @click="openGridSlotEdit(idx)">
+                    <span class="empty-icon">➕</span>
+                    <div class="line-2">상품 지정</div>
+                  </button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙ edit</button>
+                </template>
               </div>
             </div>
           </div>
 
-          <div class="hotkey-block">
-            <div class="block-header">
-              <h3 style="color: #f59e0b;">🤝 Customer Quick Pick (주요 지점)</h3>
-            </div>
-            <div class="grid-3x4">
-              <div class="hotkey-card" v-for="i in 4" :key="'cust-'+i">
-                <button class="hotkey-btn-core empty-slot" disabled>
-                  <div class="line-1" style="font-size: 18px; color: #f59e0b;">+</div>
-                  <div class="line-2" style="font-size: 11px;">지점 지정</div>
-                </button>
-                <button class="hotkey-sub-edit-btn" disabled>⚙ edit</button>
-              </div>
-            </div>
-          </div>
+        </div>
+      </div>
+    </div>
 
+    <!-- 단일 버튼 상품 지정 모달 -->
+    <div class="modal-overlay" v-if="isSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">단일 상품 지정 (슬롯 {{ editSlotIndex + 1 }})</h3>
+          <button class="close-text-btn" @click="isSlotEditModalOpen = false" style="margin:0; background:none; border:none; color:#64748b; cursor:pointer;">✕</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px; padding: 0 15px;">
+          <input type="text" v-model="slotSearchQuery" placeholder="상품명 검색..." class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </div>
+        <div class="slot-item-list" style="padding: 15px; overflow-y: auto; max-height: 400px;">
+          <div v-for="item in filteredSlotItems" :key="item.name" 
+               class="slot-list-item" 
+               @click="assignSlotItem(item)"
+               style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #e2e8f0; cursor:pointer;">
+            <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || '기본' }})</div>
+            <div class="item-stock">{{ getStock(item.name, authStore.user?.branch_name) }} 개</div>
+          </div>
+          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색된 상품이 없습니다.</div>
+        </div>
+        <div style="padding: 15px;">
+          <button class="btn-clear-slot" @click="clearSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">슬롯 비우기 (삭제)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 그리드 묶음 상품 지정 모달 -->
+    <div class="modal-overlay" v-if="isGridSlotEditModalOpen">
+      <div class="modal-content slot-edit-modal">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">묶음 상품 지정 (슬롯 {{ editGridSlotIndex + 1 }})</h3>
+          <button class="close-text-btn" @click="isGridSlotEditModalOpen = false" style="margin:0; background:none; border:none; color:#64748b; cursor:pointer;">✕</button>
+        </div>
+        <div class="search-section" style="margin-top: 15px; padding: 0 15px;">
+          <input type="text" v-model="gridSlotSearchQuery" placeholder="묶음명(아이템명) 검색..." class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </div>
+        <div class="slot-item-list" style="padding: 15px; overflow-y: auto; max-height: 400px;">
+          <div v-for="group in filteredGridSlotItems" :key="group.id" 
+               class="slot-list-item" 
+               @click="assignGridSlotItem(group)"
+               style="padding:10px; border-bottom:1px solid #e2e8f0; cursor:pointer;">
+            <div class="item-desc"><strong>{{ group.group_name }}</strong> ({{ group.variants.length }} color)</div>
+          </div>
+          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색된 묶음이 없습니다.</div>
+        </div>
+        <div style="padding: 15px;">
+          <button class="btn-clear-slot" @click="clearGridSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">슬롯 비우기 (삭제)</button>
         </div>
       </div>
     </div>
@@ -365,6 +419,132 @@ const handleClerkAdded = (newClerk) => {
   })
 }
 
+// --- Quick Pick Logic ---
+const userKey = authStore.user?.email || 'guest'
+const singleStorageKey = `wms_quick_pick_slots_${userKey}`
+const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
+
+const quickPickSlotNames = ref(JSON.parse(localStorage.getItem(singleStorageKey)) || new Array(8).fill(null))
+const gridPickSlotNames = ref(JSON.parse(localStorage.getItem(gridStorageKey)) || new Array(8).fill(null))
+
+const quickPickSlots = computed(() => {
+  return quickPickSlotNames.value.map(name => {
+    if (!name) return null;
+    return props.rawItems.find(i => i.name === name) || null;
+  })
+})
+
+const gridHotkeys = computed(() => {
+  const groupedByName = {};
+  props.rawItems.forEach(item => {
+    const groupId = item.custom_grid_group_id || item.item_name || '미분류';
+    if (!groupedByName[groupId]) {
+      groupedByName[groupId] = {
+        id: groupId,
+        group_name: item.item_name || '미분류',
+        variants: [],
+        is_explicit_grid: false
+      };
+    }
+    if (item.custom_is_grid_item === 1) {
+      groupedByName[groupId].is_explicit_grid = true;
+    }
+    groupedByName[groupId].variants.push({ ...item, input_box: 0, input_each: 0 });
+  });
+
+  const newGrids = [];
+  Object.values(groupedByName).forEach(group => {
+    if (group.is_explicit_grid || group.variants.length > 1) {
+      newGrids.push(group);
+    }
+  });
+  return newGrids;
+})
+
+const gridPickSlots = computed(() => {
+  return gridPickSlotNames.value.map(id => {
+    if (!id) return null;
+    return gridHotkeys.value.find(g => g.id === id) || null;
+  })
+})
+
+// Single Pick Modal Logic
+const isSlotEditModalOpen = ref(false)
+const editSlotIndex = ref(-1)
+const slotSearchQuery = ref('')
+
+const filteredSlotItems = computed(() => {
+  if (!slotSearchQuery.value.trim()) return []
+  const q = slotSearchQuery.value.trim()
+  const hits = searchItemsOrAll(q, { limit: 100 })
+  return rankItemNameMatches(hits, q)
+})
+
+const openSlotEdit = (idx) => {
+  editSlotIndex.value = idx
+  slotSearchQuery.value = ''
+  isSlotEditModalOpen.value = true
+}
+
+const assignSlotItem = (item) => {
+  const newArr = [...quickPickSlotNames.value]
+  newArr[editSlotIndex.value] = item.name
+  quickPickSlotNames.value = newArr
+  localStorage.setItem(singleStorageKey, JSON.stringify(newArr))
+  isSlotEditModalOpen.value = false
+}
+
+const clearSlot = () => {
+  const newArr = [...quickPickSlotNames.value]
+  newArr[editSlotIndex.value] = null
+  quickPickSlotNames.value = newArr
+  localStorage.setItem(singleStorageKey, JSON.stringify(newArr))
+  isSlotEditModalOpen.value = false
+}
+
+const addSingleHotkeyToCart = (item) => {
+  if (!item) return;
+  addToCart(item);
+}
+
+// Grid Pick Modal Logic
+const isGridSlotEditModalOpen = ref(false)
+const editGridSlotIndex = ref(-1)
+const gridSlotSearchQuery = ref('')
+
+const filteredGridSlotItems = computed(() => {
+  if (!gridSlotSearchQuery.value.trim()) return gridHotkeys.value.slice(0, 50)
+  const q = gridSlotSearchQuery.value.toLowerCase()
+  return gridHotkeys.value.filter(g => g.group_name?.toLowerCase().includes(q) || g.id?.toLowerCase().includes(q))
+})
+
+const openGridSlotEdit = (idx) => {
+  editGridSlotIndex.value = idx
+  gridSlotSearchQuery.value = ''
+  isGridSlotEditModalOpen.value = true
+}
+
+const assignGridSlotItem = (group) => {
+  const newArr = [...gridPickSlotNames.value]
+  newArr[editGridSlotIndex.value] = group.id
+  gridPickSlotNames.value = newArr
+  localStorage.setItem(gridStorageKey, JSON.stringify(newArr))
+  isGridSlotEditModalOpen.value = false
+}
+
+const clearGridSlot = () => {
+  const newArr = [...gridPickSlotNames.value]
+  newArr[editGridSlotIndex.value] = null
+  gridPickSlotNames.value = newArr
+  localStorage.setItem(gridStorageKey, JSON.stringify(newArr))
+  isGridSlotEditModalOpen.value = false
+}
+
+const openGridModal = (group) => {
+  if (group) emit('open-grid-modal', group)
+}
+// ------------------------
+
 // Init Search Index
 watch(() => props.rawItems, (newVal) => {
   if (newVal && newVal.length > 0) {
@@ -391,9 +571,18 @@ watch(searchQuery, () => resetListPage())
 
 const getStock = (itemCode, warehouse) => {
   if (!warehouse) return 0
-  const actual = (props.binData[itemCode] && props.binData[itemCode][warehouse]) || 0
-  const reserved = (props.pendingReserved[warehouse] && props.pendingReserved[warehouse][itemCode]) || 0
+  const actual = props.binData?.[itemCode]?.[warehouse] || 0
+  const reserved = props.pendingReserved?.[warehouse]?.[itemCode] || 0
   return actual - reserved
+}
+
+const getFormattedStockFor = (item) => {
+  if (!item) return '';
+  const availableQty = getStock(item.name, '[MAIN] ALARCON - K');
+  const packQty = item.custom_pack_qty || 1;
+  const boxes = Math.floor(availableQty / packQty);
+  const eaches = availableQty % packQty;
+  return `📦 ${boxes} Box / ${eaches} 개`;
 }
 
 const cancelSearch = () => {

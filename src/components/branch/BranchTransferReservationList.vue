@@ -2,14 +2,19 @@
   <div class="reservation-list-container">
     <div class="header-actions">
       <h2>📅 지점 재고이동 예약 현황</h2>
-      <button class="btn-create" @click="emit('create-new')">➕ 새 예약 작성</button>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-action outline" @click="isSummaryModalOpen = true" style="background: white; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; padding: 10px 15px; cursor: pointer; color: #475569;">
+          📦 품목별 요약 보기
+        </button>
+        <button class="btn-create" @click="emit('create-new')">➕ 새 예약 작성</button>
+      </div>
     </div>
 
     <div class="filters">
       <input type="text" v-model="searchQuery" placeholder="검색 (예약번호 등)" class="filter-input" />
       <select v-model="statusFilter" class="filter-select">
         <option value="all">모든 상태 (All)</option>
-        <option value="incomplete">진행 중 (Incomplete)</option>
+        <option value="incomplete">{{ $t('branch.res_list.status_incomplete') }}<</option>
         <option value="completed">완료 (Completed)</option>
       </select>
       <button class="btn-refresh" @click="fetchReservations" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
@@ -21,20 +26,20 @@
       <table class="history-table">
         <thead>
           <tr>
-            <th>예약 번호</th>
+            <th>{{ $t('branch.res_list.col_no') }}<</th>
             <th>날짜</th>
             <th>소스 (출발 창고)</th>
             <th>타겟 (도착 창고)</th>
-            <th>상태</th>
-            <th>총 수량</th>
-            <th>진행률</th>
+            <th>{{ $t('branch.res_list.col_status') }}<</th>
+            <th>{{ $t('branch.res_list.col_total_qty') }}</th>
+            <th>{{ $t('branch.res_list.col_progress') }}<</th>
             <th class="action-cell">작업</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row">
+          <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row" @mouseenter="showHover($event, res)" @mouseleave="hideHover">
             <td class="res-id" @click="openDetail(res)">{{ res.name }}</td>
-            <td @click="openDetail(res)">{{ res.schedule_date || res.creation?.split(' ')[0] }}</td>
+            <td @click="openDetail(res)">{{ res.creation ? res.creation.split(' ')[0] : (res.schedule_date || '-') }}</td>
             <td class="customer-name" @click="openDetail(res)">
               <div>{{ res.set_from_warehouse || '-' }}</div>
             </td>
@@ -43,7 +48,7 @@
               <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_orderer || res.owner || '-' }}</div>
             </td>
             <td @click="openDetail(res)">
-              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage) }}</span>
+              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage, res.is_stock_entry) }}</span>
             </td>
             <td @click="openDetail(res)">{{ totalQtyMap[res.name] || 0 }} 개</td>
             <td @click="openDetail(res)">
@@ -56,7 +61,7 @@
               <button v-if="userRole === 'Manager' && res.custom_approval_stage === '점원 요청' && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
                 ✅ 승인
               </button>
-              <button v-if="res.docstatus === 0" class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
+              <button v-if="res.docstatus === 0 && !res.is_stock_entry" class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
               <button class="btn-delete" @click.stop="cancelReservation(res)" title="삭제" style="margin-left:5px;">🗑️</button>
             </td>
           </tr>
@@ -91,45 +96,174 @@
               <div class="val">{{ selectedReservation.custom_orderer }}</div>
             </div>
           </div>
-          
+          <div v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
+            <span style="font-size:12px; color:#64748b; font-weight:bold;">📦 필요한 박스(Caja) 및 낱장(Pza) 수량을 바로 입력하세요.</span>
+          </div>
+
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목 코드</th>
-                <th>품명</th>
-                <th>수량 (Pza)</th>
+                <th rowspan="2">품목 코드</th>
+                <th colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">수량 입력</th>
+                <th rowspan="2">{{ $t('branch.res_list.col_total_qty') }}</th>
+                <th rowspan="2">기출고</th>
+                <th rowspan="2">잔여</th>
+              </tr>
+              <tr>
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Caja(박스)</th>
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Pza(낱장)</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="font-weight:bold;">{{ item.item_code }}</td>
-                <td>{{ item.item_name }}</td>
-                <td style="font-weight:bold; color:#0ea5e9;">{{ item.qty }} 개</td>
+                
+                <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
+                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
+                    <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  </td>
+                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
+                    <input type="number" v-model.number="item.request_pza" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  </td>
+                </template>
+                <template v-else>
+                  <td colspan="2" style="background:#f1f5f9; color:#94a3b8; font-size:12px; text-align:center;">수정 불가</td>
+                </template>
+                
+                <td style="font-weight:bold; color:#64748b; text-align:center;">{{ item.qty }}</td>
+                <td style="font-weight:bold; color:#059669; text-align:center;">{{ item.ordered_qty || 0 }}</td>
+                <td style="font-weight:bold; color:#0ea5e9; text-align:center;">{{ item.remain_qty }}</td>
               </tr>
               <tr v-if="selectedReservationItems.length === 0">
-                <td colspan="3" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+                <td colspan="6" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button @click="selectedReservation = null" style="background: white; border: 1px solid #cbd5e1; color: #475569; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+              닫기
+            </button>
+            <button v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" @click="submitPartialRequest" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isSubmittingPartial">
+              {{ isSubmittingPartial ? '전송 중...' : '🔥 입력한 수량만큼 즉시 출고 대기열로 넘기기' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 품목별 요약 모달 -->
+    <div v-if="isSummaryModalOpen" class="modal-overlay" @click.self="isSummaryModalOpen = false">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h3>📦 드래프트 품목 요약 보기</h3>
+          <button class="close-btn" @click="isSummaryModalOpen = false">×</button>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+          <table class="history-table" style="margin: 0;">
+            <thead>
+              <tr>
+                <th style="background: #f8fafc;">아이템코드</th>
+                <th style="background: #f8fafc; text-align: right;">주문 박스총 수량</th>
+                <th style="background: #f8fafc; text-align: right;">주문낱개총수량</th>
+                <th style="background: #f8fafc; text-align: right;">주문총수량</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in aggregatedSummaryItems" :key="item.item_code">
+                <td style="font-weight: 500;">{{ item.item_code }}</td>
+                <td style="text-align: right;">{{ Math.floor(item.total_qty / getPackQty(item.item_code)) || 0 }}</td>
+                <td style="text-align: right;">{{ item.total_qty % getPackQty(item.item_code) || 0 }}</td>
+                <td style="text-align: right; font-weight: bold; color: #0f172a;">{{ item.total_qty }}</td>
+              </tr>
+              <tr v-if="aggregatedSummaryItems.length === 0">
+                <td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">진행 중인(Draft) 재고 이동 품목이 없습니다.</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <div style="padding: 15px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+          <button @click="isSummaryModalOpen = false" style="background: white; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+            닫기
+          </button>
+        </div>
       </div>
     </div>
+    <!-- Hover Tooltip -->
+    <div v-if="hoverTooltip.visible" class="hover-tooltip" :style="{ top: hoverTooltip.y + 'px', left: hoverTooltip.x + 'px' }">
+      <div style="font-weight: bold; font-size: 13px; color: #3b82f6; margin-bottom: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+        요청자: {{ hoverTooltip.data.requester }}
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="border-bottom: 1px solid #cbd5e1; color: #64748b;">
+            <th style="text-align: left; padding: 2px 4px;">품목 (Color)</th>
+            <th style="text-align: right; padding: 2px 4px;">Box</th>
+            <th style="text-align: right; padding: 2px 4px;">낱개</th>
+            <th style="text-align: right; padding: 2px 4px;">총수량</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="hoverTooltip.loading">
+            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">로딩 중...</td>
+          </tr>
+          <tr v-else-if="hoverTooltip.items.length === 0">
+            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">품목이 없습니다.</td>
+          </tr>
+          <tr v-for="item in hoverTooltip.items" :key="item.item_code">
+            <td style="font-weight: 500; padding: 2px 4px;">{{ item.item_code }} ({{ item.custom_color || '-' }})</td>
+            <td style="text-align: right; padding: 2px 4px;">{{ Math.floor(item.qty / getPackQty(item.item_code)) || 0 }}</td>
+            <td style="text-align: right; padding: 2px 4px;">{{ Math.floor(item.qty % getPackQty(item.item_code)) || 0 }}</td>
+            <td style="text-align: right; font-weight: bold; color: #0f172a; padding: 2px 4px;">{{ item.qty }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import axios from 'axios'
 import frappeApi from '../../api/frappe.js'
 import { useAuthStore } from '../../stores/auth.js'
 
-const authStore = useAuthStore()
+// 임시: 권한 부여 전까지 token API 사용 (지점장 권한 설정 후 frappeApi로 복구 예정)
+const adminApi = axios.create({
+  baseURL: '',
+  withCredentials: true,
+  headers: {
+    'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+})
+
+const authStore = useAuthStore();
+const { t } = useI18n();
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
 const emit = defineEmits(['create-new', 'edit-reservation'])
+
+const props = defineProps({
+  rawItems: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const getPackQty = (itemCode) => {
+  const found = props.rawItems.find(i => i.name === itemCode)
+  return found?.custom_pack_qty || 1
+}
 
 const reservations = ref([])
 const filteredReservations = ref([])
 const selectedReservation = ref(null)
 const selectedReservationItems = ref([])
+
+const isSummaryModalOpen = ref(false)
+const aggregatedSummaryItems = ref([])
 
 const searchQuery = ref('')
 const statusFilter = ref('incomplete')
@@ -145,40 +279,97 @@ const fetchReservations = async () => {
   }
 
   try {
-    // 관리자 ReservationListView 와 동일: Vite 프록시 상대경로 `/api` + 세션 쿠키
-    // (과거 localhost:8000 직접 호출은 쿠키/CORS로 실패 → 빈 목록)
-    const res = await frappeApi.get('/api/resource/Material Request', {
-      params: {
-        fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
-        filters: JSON.stringify([
-          ['docstatus', 'in', [0, 1]],
-          ['material_request_type', '=', 'Material Transfer'],
-          ['set_warehouse', '=', branch] // 도착 창고 = 로그인한 지점
-        ]),
-        limit_page_length: 500,
-        order_by: 'creation desc'
-      }
-    })
-    reservations.value = res.data.data || []
+    const [mrRes, seRes, userRes] = await Promise.all([
+      frappeApi.get('/api/resource/Material Request', {
+        params: {
+          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner', 'creation']),
+          filters: JSON.stringify([
+            ['docstatus', 'in', [0, 1]],
+            ['material_request_type', '=', 'Material Transfer'],
+            ['set_warehouse', '=', branch]
+          ]),
+          limit_page_length: 500,
+          order_by: 'creation desc'
+        }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Stock Entry', {
+        params: {
+          fields: JSON.stringify(['name', 'creation', 'docstatus', 'purpose', 'from_warehouse', 'to_warehouse', 'owner', 'custom_orderer']),
+          filters: JSON.stringify([
+            ['docstatus', '=', 0],
+            ['stock_entry_type', '=', 'Material Transfer'],
+            ['to_warehouse', '=', branch]
+          ]),
+          limit_page_length: 500,
+          order_by: 'creation desc'
+        }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/User', {
+        params: {
+          fields: JSON.stringify(['name', 'full_name']),
+          limit_page_length: 1000
+        }
+      }).catch(() => ({ data: { data: [] } }))
+    ])
+
+    const userMap = {}
+    const users = userRes?.data?.data || []
+    users.forEach(u => { userMap[u.name] = u.full_name })
+
+    const mrData = mrRes.data?.data || []
+    const seData = seRes.data?.data || []
+
+    const normalizedSE = seData.map(se => ({
+      ...se,
+      is_stock_entry: true,
+      status: 'Draft',
+      schedule_date: (() => {
+        try {
+          const d = new Date(se.creation.replace(' ', 'T') + '+09:00');
+          return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        } catch(e) { return se.creation.split(' ')[0]; }
+      })(),
+      set_from_warehouse: se.from_warehouse,
+      set_warehouse: se.to_warehouse,
+      custom_orderer: userMap[se.custom_orderer] || se.custom_orderer || userMap[se.owner] || se.owner || ''
+    }))
+
+    reservations.value = [...mrData, ...normalizedSE].sort((a, b) => new Date(b.creation) - new Date(a.creation))
     
     // 예약 총 수량 계산
     if (reservations.value.length > 0) {
       const detailPromises = reservations.value.map(r => 
-        frappeApi.get(`/api/resource/Material Request/${r.name}`)
+        r.is_stock_entry
+          ? frappeApi.get(`/api/resource/Stock Entry/${r.name}`)
+          : frappeApi.get(`/api/resource/Material Request/${r.name}`)
       )
       const detailResArray = await Promise.all(detailPromises)
       
       const qtyMap = {}
+      const aggItemsMap = {}
+      
       detailResArray.forEach(resp => {
         const doc = resp.data.data
         if (doc && doc.items) {
           const total = doc.items.reduce((sum, item) => sum + (item.qty || 0), 0)
           qtyMap[doc.name] = total
+          
+          // 드래프트 Stock Entry 품목 합산
+          if (doc.doctype === 'Stock Entry' && doc.docstatus === 0) {
+            doc.items.forEach(item => {
+              if (!aggItemsMap[item.item_code]) {
+                aggItemsMap[item.item_code] = { item_code: item.item_code, total_qty: 0 }
+              }
+              aggItemsMap[item.item_code].total_qty += item.qty || 0
+            })
+          }
         }
       })
       totalQtyMap.value = qtyMap
+      aggregatedSummaryItems.value = Object.values(aggItemsMap).sort((a, b) => b.total_qty - a.total_qty)
     } else {
       totalQtyMap.value = {}
+      aggregatedSummaryItems.value = []
     }
 
     applyFilters()
@@ -188,7 +379,8 @@ const fetchReservations = async () => {
   }
 }
 
-const translateStatus = (status, docstatus, approval_stage) => {
+const translateStatus = (status, docstatus, approval_stage, is_stock_entry) => {
+  if (is_stock_entry && docstatus === 0) return '본점 출고 대기'
   if (docstatus === 0) {
     if (approval_stage) return `Draft(${approval_stage})`
     return 'Draft'
@@ -201,6 +393,7 @@ const translateStatus = (status, docstatus, approval_stage) => {
 }
 
 const getStatusClass = (res) => {
+  if (res.is_stock_entry && res.docstatus === 0) return 'status-delivering'
   if (res.docstatus === 0) return 'status-default'
   if (res.status === 'Pending' || (res.docstatus === 1 && res.status === 'Draft')) return 'status-pending'
   if (res.status?.includes('Partial')) return 'status-partial'
@@ -237,11 +430,100 @@ const applyFilters = () => {
 
 const openDetail = async (res) => {
   selectedReservation.value = { ...res }
+  isSubmittingPartial.value = false
   try {
-    const detail = await frappeApi.get(`/api/resource/Material Request/${res.name}`)
-    selectedReservationItems.value = detail.data.data.items || []
+    const detail = res.is_stock_entry
+      ? await frappeApi.get(`/api/resource/Stock Entry/${res.name}`)
+      : await frappeApi.get(`/api/resource/Material Request/${res.name}`)
+      
+    const items = detail.data.data.items || []
+    
+    // Fetch custom_pack_qty from Item master for accurate box calculation
+    const itemCodes = [...new Set(items.map(i => i.item_code))]
+    let packQtyMap = {}
+    if (itemCodes.length > 0) {
+      const itemRes = await frappeApi.get('/api/resource/Item', {
+        params: {
+          filters: JSON.stringify([['item_code', 'in', itemCodes]]),
+          fields: JSON.stringify(['item_code', 'custom_pack_qty']),
+          limit_page_length: 999
+        }
+      }).catch(() => ({ data: { data: [] } }))
+      
+      itemRes.data?.data?.forEach(i => {
+        packQtyMap[i.item_code] = i.custom_pack_qty || 1
+      })
+    }
+
+    selectedReservationItems.value = items.map(item => {
+      const remain = item.qty - (item.ordered_qty || 0)
+      return {
+        ...item,
+        custom_pack_qty: item.custom_pack_qty || packQtyMap[item.item_code] || 1,
+        remain_qty: remain > 0 ? remain : 0,
+        request_caja: 0,
+        request_pza: 0,
+        request_qty: 0
+      }
+    })
   } catch (err) {
     console.error('Fetch detail error:', err)
+  }
+}
+
+const isSubmittingPartial = ref(false)
+
+const handleQtyChange = (item) => {
+  const cap = item.custom_pack_qty || 1
+  let total = (item.request_caja || 0) * cap + (item.request_pza || 0)
+  
+  if (total > item.remain_qty) {
+    alert(`예약물량이 부족합니다. (최대 ${item.remain_qty}개 까지만 가능)`)
+    total = item.remain_qty
+    item.request_caja = Math.floor(total / cap)
+    item.request_pza = total % cap
+  }
+  
+  item.request_qty = total
+}
+
+const submitPartialRequest = async () => {
+  const validItems = selectedReservationItems.value.filter(item => item.request_qty > 0)
+  if (validItems.length === 0) {
+    alert('요청할 수량이 없습니다. 수량을 먼저 입력해주세요.')
+    return
+  }
+
+  isSubmittingPartial.value = true
+  try {
+    const sePayload = {
+      docstatus: 0,
+      stock_entry_type: 'Material Transfer',
+      purpose: 'Material Transfer',
+      from_warehouse: '[MAIN] ALARCON - K',
+      to_warehouse: authStore.user?.branch_name,
+      custom_orderer: selectedReservation.value.custom_orderer,
+      items: validItems.map(item => ({
+        item_code: item.item_code,
+        qty: item.request_qty,
+        s_warehouse: '[MAIN] ALARCON - K',
+        t_warehouse: authStore.user?.branch_name,
+        uom: item.uom || 'Nos',
+        conversion_factor: item.conversion_factor || 1,
+        material_request: selectedReservation.value.name,
+        material_request_item: item.name
+      }))
+    }
+    
+    await adminApi.post('/api/resource/Stock Entry', sePayload)
+    alert(`성공적으로 부분 출고 요청(초안)이 생성되었습니다! 본점 대기열로 전송되었습니다.`)
+    selectedReservation.value = null
+    fetchReservations()
+  } catch (error) {
+    console.error('Partial request error:', error)
+    alert('부분 출고 요청 중 오류가 발생했습니다.')
+  } finally {
+    isSubmittingPartial.value = false
   }
 }
 
@@ -266,19 +548,77 @@ const editReservation = (res) => {
 const cancelReservation = async (res) => {
   if (!confirm(`예약(${res.name})을 정말 삭제하시겠습니까?`)) return
   try {
-    await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
+    if (res.is_stock_entry) {
+      await adminApi.delete(`/api/resource/Stock Entry/${res.name}`)
+    } else {
+      await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
+    }
     alert('삭제되었습니다.')
     fetchReservations()
-  } catch (err) {
-    console.error('Delete error:', err)
-    alert('삭제 중 오류가 발생했습니다.')
+  } catch (error) {
+    console.error('삭제 권한 오류:', error)
+    alert('삭제할 권한이 없거나, 이미 진행중인 예약입니다.')
   }
+}
+
+// Hover Tooltip Logic
+const itemCache = ref({})
+const hoverTooltip = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  items: [],
+  loading: false,
+  data: {}
+})
+
+const showHover = async (event, res) => {
+  const rowRect = event.currentTarget.getBoundingClientRect()
+  
+  hoverTooltip.value = {
+    visible: true,
+    x: rowRect.left,
+    y: rowRect.top - 10,
+    items: [],
+    loading: true,
+    data: { requester: res.custom_orderer || res.owner || 'Unknown' }
+  }
+
+  if (itemCache.value[res.name]) {
+    hoverTooltip.value.items = itemCache.value[res.name]
+    hoverTooltip.value.loading = false
+    return
+  }
+
+  try {
+    const detailRes = await frappeApi.get(`/api/resource/${res.is_stock_entry ? 'Stock Entry' : 'Material Request'}/${res.name}`)
+    const items = detailRes.data?.data?.items || []
+    itemCache.value[res.name] = items
+    if (hoverTooltip.value.visible && hoverTooltip.value.data.requester === (res.custom_orderer || res.owner || 'Unknown')) {
+      hoverTooltip.value.items = items
+      hoverTooltip.value.loading = false
+    }
+  } catch (e) {
+    console.error(e)
+    if (hoverTooltip.value.visible) hoverTooltip.value.loading = false
+  }
+}
+
+const hideHover = () => {
+  hoverTooltip.value.visible = false
 }
 
 watch([statusFilter, searchQuery], () => applyFilters())
 
+let pollInterval = null
+
 onMounted(() => {
   fetchReservations()
+  pollInterval = setInterval(fetchReservations, 10000)
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
 })
 </script>
 
@@ -304,6 +644,7 @@ onMounted(() => {
 .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
 .status-default { background: #f1f5f9; color: #475569; }
 .status-pending { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
+.status-delivering { background: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; }
 .status-partial { background: #fed7aa; color: #9a3412; border: 1px solid #fdba74; }
 .status-completed { background: #bbf7d0; color: #166534; border: 1px solid #86efac; }
 .status-cancelled { background: #e2e8f0; color: #475569; }
@@ -332,4 +673,18 @@ onMounted(() => {
 .detail-items-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #e2e8f0; }
 .detail-items-table th, .detail-items-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 13px; }
 .detail-items-table th { background: #f1f5f9; color: #475569; font-weight: bold; }
+
+/* Hover Tooltip */
+.hover-tooltip {
+  position: fixed;
+  background: white;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 9999;
+  min-width: 250px;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
 </style>

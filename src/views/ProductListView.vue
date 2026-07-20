@@ -242,7 +242,13 @@ const loadProducts = async () => {
     
   } catch (err) {
     console.error('Error loading products:', err)
-    alert('Failed to load product data.')
+    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+      alert('세션이 만료되었거나 권한이 없습니다. 다시 로그인해 주세요.')
+      authStore.logout()
+      router.push('/login')
+    } else {
+      alert(`Failed to load product data: ${err.message || err}`)
+    }
   } finally {
     isLoading.value = false
   }
@@ -504,7 +510,7 @@ const exportCSV = () => {
   const link = document.createElement("a")
   link.setAttribute("href", encodedUri)
   
-  const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '')
+  const dateStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0].replace(/-/g, '')
   link.setAttribute("download", `product_export_${dateStr}.csv`)
   
   document.body.appendChild(link)

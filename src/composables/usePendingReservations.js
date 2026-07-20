@@ -33,9 +33,9 @@ export function usePendingReservations() {
 
       if (reqList.length > 0) {
         const mrDetailsPromises = reqList.map(req =>
-          frappeApi.get(`/api/resource/Material Request/${req.name}`)
+          frappeApi.get(`/api/resource/Material Request/${req.name}`).catch(() => null)
         );
-        const mrDetailsRes = await Promise.all(mrDetailsPromises);
+        const mrDetailsRes = (await Promise.all(mrDetailsPromises)).filter(Boolean);
 
         mrDetailsRes.forEach(res => {
           const doc = res.data?.data;

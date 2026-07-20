@@ -11,19 +11,19 @@
       </div>
       <nav class="nav-menu">
         <!-- 지점 전용 VENTA (항상 가장 먼저 노출) -->
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')" style="background-color: #38bdf8; color: #0f172a; font-weight: bold;">
+        <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')" style="background-color: #38bdf8; color: #0f172a; font-weight: bold;">
           🛒 VENTA (판매)
-        </a>
+        </a> -->
 
         <!-- 지점 전용 메뉴 -->
         <div class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
-          <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">지점 전용 (Branch)</span>
+          <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.branch_group') }}</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">재고 이동 작성 (입력)</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">재고 이동 예약 현황</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">재고 조회</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-sales' }" @click.prevent="setActiveNav('branch-sales')">판매 내역</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-staff' }" @click.prevent="setActiveNav('branch-staff')">점원/포스 관리</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">{{ $t('nav.branch_reservation') }} <span v-if="branchReservationCount > 0" class="res-badge">{{ branchReservationCount }}</span></a>
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
+            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-sales' }" @click.prevent="setActiveNav('branch-sales')">판매 내역</a> -->
+            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-staff' }" @click.prevent="setActiveNav('branch-staff')">점원/포스 관리</a> -->
           </div>
         </div>
 
@@ -53,7 +53,7 @@
         </button>
         <div v-show="isTransferMenuOpen" class="nav-sub-menu" style="background: rgba(0,0,0,0.1); padding-left:10px;">
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer' && !currentTab?.activeReservationId && !currentTab?.amendingStockEntry }" @click.prevent="setActiveNav('transfer', 'transfer')">{{ $t('nav.move_entry') }}</a>
-          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-reservation' }" @click.prevent="setActiveNav('transfer-reservation'); setTransactionMode('transfer')">{{ $t('nav.move_res') }} <span v-if="incompleteTransferReservationCount > 0" class="res-badge">{{ incompleteTransferReservationCount }}</span></a>
+          <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-reservation' }" @click.prevent="setActiveNav('transfer-reservation'); setTransactionMode('transfer')">{{ $t('nav.move_res') }} <span v-if="incompleteTransferReservationCount > 0 || incompleteTransferStockEntryCount > 0" class="res-badge"><template v-if="incompleteTransferStockEntryCount > 0">{{ incompleteTransferReservationCount }} - {{ incompleteTransferStockEntryCount }}</template><template v-else>{{ incompleteTransferReservationCount }}</template></span></a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-list' }" @click.prevent="setActiveNav('transfer-list'); setTransactionMode('transfer')">{{ $t('nav.move_list') }}</a>
           <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'transfer-history' }" @click.prevent="setActiveNav('transfer-history'); setTransactionMode('transfer')">{{ $t('nav.move_history') }}</a>
         </div>
@@ -65,18 +65,18 @@
           </a>
           <div v-show="isProductMenuOpen" class="nav-sub-menu">
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-list' }" @click.prevent="setActiveNav('product-list')">📋 {{ $t('nav.product_list') }}</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-move' }" @click.prevent="setActiveNav('product-move')">🔄 {{ $t('nav.product_move') }}</a>
+            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-move' }" @click.prevent="setActiveNav('product-move')">🔄 {{ $t('nav.product_move') }}</a> -->
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-adj' }" @click.prevent="setActiveNav('product-adj')">⚖️ {{ $t('nav.product_adj') }}</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-reg' }" @click.prevent="setActiveNav('product-reg')">➕ {{ $t('nav.product_reg') }}</a>
+            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'product-reg' }" @click.prevent="setActiveNav('product-reg')">➕ {{ $t('nav.product_reg') }}</a> -->
           </div>
         </div>
 
         <!-- 기존 상품등록 (보존용) -->
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a>
+        <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a> -->
         <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 {{ $t('nav.node') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 {{ $t('nav.report') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 {{ $t('nav.manager') }}</a>
-        <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="setActiveNav('search-edit')">🔍 {{ $t('nav.search_edit') }}</a>
+        <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'search-edit' }" @click.prevent="setActiveNav('search-edit')">🔍 {{ $t('nav.search_edit') }}</a> -->
         </template>
 
         <template v-if="isAdmin">
@@ -92,10 +92,10 @@
 
     <main class="main-content-zone">
       <!-- 🌟 신규 추가된 컴포넌트들 -->
-      <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
-      <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @refresh-items="fetchFrappeItems" />
+      <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
+      <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
-      <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav('product-list')" />
+      <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav(previousNavForProductDetail)" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
       
       <!-- 지점 전용 영역 -->
@@ -119,6 +119,7 @@
       <!-- 지점 예약 리스트 (DRAFT) -->
       <BranchTransferReservationList 
         v-else-if="activeNav === 'branch-reservation'" 
+        :raw-items="rawSingleItems"
         @create-new="setActiveNav('branch-transfer')"
         @edit-reservation="handleBranchEditReservation"
         @refresh-items="fetchFrappeItems"
@@ -134,10 +135,10 @@
       
       <OutboundListView v-else-if="activeNav === 'outbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadOutboundToCart" @refresh-items="fetchFrappeItems" list-type="Material Issue" />
       <OutboundListView v-else-if="activeNav === 'transfer-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadTransferToCart" @refresh-items="fetchFrappeItems" list-type="Material Transfer" />
-      <OutboundHistoryListView v-else-if="activeNav === 'outbound-history'" :branch-list="branchList" @edit-history="loadOutboundToCart" list-type="Material Issue" />
-      <OutboundHistoryListView v-else-if="activeNav === 'transfer-history'" :branch-list="branchList" @edit-history="loadTransferToCart" list-type="Material Transfer" />
+      <OutboundHistoryListView v-else-if="activeNav === 'outbound-history'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-history="loadOutboundToCart" list-type="Material Issue" />
+      <OutboundHistoryListView v-else-if="activeNav === 'transfer-history'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-history="loadTransferToCart" list-type="Material Transfer" />
       <InboundListView v-else-if="activeNav === 'inbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-inbound="loadInboundToCart" />
-      <InboundHistoryListView v-else-if="activeNav === 'inbound-history'" :branch-list="branchList" @edit-history="loadInboundToCart" />
+      <InboundHistoryListView v-else-if="activeNav === 'inbound-history'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-history="loadInboundToCart" />
       
       <!-- 보존된 기존 컴포넌트 -->
       <ProductRegistrationPanel v-else-if="activeNav === 'product'" />
@@ -894,16 +895,19 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items,
 // ----------------------------
 const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
-const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-pos')
+// 지점 사용자는 VENTA(판매) 대신 '재고 이동 작성 (입력)' 화면을 기본값으로 사용
+const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-transfer')
 const transactionMode = ref('outbound')
 const isProductMenuOpen = ref(false)
 const isInboundMenuOpen = ref(false)
 const isOutboundMenuOpen = ref(true)
-const isTransferMenuOpen = ref(false)
+const isTransferMenuOpen = ref(true)
 const activeProductId = ref(null)
+const previousNavForProductDetail = ref('product-list')
 
 const openProductDetail = (itemId) => {
   activeProductId.value = itemId
+  previousNavForProductDetail.value = activeNav.value
   activeNav.value = 'product-detail'
 }
 
@@ -920,6 +924,8 @@ const salesPersonList = ref([])
 const supplierList = ref([])
 const incompleteReservationCount = ref(0)
 const incompleteTransferReservationCount = ref(0)
+const incompleteTransferStockEntryCount = ref(0)
+const branchReservationCount = ref(0)
 const branchDraftWaitCount = ref(0)
 
 const isQuickItemModalOpen = ref(false)
@@ -945,8 +951,24 @@ const filteredSalesPersonList = computed(() => {
     ? currentTab.value?.selectedTarget 
     : currentTab.value?.selectedBranch;
     
-  if (!targetBranch) return salesPersonList.value;
-  return salesPersonList.value.filter(sp => sp.custom_branch === targetBranch)
+  const selected = currentTab.value?.selectedResponder
+  let list = !targetBranch
+    ? [...salesPersonList.value]
+    : salesPersonList.value.filter(sp => sp.custom_branch === targetBranch)
+
+  // 현재 선택된 요청자는 지점 필터와 달라도 옵션에 유지 (Draft 로드 시 빈칸 방지)
+  if (selected && !list.some(sp => sp.name === selected)) {
+    const missing = salesPersonList.value.find(sp => sp.name === selected)
+    if (missing) list = [...list, missing]
+  }
+
+  // name 기준 중복 제거
+  const seen = new Set()
+  return list.filter(sp => {
+    if (seen.has(sp.name)) return false
+    seen.add(sp.name)
+    return true
+  })
 })
 
 const isQuickAdjustModalOpen = ref(false)
@@ -1314,7 +1336,7 @@ const handleSalesPersonChange = () => {
 // Frappe API 호출 로직 (컴포넌트 로드 시 자동 실행)
 const pollReservations = async () => {
   try {
-    const [reqRes, reqDraftRes, binRes] = await Promise.all([
+    const [reqRes, reqDraftRes, seDraftRes, binRes] = await Promise.all([
       frappeApi.get('/api/resource/Material Request', {
         params: {
           fields: JSON.stringify(['name']),
@@ -1329,6 +1351,13 @@ const pollReservations = async () => {
           limit_page_length: 0
         }
       }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Stock Entry', {
+        params: {
+          fields: JSON.stringify(['name', 'to_warehouse']),
+          filters: JSON.stringify([['docstatus', '=', 0], ['purpose', '=', 'Material Transfer']]),
+          limit_page_length: 0
+        }
+      }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Bin', {
         params: {
           fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
@@ -1339,13 +1368,21 @@ const pollReservations = async () => {
 
     const reqList1 = reqRes.data?.data || [];
     const reqList2 = reqDraftRes.data?.data || [];
+    const seList = seDraftRes.data?.data || [];
     const reqList = [...reqList1, ...reqList2];
+    
+    incompleteTransferStockEntryCount.value = seList.length;
+
+    let currentBranchResCount = 0;
+    if (authStore.user?.branch_name) {
+       currentBranchResCount += seList.filter(se => se.to_warehouse === authStore.user.branch_name).length;
+    }
 
     if (reqList.length > 0) {
       const mrDetailsPromises = reqList.map(req =>
-        frappeApi.get(`/api/resource/Material Request/${req.name}`)
+        frappeApi.get(`/api/resource/Material Request/${req.name}`).catch(() => null)
       );
-      const mrDetailsRes = await Promise.all(mrDetailsPromises);
+      const mrDetailsRes = (await Promise.all(mrDetailsPromises)).filter(Boolean);
       
       const reservedMap = {};
       let outboundResCount = 0;
@@ -1354,7 +1391,12 @@ const pollReservations = async () => {
       mrDetailsRes.forEach(res => {
          const doc = res.data.data;
          if (doc.material_request_type === 'Material Issue') outboundResCount++;
-         else if (doc.material_request_type === 'Material Transfer') transferResCount++;
+         else if (doc.material_request_type === 'Material Transfer') {
+             transferResCount++;
+             if (authStore.user?.branch_name && (doc.set_warehouse === authStore.user.branch_name || doc.custom_ordering_branch === authStore.user.branch_name)) {
+                 currentBranchResCount++;
+             }
+         }
 
          let sourceWh = null;
          if (doc.material_request_type === 'Material Issue') {
@@ -1386,10 +1428,12 @@ const pollReservations = async () => {
 
       incompleteReservationCount.value = outboundResCount;
       incompleteTransferReservationCount.value = transferResCount;
+      branchReservationCount.value = currentBranchResCount;
       pendingReservedMap.value = reservedMap;
     } else {
       incompleteReservationCount.value = 0;
       incompleteTransferReservationCount.value = 0;
+      branchReservationCount.value = currentBranchResCount;
       pendingReservedMap.value = {};
     }
 
@@ -1822,8 +1866,78 @@ const cancelReservationCheckout = () => {
   activeNav.value = transactionMode.value === 'transfer' ? 'transfer-reservation' : 'outbound-reservation'
 }
 
+// Sales Person 드롭다운(지점 필터)에 보이도록 요청자 값을 해석·주입
+const ensureSalesPersonOption = (spName, displayName = '', branchHint = '') => {
+  if (!spName) return ''
+  const branch = branchHint || currentTab.value?.selectedTarget || ''
+  const existing = salesPersonList.value.find(sp => sp.name === spName)
+  if (existing) {
+    if (branch && !existing.custom_branch) existing.custom_branch = branch
+    return existing.name
+  }
+  salesPersonList.value.push({
+    name: spName,
+    sales_person_name: displayName || spName,
+    custom_branch: branch || undefined
+  })
+  return spName
+}
+
+const findSalesPersonByLabel = (label) => {
+  if (!label) return null
+  const q = String(label).trim().toLowerCase()
+  return salesPersonList.value.find(sp =>
+    sp.name?.toLowerCase() === q ||
+    sp.sales_person_name?.toLowerCase() === q
+  ) || null
+}
+
+/** Stock Entry / MR 문서에서 재고이동요청자(selectedResponder)로 쓸 Sales Person name 해석 */
+const resolveTransferRequester = async (entry) => {
+  const branch = entry.to_warehouse || entry.set_warehouse || currentTab.value?.selectedTarget || ''
+
+  const tryResolve = async (raw) => {
+    if (!raw) return ''
+    const direct = findSalesPersonByLabel(raw)
+    if (direct) return ensureSalesPersonOption(direct.name, direct.sales_person_name, branch)
+
+    // User 이메일이면 full_name 으로 Sales Person 매칭
+    try {
+      const userRes = await frappeApi.get(`/api/resource/User/${encodeURIComponent(raw)}`)
+      const fullName = userRes.data?.data?.full_name
+      if (fullName) {
+        const byFull = findSalesPersonByLabel(fullName)
+        if (byFull) return ensureSalesPersonOption(byFull.name, byFull.sales_person_name, branch)
+        return ensureSalesPersonOption(raw, fullName, branch)
+      }
+    } catch (e) { /* User 문서가 아니면 Sales Person ID로 간주 */ }
+
+    return ensureSalesPersonOption(raw, raw, branch)
+  }
+
+  // 1) Stock Entry / 문서의 custom_orderer
+  const fromOrderer = await tryResolve(entry.custom_orderer)
+  if (fromOrderer) return fromOrderer
+
+  // 2) 연결된 Material Request 의 custom_orderer (STE Draft에 요청자가 비어 있는 경우 복구)
+  const mrLinks = [...new Set((entry.items || []).map(i => i.material_request).filter(Boolean))]
+  for (const mrName of mrLinks) {
+    try {
+      const mrRes = await frappeApi.get(`/api/resource/Material Request/${encodeURIComponent(mrName)}`)
+      const mrOrderer = mrRes.data?.data?.custom_orderer
+      const fromMr = await tryResolve(mrOrderer)
+      if (fromMr) return fromMr
+    } catch (e) {
+      console.warn('MR requester resolve failed:', e)
+    }
+  }
+
+  // 3) owner 최후 수단 (이메일이면 드롭다운에 맞게 주입)
+  return await tryResolve(entry.owner)
+}
+
 // 🌟 예약 내역을 장바구니로 로드 🌟
-const loadReservationToCart = (res) => {
+const loadReservationToCart = async (res) => {
   const isTransfer = res.material_request_type === 'Material Transfer'
   const targetMode = isTransfer ? 'transfer' : 'outbound'
   
@@ -1836,15 +1950,19 @@ const loadReservationToCart = (res) => {
     
     currentTab.value.selectedCustomer = res.custom_customer || res.customer || ''
     currentTab.value.selectedBranch = res.custom_ordering_branch || (!isTransfer && res.material_request_type !== 'Material Issue' ? res.set_warehouse : '') || ''
-    const responder = res.custom_orderer || ''
-    if (responder && !salesPersonList.value.some(sp => sp.name === responder)) {
-      salesPersonList.value.push({ name: responder, sales_person_name: responder })
-    }
-    currentTab.value.selectedResponder = responder
-    currentTab.value.selectedRequester = res.custom_branch_requester || ''
     currentTab.value.selectedSource = res.set_from_warehouse || (res.material_request_type === 'Material Issue' ? res.set_warehouse : '') || ''
     currentTab.value.reservationOriginalSource = currentTab.value.selectedSource
     currentTab.value.selectedTarget = isTransfer ? res.set_warehouse : ''
+
+    const responder = await resolveTransferRequester({
+      custom_orderer: res.custom_orderer,
+      to_warehouse: currentTab.value.selectedTarget,
+      set_warehouse: res.set_warehouse,
+      owner: res.owner,
+      items: res.items || []
+    })
+    currentTab.value.selectedResponder = responder
+    currentTab.value.selectedRequester = res.custom_branch_requester || ''
     
     const newCart = []
     res.items.forEach(item => {
@@ -1868,6 +1986,7 @@ const loadReservationToCart = (res) => {
           input_box: input_box,
           input_each: input_each,
           mr_item_id: item.name, // 부분 출고 연결고리
+          mr_name: res.name || undefined,
           mr_qty: remainingQty // 예약 잔량 초과 출고 시 행 분리를 위한 잔량 저장
         })
       }
@@ -1878,7 +1997,7 @@ const loadReservationToCart = (res) => {
 }
 
 // 🌟 재고이동 전표를 장바구니로 로드
-const loadTransferToCart = (entry) => {
+const loadTransferToCart = async (entry) => {
   activeNav.value = 'transfer'
   setTransactionMode('transfer')
   if (currentTab.value) {
@@ -1887,7 +2006,12 @@ const loadTransferToCart = (entry) => {
     currentTab.value.amendSourceNav = entry.sourceNav || 'transfer-list'
     currentTab.value.selectedSource = entry.from_warehouse || ''
     currentTab.value.selectedTarget = entry.to_warehouse || ''
-    currentTab.value.selectedResponder = entry.custom_orderer || ''
+    currentTab.value.selectedResponder = await resolveTransferRequester({
+      custom_orderer: entry.custom_orderer,
+      to_warehouse: entry.to_warehouse,
+      owner: entry.owner,
+      items: entry.items || []
+    })
     const newCart = []
     entry.items.forEach(item => {
       const qty = Number(item.qty) || 0
@@ -1910,6 +2034,68 @@ const loadTransferToCart = (entry) => {
       }
     })
     currentTab.value.cartItems = newCart
+  }
+}
+
+// 🌟 초안 대기열 문서를 장바구니로 로드
+const loadDraftToCart = async (docName) => {
+  try {
+    const res = await frappeApi.get(`/api/resource/Stock Entry/${docName}`)
+    const entry = res.data.data
+
+    activeNav.value = 'transfer'
+    setTransactionMode('transfer')
+
+    if (currentTab.value) {
+      currentTab.value.title = `초안 대기열: ${entry.name}`
+      currentTab.value.amendingStockEntry = entry.name
+      currentTab.value.amendSourceNav = 'transfer-reservation'
+      currentTab.value.selectedSource = entry.from_warehouse || ''
+      currentTab.value.selectedTarget = entry.to_warehouse || ''
+
+      // 요청자: custom_orderer → (없으면) 연결 MR → Sales Person 드롭다운에 맞게 해석
+      currentTab.value.selectedResponder = await resolveTransferRequester(entry)
+      
+      const newCart = []
+      entry.items.forEach(item => {
+        const qty = Number(item.qty) || 0
+        if (qty > 0) {
+          const prod = rawSingleItems.value.find(p => p.name === item.item_code)
+          let input_box = 0
+          let input_each = qty
+          if (prod && prod.custom_pack_qty) {
+            input_box = Math.floor(qty / prod.custom_pack_qty)
+            input_each = qty % prod.custom_pack_qty
+          }
+          newCart.push({
+            name: item.item_code,
+            item_name: item.item_name || item.item_code,
+            custom_color: prod ? prod.custom_color : '',
+            custom_pack_qty: prod ? (prod.custom_pack_qty || 1) : 1,
+            input_box,
+            input_each,
+            mr_item_id: item.material_request_item || undefined,
+            mr_name: item.material_request || undefined,
+            mr_qty: qty
+          })
+        }
+      })
+      currentTab.value.cartItems = newCart
+
+      // Draft에 custom_orderer가 비어 있었고 MR에서 복구했다면, 문서에도 되돌려 저장(이후 재로드 안정화)
+      if (currentTab.value.selectedResponder && !entry.custom_orderer) {
+        try {
+          await frappeApi.put(`/api/resource/Stock Entry/${entry.name}`, {
+            custom_orderer: currentTab.value.selectedResponder
+          })
+        } catch (e) {
+          console.warn('Draft custom_orderer backfill skipped:', e)
+        }
+      }
+    }
+  } catch(e) {
+    console.error('Draft load error:', e)
+    alert('대기열 문서를 불러오지 못했습니다.')
   }
 }
 
@@ -2103,6 +2289,7 @@ const submitToFrappe = async () => {
 
   try {
     // 🌟 수정 모드일 경우: 기존 전표 취소(Cancel) 처리 먼저 수행
+    let validAmendedFrom = undefined;
     if (currentTab.value.amendingStockEntry) {
       try {
         await frappeApi.post('/api/method/frappe.client.cancel', {
@@ -2110,10 +2297,15 @@ const submitToFrappe = async () => {
           name: currentTab.value.amendingStockEntry
         });
         console.log(`기존 전표 ${currentTab.value.amendingStockEntry} 취소 완료`);
+        validAmendedFrom = currentTab.value.amendingStockEntry;
       } catch (cancelErr) {
-        console.error('기존 전표 취소 실패:', cancelErr);
-        // 만약 이미 취소된 상태이거나 권한 문제가 있으면 여기서 막혀야 할 수도 있지만, 
-        // 일단 진행하거나 사용자에게 알릴 수 있습니다.
+        console.error('기존 전표 취소 실패 (Submit 안 된 Draft일 수 있음):', cancelErr);
+        try {
+          await frappeApi.delete(`/api/resource/Stock Entry/${currentTab.value.amendingStockEntry}`);
+          console.log(`Draft 전표 삭제 완료`);
+        } catch(delErr) {
+          console.error('Draft 전표 삭제 실패:', delErr);
+        }
       }
     }
 
@@ -2151,7 +2343,7 @@ const submitToFrappe = async () => {
       stock_entry_type: entryType,
       from_warehouse: fromWh,
       to_warehouse: toWh,
-      amended_from: currentTab.value.amendingStockEntry || undefined,
+      amended_from: validAmendedFrom,
       
       
       custom_ordering_branch: transactionMode.value === 'outbound' ? (currentTab.value.selectedBranch || undefined) : undefined,
@@ -2172,7 +2364,7 @@ const submitToFrappe = async () => {
               s_warehouse: fromWh,
               t_warehouse: toWh,
               allow_zero_valuation_rate: 1,
-              material_request: currentTab.value.activeReservationId,
+              material_request: item.mr_name || currentTab.value.activeReservationId || undefined,
               material_request_item: item.mr_item_id
             },
             {
@@ -2193,7 +2385,7 @@ const submitToFrappe = async () => {
           s_warehouse: fromWh,
           t_warehouse: toWh,
           allow_zero_valuation_rate: 1,
-          material_request: item.mr_item_id ? currentTab.value.activeReservationId : undefined,
+          material_request: item.mr_item_id ? (item.mr_name || currentTab.value.activeReservationId || undefined) : undefined,
           material_request_item: item.mr_item_id || undefined
         }];
       })
@@ -2332,7 +2524,7 @@ const submitReservation = async () => {
   try {
     const scheduleDate = new Date();
     scheduleDate.setDate(scheduleDate.getDate() + 1); // 기본 예약일을 내일로 설정
-    const dateStr = scheduleDate.toISOString().split('T')[0];
+    const dateStr = new Date(scheduleDate.getTime() - scheduleDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
     let reqType = 'Material Issue'; // 기본 출고 예약
     let fromWh = currentTab.value.selectedSource || undefined;
@@ -2712,7 +2904,7 @@ const submitReservation = async () => {
 /* 🌟 예약 뱃지 스타일 */
 .res-badge {
   background: #ef4444; color: white; font-size: 11px; font-weight: bold;
-  padding: 2px 6px; border-radius: 10px; margin-left: auto;
+  padding: 2px 6px; border-radius: 10px; margin-left: auto; white-space: nowrap;
 }
 .action-btn-triple-group { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; }
 </style>

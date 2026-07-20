@@ -48,7 +48,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="res in filteredOutboundHistorys" :key="res.name" @click="openDetail(res)" class="clickable-row">
+          <tr v-for="res in filteredOutboundHistorys" :key="res.name" 
+              @click="openDetail(res)" 
+              @mouseenter="handleMouseEnter($event, res)"
+              @mouseleave="handleMouseLeave"
+              class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
             <td>{{ res.creation ? res.creation.split(' ')[0] : '' }}</td>
             <td class="customer-name">{{ [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || res.owner || '-' }}</td>
@@ -138,6 +142,35 @@
       </div>
     </div>
 
+    <div v-if="hoverTooltip.visible" class="hover-tooltip" :style="{ top: hoverTooltip.y + 'px', left: hoverTooltip.x + 'px' }">
+      <div class="tooltip-header">
+        요청자: {{ hoverTooltip.data.requester }}
+      </div>
+      <table class="tooltip-table">
+        <thead>
+          <tr>
+            <th>품목명</th>
+            <th>박스</th>
+            <th>낱개</th>
+            <th>총수량</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="hoverTooltip.loading">
+            <td colspan="4" style="text-align: center; padding: 10px;">로딩 중...</td>
+          </tr>
+          <tr v-else-if="hoverTooltip.items.length === 0">
+            <td colspan="4" style="text-align: center; padding: 10px;">데이터가 없습니다.</td>
+          </tr>
+          <tr v-for="item in hoverTooltip.items" :key="item.item_code">
+            <td style="font-weight: 500;">{{ item.item_code }}</td>
+            <td style="text-align: right;">{{ Math.floor(item.qty / getPackQty(item.item_code)) || 0 }}</td>
+            <td style="text-align: right;">{{ item.qty % getPackQty(item.item_code) || 0 }}</td>
+            <td style="text-align: right; font-weight: bold; color: #0f172a;">{{ item.qty }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -145,16 +178,37 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
+// Tooltip State
+const hoverTooltip = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  data: {},
+  items: [],
+  loading: false
+})
+const hoverTimeout = ref(null)
+const itemCache = ref({})
+
 const props = defineProps({
   branchList: {
+    type: Array,
+    required: true
+  },
+  rawItems: {
     type: Array,
     default: () => []
   },
   listType: {
     type: String,
-    default: 'Material Issue'
+    default: 'Material Issue' // 'Material Issue' | 'Material Transfer'
   }
 })
+
+const getPackQty = (itemCode) => {
+  const found = props.rawItems.find(i => i.name === itemCode)
+  return found?.custom_pack_qty || 1
+}
 
 const emit = defineEmits(['create-new', 'edit-history'])
 
@@ -234,6 +288,9 @@ const openDetail = async (res) => {
     const detail = await frappeApi.get(`/api/resource/Stock Entry/${res.name}`)
     selectedOutboundHistoryItems.value = detail.data.data.items || []
     
+    // 캐시 저장
+    itemCache.value[res.name] = detail.data.data.items || []
+
     // 수정 후(Amended) 문서 찾기
     const amendedQuery = await frappeApi.get('/api/resource/Stock Entry', {
       params: {
@@ -249,9 +306,53 @@ const openDetail = async (res) => {
       const am_detail = await frappeApi.get(`/api/resource/Stock Entry/${am_name}`)
       amendedDocumentItems.value = am_detail.data.data.items || []
     }
-  } catch (err) {
-    console.error('상세 조회 에러:', err)
+  } catch (error) {
+    console.error('취소/수정 내역 상세 조회 에러:', error)
   }
+}
+
+const handleMouseEnter = (event, res) => {
+  if (hoverTimeout.value) clearTimeout(hoverTimeout.value)
+  
+  const requester = [res.custom_orderer, res.custom_customer].filter(Boolean).join(' / ') || res.owner || '-'
+  
+  hoverTooltip.value = {
+    visible: false,
+    x: event.clientX + 20,
+    y: event.clientY + 20,
+    data: { requester },
+    items: [],
+    loading: true
+  }
+
+  hoverTimeout.value = setTimeout(async () => {
+    hoverTooltip.value.visible = true
+    
+    if (itemCache.value[res.name]) {
+      hoverTooltip.value.items = itemCache.value[res.name]
+      hoverTooltip.value.loading = false
+      return
+    }
+
+    try {
+      const detail = await frappeApi.get(`/api/resource/Stock Entry/${res.name}`)
+      const items = detail.data.data.items || []
+      itemCache.value[res.name] = items
+      hoverTooltip.value.items = items
+    } catch (err) {
+      console.error('Hover fetch error:', err)
+    } finally {
+      hoverTooltip.value.loading = false
+    }
+  }, 400) // 400ms 딜레이 (부하 방지)
+}
+
+const handleMouseLeave = () => {
+  if (hoverTimeout.value) {
+    clearTimeout(hoverTimeout.value)
+    hoverTimeout.value = null
+  }
+  hoverTooltip.value.visible = false
 }
 
 const goToPreviousHistory = () => {
@@ -500,6 +601,47 @@ const loadToCart = () => {
   background: #f8fafc;
   padding: 15px;
   border-radius: 8px;
+  border-bottom: 2px solid transparent;
+}
+
+.hover-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background-color: #ffffff;
   border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  padding: 15px;
+  width: 350px;
+  pointer-events: none; /* 마우스가 툴팁 위로 가도 깜빡이지 않게 함 */
+}
+
+.hover-tooltip .tooltip-header {
+  font-size: 14px;
+  font-weight: bold;
+  color: #0ea5e9;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 5px;
+}
+
+.hover-tooltip .tooltip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.hover-tooltip .tooltip-table th,
+.hover-tooltip .tooltip-table td {
+  padding: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.hover-tooltip .tooltip-table th {
+  text-align: left;
+  background-color: #f8fafc;
+  color: #64748b;
+  font-weight: bold;
 }
 </style>
+

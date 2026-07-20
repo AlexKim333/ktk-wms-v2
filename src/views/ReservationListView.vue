@@ -2,7 +2,16 @@
   <div class="reservation-list-container">
     <div class="header-actions">
       <h2>📅 {{ $t('reservation_list.title') }}</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ {{ $t('reservation_list.btn_create') }}</button>
+      <button class="btn-create" v-if="viewMode === 'requests'" @click="$emit('create-new')">➕ {{ $t('reservation_list.btn_create') }}</button>
+    </div>
+
+    <div class="view-mode-tabs" style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <button @click="viewMode = 'requests'" :class="['tab-btn', viewMode === 'requests' ? 'active-tab' : 'inactive-tab']">
+        📦 전체 예약 현황 (Material Request)
+      </button>
+      <button @click="viewMode = 'drafts'" :class="['tab-btn', viewMode === 'drafts' ? 'active-tab' : 'inactive-tab']">
+        🚚 출고 대기열 (Draft Stock Entry)
+      </button>
     </div>
 
     <div class="filters">
@@ -34,10 +43,10 @@
             <th>{{ $t('reservation_list.col_cancel') }}</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody v-if="viewMode === 'requests'">
           <tr v-for="res in filteredReservations" :key="res.name" @click="openDetail(res)" class="clickable-row">
             <td class="res-id">{{ res.name }}</td>
-            <td>{{ res.schedule_date }}</td>
+            <td>{{ res.creation ? res.creation.split(' ')[0] : (res.schedule_date || '-') }}</td>
             <td class="customer-name">
               <div>{{ reservationType === 'Material Transfer' ? (res.set_from_warehouse || '-') : (res.custom_customer || res.customer || '-') }}</div>
             </td>
@@ -48,7 +57,7 @@
               </div>
             </td>
             <td>
-              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus) }}</span>
+              <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.is_stock_entry) }}</span>
             </td>
             <td>{{ totalQtyMap[res.name] || 0 }} {{ $t('reservation_list.ea') }}</td>
             <td>
@@ -58,7 +67,7 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td class="action-cell" @click.stop>
-              <button v-if="res.docstatus === 0" class="btn-submit" @click="submitDraft(res)" title="예약 확정(Submit)" style="background:none; border:none; cursor:pointer; font-size:1.1em; margin-right:5px;">
+              <button v-if="res.docstatus === 0 && !res.is_stock_entry" class="btn-submit" @click="submitDraft(res)" title="예약 확정(Submit)" style="background:none; border:none; cursor:pointer; font-size:1.1em; margin-right:5px;">
                 ✅
               </button>
               <button class="btn-delete" @click="cancelReservation(res)" :title="res.docstatus === 0 ? '반려(삭제)' : (res.status === 'Pending' ? $t('reservation_list.btn_cancel') : $t('reservation_list.btn_terminate'))">
@@ -68,6 +77,26 @@
           </tr>
           <tr v-if="filteredReservations.length === 0">
             <td colspan="8" class="empty-msg">{{ $t('reservation_list.empty_msg') }}</td>
+          </tr>
+        </tbody>
+
+        <tbody v-if="viewMode === 'drafts'">
+          <tr v-for="res in filteredDrafts" :key="res.name" @click="loadDraftToCart(res)" class="clickable-row" style="background-color: #fffbeb;">
+            <td class="res-id">{{ res.name }}</td>
+            <td>{{ res.creation?.split(' ')[0] }}</td>
+            <td class="customer-name">{{ res.from_warehouse || '-' }}</td>
+            <td>{{ res.to_warehouse || '-' }}</td>
+            <td><span class="status-badge status-default" style="background:#fef3c7; color:#d97706; border:1px solid #fcd34d;">출고 대기(Draft)</span></td>
+            <td><strong style="color:#2563eb;">{{ totalQtyMap[res.name] || 0 }}</strong> {{ $t('reservation_list.ea') }}</td>
+            <td><span style="color:#ef4444; font-weight:bold;">대기 중</span></td>
+            <td class="action-cell" @click.stop>
+              <button class="btn-submit" @click="loadDraftToCart(res)" title="장바구니 로드" style="background:none; border:none; cursor:pointer; font-size:1.2em;">
+                🛒
+              </button>
+            </td>
+          </tr>
+          <tr v-if="filteredDrafts.length === 0">
+            <td colspan="8" class="empty-msg" style="padding: 40px; color: #94a3b8;">출고 대기 중인 문서가 없습니다. 🎉</td>
           </tr>
         </tbody>
       </table>
@@ -165,7 +194,7 @@ const props = defineProps({
 
 const { t } = useI18n()
 
-const emit = defineEmits(['create-new', 'edit-reservation', 'refresh-items'])
+const emit = defineEmits(['create-new', 'edit-reservation', 'edit-draft', 'refresh-items'])
 
 const frappeApi = axios.create({
   headers: {
@@ -187,6 +216,9 @@ const getPackQty = (itemCode) => {
 
 
 const reservations = ref([])
+const drafts = ref([])
+const viewMode = ref('requests')
+const filteredDrafts = ref([])
 const searchQuery = ref('')
 const statusFilter = ref('incomplete')
 const branchFilter = ref('all')
@@ -196,10 +228,10 @@ const totalQtyMap = ref({})
 
 const fetchReservations = async () => {
   try {
-    const [resPending, resDraft] = await Promise.all([
+    const [resPending, resDraft, userRes] = await Promise.all([
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          fields: JSON.stringify(['name', 'creation', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
           filters: JSON.stringify([
             ['docstatus', '=', 1],
             ['material_request_type', '=', props.reservationType]
@@ -210,7 +242,7 @@ const fetchReservations = async () => {
       }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
+          fields: JSON.stringify(['name', 'creation', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
           filters: JSON.stringify([
             ['docstatus', '=', 0],
             ['material_request_type', '=', props.reservationType],
@@ -219,23 +251,71 @@ const fetchReservations = async () => {
           limit_page_length: 100,
           order_by: 'creation desc'
         }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/User', {
+        params: {
+          fields: JSON.stringify(['name', 'full_name']),
+          limit_page_length: 1000
+        }
       }).catch(() => ({ data: { data: [] } }))
     ])
     
-    reservations.value = [...(resPending.data?.data || []), ...(resDraft.data?.data || [])]
+    const userMap = {}
+    const users = userRes?.data?.data || []
+    users.forEach(u => { userMap[u.name] = u.full_name })
     
-    // 예약 총 수량 계산을 위해 각 예약 문서 상세 조회
-    if (reservations.value.length > 0) {
-      const detailPromises = reservations.value.map(r => 
-        frappeApi.get(`/api/resource/Material Request/${r.name}`)
-      )
+    // Fetch Draft Stock Entries
+    const draftsRes = await frappeApi.get('/api/resource/Stock Entry', {
+      params: {
+        fields: JSON.stringify(['name', 'creation', 'purpose', 'stock_entry_type', 'from_warehouse', 'to_warehouse', 'docstatus', 'owner', 'custom_orderer']),
+        filters: JSON.stringify([
+          ['docstatus', '=', 0],
+          ['purpose', '=', 'Material Transfer']
+        ]),
+        limit_page_length: 200,
+        order_by: 'creation desc'
+      }
+    }).catch(() => ({ data: { data: [] } }))
+    
+    const seData = draftsRes.data?.data || []
+    const normalizedSE = seData.map(se => ({
+      ...se,
+      is_stock_entry: true,
+      material_request_type: 'Material Transfer',
+      status: 'Draft',
+      schedule_date: (() => {
+        try {
+          const d = new Date(se.creation.replace(' ', 'T') + '+09:00');
+          return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        } catch(e) { return se.creation.split(' ')[0]; }
+      })(),
+      set_from_warehouse: se.from_warehouse,
+      set_warehouse: se.to_warehouse,
+      custom_orderer: userMap[se.custom_orderer] || se.custom_orderer || userMap[se.owner] || se.owner || ''
+    }))
+
+    reservations.value = [...(resPending.data?.data || []), ...(resDraft.data?.data || []), ...normalizedSE].sort((a, b) => new Date(b.schedule_date || b.creation) - new Date(a.schedule_date || a.creation))
+    
+    drafts.value = seData
+    
+    // 예약 및 출고 대기열 총 수량 계산
+    const allDocs = reservations.value
+    if (allDocs.length > 0) {
+      const detailPromises = allDocs.map(r => {
+        if (r.is_stock_entry || r.name.startsWith('MAT-STE') || r.name.startsWith('STE-')) {
+          return frappeApi.get(`/api/resource/Stock Entry/${r.name}`)
+        } else {
+          return frappeApi.get(`/api/resource/Material Request/${r.name}`)
+        }
+      })
       const detailResArray = await Promise.all(detailPromises)
       
       const qtyMap = {}
       detailResArray.forEach(res => {
         const doc = res.data.data
-        if (doc && doc.items) {
-          const total = doc.items.reduce((sum, item) => sum + (item.qty || 0), 0)
+        if (doc && (doc.items || doc.items)) {
+          const items = doc.items || []
+          const total = items.reduce((sum, item) => sum + (item.qty || 0), 0)
           qtyMap[doc.name] = total
         }
       })
@@ -286,7 +366,8 @@ const filteredReservations = computed(() => {
   })
 })
 
-const translateStatus = (status, docstatus) => {
+const translateStatus = (status, docstatus, is_stock_entry) => {
+  if (is_stock_entry && docstatus === 0) return '본점 출고 대기'
   if (docstatus === 0) return 'Draft(지점장 승인)'
   if (docstatus === 1 && status === 'Draft') return t('status.pending') // 억까 방지: 실제로는 docstatus 1 인데 상태값이 Draft로 내려온 경우
   if (!status) return ''
@@ -310,9 +391,10 @@ const getStatusLabel = (res) => {
 }
 
 const getStatusClass = (res) => {
+  if (res.is_stock_entry && res.docstatus === 0) return 'status-delivering'
   if (res.docstatus === 0) return 'status-default'
   if (res.status === 'Pending' || (res.docstatus === 1 && res.status === 'Draft')) return 'status-pending'
-  if (res.status.includes('Partial')) return 'status-partial'
+  if (res.status?.includes('Partial') || (res.status && res.status.includes('Partial'))) return 'status-partial'
   if (res.status === 'Completed' || res.status === 'Issued' || res.status === 'Transferred' || res.status === 'Received') return 'status-completed'
   if (res.status === 'Cancelled') return 'status-cancelled'
   return 'status-default'
@@ -329,7 +411,9 @@ const getTotalQty = (res) => {
 const openDetail = async (res) => {
   selectedReservation.value = { ...res }
   try {
-    const detail = await frappeApi.get(`/api/resource/Material Request/${res.name}`)
+    const detail = res.is_stock_entry 
+      ? await frappeApi.get(`/api/resource/Stock Entry/${res.name}`)
+      : await frappeApi.get(`/api/resource/Material Request/${res.name}`)
     // 전체 문서를 병합하여 모든 필드를 PosView로 넘겨줄 수 있게 함
     selectedReservation.value = { ...selectedReservation.value, ...detail.data.data }
     selectedReservationItems.value = detail.data.data.items || []
@@ -339,11 +423,14 @@ const openDetail = async (res) => {
 }
 
 const loadToCart = () => {
-  // 선택된 예약과 해당 아이템들을 PosView로 전달하여 장바구니 세팅
-  emit('edit-reservation', {
-    ...selectedReservation.value,
-    items: selectedReservationItems.value
-  })
+  if (selectedReservation.value.is_stock_entry || selectedReservation.value.name.startsWith('MAT-STE')) {
+    emit('edit-draft', selectedReservation.value.name)
+  } else {
+    emit('edit-reservation', {
+      ...selectedReservation.value,
+      items: selectedReservationItems.value
+    })
+  }
   selectedReservation.value = null
 }
 
@@ -367,7 +454,11 @@ const cancelReservation = async (res) => {
     if (!confirm(t('reservation_list.msg_confirm_cancel', { name: res.name }))) return
     try {
       if (res.docstatus === 0) {
-        await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
+        if (res.is_stock_entry) {
+          await frappeApi.delete(`/api/resource/Stock Entry/${res.name}`)
+        } else {
+          await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
+        }
       } else {
         await frappeApi.post(`/api/method/frappe.client.cancel`, {
           doctype: 'Material Request',
@@ -495,6 +586,7 @@ const cancelReservation = async (res) => {
   font-weight: bold;
 }
 .status-pending { background: #fef08a; color: #854d0e; }
+.status-delivering { background: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; }
 .status-partial { background: #fed7aa; color: #c2410c; }
 .status-completed { background: #bbf7d0; color: #166534; }
 .status-cancelled { background: #fecaca; color: #991b1b; }

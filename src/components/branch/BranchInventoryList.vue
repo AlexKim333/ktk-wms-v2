@@ -1,7 +1,7 @@
 <template>
   <div class="product-list-zone branch-inventory">
     <header class="page-header">
-      <h2>📦 지점 재고 조회 ({{ authStore.user?.branch_name }})</h2>
+      <h2>{{ $t('branch.inventory.title', { branch: authStore.user?.branch_name }) }}</h2>
       <div class="action-buttons">
         <button class="btn-action outline" @click="$emit('handle-migration')">
           <span class="icon">📤</span> CSV 업로드
@@ -19,24 +19,24 @@
           <input 
             type="text" 
             v-model="searchQuery" 
-            placeholder="상품명 검색..." 
+            :placeholder="$t('branch.inventory.ph_search')" 
             class="search-input" 
           />
         </div>
-        <button class="btn-refresh" @click="loadInventory">🔄 새로고침</button>
+        <button class="btn-refresh" @click="loadInventory">{{ $t('branch.inventory.btn_refresh') }}</button>
       </div>
 
       <div class="table-scroll">
         <table class="product-table">
           <thead>
             <tr>
-              <th>품명 (상품명)</th>
-              <th>카테고리</th>
-              <th>컬러/속성</th>
-              <th>팩 수량<br/>(Pack Qty)</th>
-              <th class="stock-col highlight-branch">내 지점 재고<br/>({{ authStore.user?.branch_name }})</th>
-              <th class="stock-col highlight-main">메인 재고<br/>([MAIN] ALARCON - K)</th>
-              <th>상세 보기 / 주문</th>
+              <th>{{ $t('branch.inventory.col_item_name') }}</th>
+              <th>{{ $t('branch.inventory.col_category') }}</th>
+              <th>{{ $t('branch.inventory.col_color') }}</th>
+              <th>{{ $t('branch.inventory.col_pack_qty') }}</th>
+              <th class="stock-col highlight-branch">{{ $t('branch.inventory.col_my_stock', { branch: authStore.user?.branch_name }) }}</th>
+              <th class="stock-col highlight-main">{{ $t('branch.inventory.col_main_stock') }}</th>
+              <th>{{ $t('branch.inventory.col_detail') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -54,25 +54,20 @@
                 <strong>{{ getStock(item.name, '[MAIN] ALARCON - K') }}</strong>
               </td>
               <td class="action-cell">
-                <div style="display: flex; gap: 8px; justify-content: center;">
-                    <button class="btn-detail" @click="$emit('open-detail', item.name)">
-                      상세 정보
-                    </button>
-                    <button class="btn-order" @click="handleAddOrder(item)">
-                      주문 ➕
-                    </button>
-                  </div>
+                <button class="btn-detail" @click="$emit('open-detail', item.name)">
+                  {{ $t('branch.inventory.btn_detail') }}
+                </button>
               </td>
             </tr>
             <tr v-if="listHasMore">
               <td colspan="7" style="text-align:center; padding: 16px; background:#fffbeb;">
                 <button type="button" class="btn-show-more" @click="loadMoreItems">
-                  결과 더보기 (+{{ listRemaining }})
+                  {{ $t('common.show_more', { n: listRemaining }) }}
                 </button>
               </td>
             </tr>
             <tr v-if="displayedItems.length === 0">
-              <td colspan="7" class="empty-state">검색된 상품이 없습니다.</td>
+              <td colspan="7" class="empty-state">{{ $t('branch.inventory.empty_msg') }}</td>
             </tr>
           </tbody>
         </table>
@@ -82,12 +77,14 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
 import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
 import { usePagedList } from '../../composables/usePagedList.js'
 
-const authStore = useAuthStore()
+const authStore = useAuthStore();
+const { t } = useI18n();
 const emit = defineEmits(['open-detail', 'handle-migration', 'add-to-transfer'])
 
 const props = defineProps({
@@ -133,7 +130,7 @@ const getStock = (itemCode, warehouse) => {
 const handleAddOrder = (item) => {
   const mainStock = getStock(item.name, '[MAIN] ALARCON - K')
   if (mainStock <= 0) {
-    alert('메인 창고([MAIN] ALARCON - K)에 해당 상품의 재고가 없습니다.\n주문을 추가할 수 없습니다.')
+    alert(t('branch.inventory.msg_no_main_stock'))
     return
   }
   emit('add-to-transfer', item.name)
@@ -147,7 +144,7 @@ const loadInventory = () => {
 const exportCSV = () => {
   if (filteredItems.value.length === 0) return
   
-  const headers = ['품명(Item Name)', '카테고리(Item Group)', '컬러(Color)', '팩 수량(Pack Qty)', `지점재고(${authStore.user?.branch_name})`, '메인재고(ALARCON-K)']
+  const headers = t('branch.inventory.export_headers', { branch: authStore.user?.branch_name }).split(',')
   
   const rows = filteredItems.value.map(item => [
     `"${item.item_name || ''}"`,
@@ -163,7 +160,7 @@ const exportCSV = () => {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.setAttribute('href', url)
-  link.setAttribute('download', `branch_inventory_${new Date().toISOString().slice(0,10)}.csv`)
+  link.setAttribute('download', `branch_inventory_${new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10)}.csv`)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

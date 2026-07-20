@@ -7,7 +7,7 @@
           <span class="search-icon">🔍</span>
           <input
             type="text"
-            placeholder="상품명 또는 속성 검색..."
+            :placeholder="$t('branch.transfer.ph_search_name')"
             class="search-bar"
             autocomplete="off"
           />
@@ -16,7 +16,7 @@
           <span class="search-icon">🏷️</span>
           <input
             type="text"
-            placeholder="바코드 스캔..."
+            :placeholder="$t('branch.transfer.ph_search_barcode')"
             class="search-bar barcode-bar"
             autocomplete="off"
           />
@@ -26,7 +26,7 @@
       <!-- Quick Pick (단일 베스트) -->
       <div class="hotkey-block">
         <div class="block-header">
-          <h3>⚡ Quick Pick (단일 베스트)</h3>
+          <h3>{{ $t('branch.transfer.qp_single') }}</h3>
         </div>
         <div class="grid-3x4">
           <!-- 더미 데이터로 레이아웃 채우기 -->
@@ -36,7 +36,7 @@
               <span class="line-2">(SURTIDO - 100入)</span>
               <span class="p-stock-info">📦 7 상자 / 10 개</span>
             </button>
-            <button class="hotkey-sub-edit-btn">⚙️ edit</button>
+            <button class="hotkey-sub-edit-btn">{{ $t('branch.transfer.btn_edit') }}</button>
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@
       <!-- Grid Quick Pick (묶음 품목) -->
       <div class="hotkey-block" style="margin-top:15px;">
         <div class="block-header" style="border-bottom-color: #0ea5e9;">
-          <h3 style="color:#0369a1;">🌐 Grid Quick Pick (묶음 품목)</h3>
+          <h3 style="color:#0369a1;">{{ $t('branch.transfer.qp_grid') }}</h3>
         </div>
         <div class="grid-3x4">
           <div class="hotkey-card" v-for="i in 4" :key="'g'+i">
@@ -59,7 +59,7 @@
       <!-- Customer Quick Pick -->
       <div class="hotkey-block" style="margin-top:15px;">
         <div class="block-header" style="border-bottom-color: #eab308;">
-          <h3 style="color:#ca8a04;">🤝 Customer Quick Pick (주요 고객)</h3>
+          <h3 style="color:#ca8a04;">{{ $t('pos.qp_customer') }}</h3>
         </div>
         <div class="grid-3x4">
           <div class="hotkey-card" v-for="i in 4" :key="'c'+i">
@@ -83,8 +83,8 @@
           </div>
         </div>
         <div class="tabs-header-actions">
-          <span class="transaction-mode-label">출고 입력</span>
-          <button class="add-tab-action-btn">+ 탭추가</button>
+          <span class="transaction-mode-label">{{ $t('pos.mode_outbound') }}</span>
+          <button class="add-tab-action-btn">{{ $t('pos.btn_add_tab') }}<</button>
         </div>
       </div>
 
@@ -93,31 +93,31 @@
         <div class="tab-internal-master-header">
           <div class="master-input-row">
             <div class="master-lock-group">
-              <label>🏢 담당 지점(창고)</label>
+              <label>{{ $t('pos.lbl_branch') }}</label>
               <!-- 지점은 로그인된 유저의 정보로 고정 -->
               <input type="text" class="master-input" :value="authStore.user?.branch_name" disabled />
             </div>
             <!-- 일괄 취소 버튼 영역 (우측 정렬) -->
             <div class="master-lock-group" style="justify-content: flex-end; align-items: flex-end;">
-              <button class="clear-cart-btn">🗑️ 일괄 취소 (비우기)</button>
+              <button class="clear-cart-btn">{{ $t('pos.btn_cancel_edit') }}</button>
             </div>
           </div>
           
           <div class="master-input-row" style="margin-top: 10px;">
             <div class="master-lock-group">
-              <label>🤝 고객 (Customer)</label>
-              <input type="text" class="master-input" placeholder="고객 검색 또는 핫키 선택" autocomplete="off" />
+              <label>{{ $t('pos.lbl_customer') }}</label>
+              <input type="text" class="master-input" :placeholder="$t('pos.ph_customer')" autocomplete="off" />
             </div>
             <div class="master-lock-group">
-              <label>👔 결재책임자 (Manager)</label>
+              <label>{{ $t('branch.transfer.lbl_manager') }}</label>
               <select class="master-select">
-                <option value="">책임자 선택</option>
+                <option value="">{{ $t('branch.transfer.sel_manager') }}</option>
               </select>
             </div>
             <div class="master-lock-group">
-              <label>👤 응대자 (Clerk)</label>
+              <label>{{ $t('branch.transfer.lbl_clerk') }}</label>
               <select class="master-select">
-                <option value="">응대자 선택</option>
+                <option value="">{{ $t('branch.transfer.sel_clerk') }}</option>
               </select>
             </div>
           </div>
@@ -128,16 +128,16 @@
           <table class="pos-cart-table">
             <thead>
               <tr>
-                <th rowspan="2">품명(컬러)</th>
-                <th colspan="2" class="sub-th" style="background:#f1f5f9;">수량 입력</th>
-                <th rowspan="2">총 수량</th>
-                <th rowspan="2">단가</th>
+                <th rowspan="2">{{ $t('pos.th_item_color') }}</th>
+                <th colspan="2" class="sub-th" style="background:#f1f5f9;">{{ $t('pos.th_qty_input') }}</th>
+                <th rowspan="2">{{ $t('pos.th_total_qty') }}</th>
+                <th rowspan="2">{{ $t('stock_adj.col_unit_cost') }}</th>
                 <th rowspan="2">금액</th>
                 <th rowspan="2" style="width: 40px;"></th>
               </tr>
               <tr class="sub-th" style="background:#f1f5f9;">
-                <th>Caja (박스)</th>
-                <th>Pza (낱장)</th>
+                <th>{{ $t('pos.th_box') }}</th>
+                <th>{{ $t('pos.th_each') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -162,7 +162,7 @@
               </tr>
               <!-- 더미 빈 장바구니 -->
               <tr>
-                <td colspan="7" class="empty-cart-msg">핫키를 누르거나 검색하여 상품을 추가하세요.</td>
+                <td colspan="7" class="empty-cart-msg">{{ $t('pos.empty_cart') }}</td>
               </tr>
             </tbody>
           </table>
@@ -175,8 +175,8 @@
             <div class="summary-label-box" style="color:#0284c7;">👕 낱장 총 개수: <strong style="color:#0284c7;">0 개</strong></div>
           </div>
           <div class="action-btn-double-group">
-            <button class="btn-outbound-reserve" style="background:#475569;">배송/픽업 옵션</button>
-            <button class="btn-final-submit" style="background:#00a896;">전표 발행 (Frappe 전송)</button>
+            <button class="btn-outbound-reserve" style="background:#475569;">{{ $t('branch.transfer.btn_save_draft') }}</button>
+            <button class="btn-final-submit" style="background:#00a896;">{{ $t('branch.transfer.btn_submit_final') }}</button>
           </div>
         </div>
       </div>
@@ -185,10 +185,12 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
 
-const authStore = useAuthStore()
+const authStore = useAuthStore();
+const { t } = useI18n();
 
 // Props for sharing data from PosView without re-fetching
 const props = defineProps({

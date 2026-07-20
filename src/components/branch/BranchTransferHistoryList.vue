@@ -1,19 +1,19 @@
 <template>
   <div class="history-list-container">
     <div class="header-actions">
-      <h2>📅 재고이동 현황 (예약 및 완료)</h2>
-      <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 재고이동)</button>
+      <h2>{{ $t('branch.history.title') }}</h2>
+      <button class="btn-create" @click="$emit('create-new')">{{ $t('branch.history.btn_new') }}<</button>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="출고 검색 (고객명, 번호)" class="filter-input" />
+      <input type="text" v-model="searchQuery" :placeholder="$t('branch.history.ph_search')" class="filter-input" />
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">전체 (All)</option>
-        <option value="incomplete">미결 (Incomplete - 예약)</option>
-        <option value="completed">완료 (Completed)</option>
+        <option value="all">{{ $t('branch.res_list.status_all') }}<</option>
+        <option value="incomplete">{{ $t('branch.res_list.status_incomplete') }}<</option>
+        <option value="completed">{{ $t('branch.res_list.status_completed') }}<</option>
       </select>
       <button class="btn-refresh" @click="fetchHistory" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
-        🔄 새로고침
+        🔄 {{ $t('branch.inventory.btn_refresh') }}
       </button>
     </div>
 
@@ -21,7 +21,7 @@
       <table class="history-table">
         <thead>
           <tr>
-            <th>이동 번호</th>
+            <th>{{ $t('branch.history.col_no') }}<</th>
             <th>날짜</th>
             <th>담당자 / 요청자</th>
             <th>출발 ➔ 도착 창고</th>
@@ -108,11 +108,13 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted } from 'vue'
 import frappeApi from '../../api/frappe.js'
 import { useAuthStore } from '../../stores/auth'
 
-const authStore = useAuthStore()
+const authStore = useAuthStore();
+const { t } = useI18n();
 const emit = defineEmits(['create-new'])
 
 const historys = ref([])
