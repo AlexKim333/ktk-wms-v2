@@ -723,6 +723,8 @@
 </template>
 
 <script setup>
+import { useMobile } from '../composables/useMobile.js'
+import MobilePosLayout from './mobile/MobilePosLayout.vue'
 import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
