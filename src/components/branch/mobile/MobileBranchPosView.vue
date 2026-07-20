@@ -1,7 +1,17 @@
 <template>
-  <div class="workspace-body branch-pos" style="padding: 15px; gap: 15px; background: #f8fafc;">
+  <div class="workspace-body branch-pos" style="padding: 15px; gap: 15px; background: #f8fafc; flex-direction: column;">
+    <!-- 모바일 모드 탭 -->
+    <div class="mobile-tabs" style="display: flex; gap: 10px;">
+      <button :class="['m-tab-btn', { active: mobileMode === 'search' }]" @click="mobileMode = 'search'" style="flex:1; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-weight: bold; color: #475569;">
+        🔍 상품 검색
+      </button>
+      <button :class="['m-tab-btn', { active: mobileMode === 'cart' }]" @click="mobileMode = 'cart'" style="flex:1; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-weight: bold; color: #475569;">
+        🛒 장바구니 ({{ currentTab?.cartItems?.length || 0 }})
+      </button>
+    </div>
+
     <!-- Left Pane: Search or Quick Pick -->
-    <div class="workspace-left" style="flex: 0.95; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; background: transparent; border: none;">
+    <div v-show="mobileMode === 'search'" class="workspace-left" style="flex: 1; width: 100%; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; background: transparent; border: none;">
       <!-- Dual Search Bar (상품명 / 바코드) -->
       <div class="search-section dual-search" style="display: flex; gap: 10px; width: 100%;">
         <div class="search-box-wrapper" style="position: relative; flex: 1; display: flex; align-items: center;">
@@ -187,7 +197,7 @@
     />
 
     <!-- Right Pane: Cart & Header -->
-    <div class="workspace-right" style="flex: 1.05; background: white; border-radius: 8px; border: 2px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden;">
+    <div v-show="mobileMode === 'cart'" class="workspace-right" style="flex: 1; width: 100%; background: white; border-radius: 8px; border: 2px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden;">
 
       <!-- 탭 컨트롤 헤더 (일관성 유지 - VENTA와 동일한 스타일) -->
       <div class="tabs-control-header" style="display: flex; justify-content: space-between; background: #e0f2fe; border-bottom: 2px solid #3b82f6; padding: 8px 10px 0 10px;">
@@ -383,6 +393,7 @@ const tabs = ref([{
   cartItems: []
 }])
 const currentTabIndex = ref(0)
+const mobileMode = ref('search')
 const nextTabId = ref(2)
 
 const currentTab = computed(() => tabs.value[currentTabIndex.value])
@@ -973,4 +984,5 @@ const submitTransfer = async () => {
   cursor: pointer;
 }
 .empty-slot { opacity: 0.5; }
+.m-tab-btn.active { background: #3b82f6 !important; color: white !important; border-color: #2563eb !important; }
 </style>

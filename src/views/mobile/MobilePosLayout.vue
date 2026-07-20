@@ -43,7 +43,7 @@
     <!-- 모바일 하단 탭 바 (지점 3종 메뉴) -->
     <nav class="mobile-bottom-nav">
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="activeNav = 'branch-pos'">
-        🛒<br/>출고(판매)
+        🔍<br/>재고검색
       </button>
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-transfer' }" @click="activeNav = 'branch-transfer'">
         🚚<br/>재고이동
