@@ -103,6 +103,7 @@ watch(() => props.rawItems, (newVal) => {
 }, { immediate: true })
 
 const filteredItems = computed(() => {
+  props.rawItems; // 강제 반응성 트리거
   const q = searchQuery.value.trim()
   if (!q) return searchItemsOrAll('', { limit: null, allLimit: 99999 })
   const hits = searchItemsOrAll(q, { limit: null, allLimit: 99999 })

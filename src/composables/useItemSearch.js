@@ -1,4 +1,5 @@
-import { Document } from 'flexsearch'
+import FlexSearch from 'flexsearch';
+const Document = FlexSearch.Document || FlexSearch;
 import { shallowRef } from 'vue'
 
 /**
