@@ -160,7 +160,13 @@
 
       <div v-else class="workspace-body">
         
-        <div class="workspace-left">
+        <div class="workspace-left" style="position: relative;">
+          <!-- Header Incomplete Overlay Gate -->
+          <div v-if="!isHeaderComplete" class="header-gate-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.85); z-index: 50; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; backdrop-filter: blur(2px);">
+            <div style="font-size: 45px; margin-bottom: 15px;">🛑</div>
+            <h2 style="color: #ef4444; margin: 0 0 10px 0; text-align: center; font-size: 24px;">잠깐! 우측 헤더를 먼저 채워주세요!</h2>
+            <p style="color: #475569; font-size: 15px; font-weight: bold; text-align: center; line-height: 1.5;">우측 상단의 전표 헤더(출발/도착 창고, 담당자 등)<br>필수 항목을 모두 선택해야 상품 검색 및 추가가 가능합니다.</p>
+          </div>
           <div class="search-section dual-search">
             <!-- 동적 검색 (자동완성) -->
             <div class="search-box-wrapper">
@@ -1723,6 +1729,21 @@ const currentTabSummary = computed(() => {
     eaches += (Number(item.input_each) || 0)
   })
   return { boxes, eaches }
+})
+
+// 🌟 헤더(마스터 정보)가 모두 입력되었는지 확인하는 Computed (Gate)
+const isHeaderComplete = computed(() => {
+  if (!currentTab.value) return false;
+  if (transactionMode.value === 'transfer') {
+    return !!currentTab.value.selectedSource && !!currentTab.value.selectedTarget && !!currentTab.value.selectedResponder;
+  }
+  if (transactionMode.value === 'outbound') {
+    return !!currentTab.value.selectedSource && !!currentTab.value.selectedBranch && !!currentTab.value.selectedCustomer && !!currentTab.value.selectedResponder;
+  }
+  if (transactionMode.value === 'inbound') {
+    return !!currentTab.value.selectedSupplier && !!currentTab.value.selectedBranch && !!currentTab.value.selectedTarget && !!currentTab.value.selectedResponder;
+  }
+  return true;
 })
 
 // 🌟 현재 선택된 트랜잭션 모드에 해당하는 탭들만 필터링
