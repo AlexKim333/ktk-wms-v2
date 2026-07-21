@@ -118,7 +118,7 @@
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="font-weight:bold;">{{ item.item_code }}</td>
                 
-                <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
+                <template v-if="(selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry) || (selectedReservation.is_stock_entry && selectedReservation.docstatus === 0)">
                   <td style="background:#f0f9ff; text-align:center; padding: 4px;">
                     <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
                   </td>
@@ -146,6 +146,9 @@
             </button>
             <button v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" @click="submitPartialRequest" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isSubmittingPartial">
               {{ isSubmittingPartial ? '전송 중...' : '🔥 입력한 수량만큼 즉시 출고 대기열로 넘기기' }}
+            </button>
+            <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="updateDraftRequest" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isUpdatingDraft">
+              {{ isUpdatingDraft ? '업데이트 중...' : '💾 수정된 수량으로 드래프트 저장하기' }}
             </button>
           </div>
         </div>
@@ -457,13 +460,16 @@ const openDetail = async (res) => {
 
     selectedReservationItems.value = items.map(item => {
       const remain = item.qty - (item.ordered_qty || 0)
+      const initialQty = (res.is_stock_entry && res.docstatus === 0) ? item.qty : 0;
+      const pack = item.custom_pack_qty || packQtyMap[item.item_code] || 1;
+      
       return {
         ...item,
-        custom_pack_qty: item.custom_pack_qty || packQtyMap[item.item_code] || 1,
+        custom_pack_qty: pack,
         remain_qty: remain > 0 ? remain : 0,
-        request_caja: 0,
-        request_pza: 0,
-        request_qty: 0
+        request_caja: Math.floor(initialQty / pack),
+        request_pza: initialQty % pack,
+        request_qty: initialQty
       }
     })
   } catch (err) {
@@ -477,11 +483,13 @@ const handleQtyChange = (item) => {
   const cap = item.custom_pack_qty || 1
   let total = (item.request_caja || 0) * cap + (item.request_pza || 0)
   
-  if (total > item.remain_qty) {
-    alert(`예약물량이 부족합니다. (최대 ${item.remain_qty}개 까지만 가능)`)
-    total = item.remain_qty
-    item.request_caja = Math.floor(total / cap)
-    item.request_pza = total % cap
+  if (!selectedReservation.value?.is_stock_entry) {
+    if (total > item.remain_qty) {
+      alert(`예약물량이 부족합니다. (최대 ${item.remain_qty}개 까지만 가능)`)
+      total = item.remain_qty
+      item.request_caja = Math.floor(total / cap)
+      item.request_pza = total % cap
+    }
   }
   
   item.request_qty = total
@@ -524,6 +532,37 @@ const submitPartialRequest = async () => {
     alert('부분 출고 요청 중 오류가 발생했습니다.')
   } finally {
     isSubmittingPartial.value = false
+  }
+}
+
+const isUpdatingDraft = ref(false)
+
+const updateDraftRequest = async () => {
+  const validItems = selectedReservationItems.value.filter(item => item.request_qty > 0)
+  if (validItems.length === 0) {
+    alert('요청할 수량이 0인 항목은 수정이 불가능합니다. (삭제는 메인화면을 이용해주세요)')
+    return
+  }
+
+  isUpdatingDraft.value = true
+  try {
+    const payload = {
+      items: validItems.map(item => ({
+        name: item.name,
+        qty: item.request_qty
+      }))
+    }
+    
+    // Frappe requires PUT for updates
+    await adminApi.put(`/api/resource/Stock Entry/${selectedReservation.value.name}`, payload)
+    alert('드래프트 수량이 성공적으로 수정되었습니다.')
+    selectedReservation.value = null
+    fetchReservations()
+  } catch (error) {
+    console.error('Update draft error:', error)
+    alert('수량 업데이트 중 오류가 발생했습니다.')
+  } finally {
+    isUpdatingDraft.value = false
   }
 }
 
