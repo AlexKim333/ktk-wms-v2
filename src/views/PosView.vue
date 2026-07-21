@@ -122,6 +122,7 @@
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
         :branch-list="branchList"
+        :editing-draft-name="editingBranchDraftName"
         @refresh-items="fetchFrappeItems"
       />
       <!-- 지점 예약 리스트 (DRAFT) -->
@@ -1642,10 +1643,14 @@ const setActiveNav = (nav, mode = null) => {
 }
 
 // 지점 전용 예약 수정 연동 함수
+const editingBranchDraftName = ref(null)
+
 const handleBranchEditReservation = (reservationName) => {
+  editingBranchDraftName.value = reservationName
   setActiveNav('branch-transfer')
-  // 향후 BranchTransferView에서 예약을 로드하는 로직을 추가할 수 있습니다.
-  alert(`예약(${reservationName}) 수정 모드로 진입했습니다. (기능 구현 예정)`)
+  // Watcher in BranchTransferView will catch this and load the draft.
+  // We reset it immediately so that clicking the same draft again triggers the watcher again.
+  setTimeout(() => { editingBranchDraftName.value = null }, 500)
 }
 
 // 🌟 탭 리스트 및 활성 탭 (모드별 독립 캐시 지원)

@@ -118,7 +118,7 @@
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="font-weight:bold;">{{ item.item_code }}</td>
                 
-                <template v-if="(selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry) || (selectedReservation.is_stock_entry && selectedReservation.docstatus === 0)">
+                <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
                   <td style="background:#f0f9ff; text-align:center; padding: 4px;">
                     <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
                   </td>
@@ -147,8 +147,8 @@
             <button v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" @click="submitPartialRequest" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isSubmittingPartial">
               {{ isSubmittingPartial ? '전송 중...' : '🔥 입력한 수량만큼 즉시 출고 대기열로 넘기기' }}
             </button>
-            <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="updateDraftRequest" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isUpdatingDraft">
-              {{ isUpdatingDraft ? '업데이트 중...' : '💾 수정된 수량으로 드래프트 저장하기' }}
+            <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="$emit('edit-reservation', selectedReservation.name)" style="background: #0ea5e9; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+              🛒 장바구니로 이동하여 수정/출고
             </button>
           </div>
         </div>
