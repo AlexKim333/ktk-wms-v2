@@ -160,12 +160,12 @@
 
       <div v-else class="workspace-body">
         
-        <div class="workspace-left" style="position: relative;">
+        <div class="workspace-left" style="position: relative;" :class="{ 'disabled-workspace': !isHeaderComplete }">
           <!-- Header Incomplete Overlay Gate -->
-          <div v-if="!isHeaderComplete" class="header-gate-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.85); z-index: 50; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; backdrop-filter: blur(2px);">
-            <div style="font-size: 45px; margin-bottom: 15px;">🛑</div>
-            <h2 style="color: #ef4444; margin: 0 0 10px 0; text-align: center; font-size: 24px;">잠깐! 우측 헤더를 먼저 채워주세요!</h2>
-            <p style="color: #475569; font-size: 15px; font-weight: bold; text-align: center; line-height: 1.5;">우측 상단의 전표 헤더(출발/도착 창고, 담당자 등)<br>필수 항목을 모두 선택해야 상품 검색 및 추가가 가능합니다.</p>
+          <div v-if="!isHeaderComplete" class="header-gate-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.4); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px;">
+            <div style="font-size: 55px; margin-bottom: 20px; text-shadow: 0 4px 6px rgba(0,0,0,0.1);">🛑</div>
+            <h2 style="color: #ef4444; margin: 0 0 10px 0; text-align: center; font-size: 26px; font-weight: 900; background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">잠깐! 우측 상단 헤더를 모두 채워주세요!</h2>
+            <p style="color: #1e293b; font-size: 16px; font-weight: 800; text-align: center; line-height: 1.6; background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">우측 상단의 전표 헤더(출발/도착 창고, 담당자 등)<br>필수 항목을 모두 선택해야 상품 검색 및 추가 작업이 활성화됩니다.</p>
           </div>
           <div class="search-section dual-search">
             <!-- 동적 검색 (자동완성) -->
@@ -446,8 +446,9 @@
               </div>
             </div>
 
-            <table class="pos-cart-table">
-              <thead>
+            <div style="position: relative;" :class="{ 'disabled-workspace': !isHeaderComplete }">
+              <table class="pos-cart-table">
+                <thead>
                 <tr><th>{{ $t('pos.th_item_color') }}</th><th colspan="2">{{ $t('pos.th_qty_input') }}</th><th>{{ $t('pos.th_total_qty') }}</th><th style="width: 40px;"></th></tr>
                 <tr class="sub-th"><th></th><th>{{ $t('pos.th_box') }}</th><th>{{ $t('pos.th_each') }}</th><th></th><th></th></tr>
               </thead>
@@ -473,6 +474,9 @@
                 </tr>
               </tbody>
             </table>
+            <!-- Cart Table Overlay -->
+            <div v-if="!isHeaderComplete" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;"></div>
+            </div>
           </div>
 
           <div class="right-footer-action-zone" v-if="currentTab">
