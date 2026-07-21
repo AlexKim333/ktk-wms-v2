@@ -1158,5 +1158,15 @@ const submitTransfer = async () => {
   cursor: pointer;
 }
 .empty-slot { opacity: 0.5; }
+
+/* Modal CSS */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+.modal-content { background: white; width: 95%; max-width: 850px; padding: 20px; border-radius: 6px; }
+.grid-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+.grid-table th, .grid-table td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+.stock-info-cell { font-weight: bold; color: #0f766e; background-color: #f0fdfa; }
+.submit-btn { background: white; border: 1px solid #333; padding: 6px 15px; font-weight: bold; cursor: pointer; }
+.close-text-btn { float: right; background: none; border: none; color: #888; cursor: pointer; margin-top: 10px; font-size: 13px; }
+
 .m-tab-btn.active { background: #3b82f6 !important; color: white !important; border-color: #2563eb !important; }
 </style>
