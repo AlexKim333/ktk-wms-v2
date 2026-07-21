@@ -318,8 +318,8 @@
           <tbody>
             <tr v-for="(v, idx) in activeGroup?.variants" :key="idx">
               <td class="color-name">{{ v.custom_color || '기본 색상' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
-              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
-              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
+              <td class="input-green"><input type="number" min="0" v-model.number="v.input_box" placeholder="0" /></td>
+              <td class="input-green"><input type="number" min="0" v-model.number="v.input_each" placeholder="0" /></td>
               <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}개</td>
               <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
             </tr>
@@ -1158,6 +1158,19 @@ const submitTransfer = async () => {
   cursor: pointer;
 }
 .empty-slot { opacity: 0.5; }
+
+/* Grid input CSS */
+.input-green { background-color: #00e676 !important; width: 80px; padding: 2px; height: 35px !important; }
+.input-green input { width: 100%; height: 100%; background: transparent; border: none; text-align: center; font-size: 16px; font-weight: bold; outline: none; }
+.input-green input[type="number"]::-webkit-inner-spin-button,
+.input-green input[type="number"]::-webkit-outer-spin-button {
+  width: 20px !important;
+  height: 30px !important; 
+  transform: scale(1.2);
+  transform-origin: center right;
+  opacity: 1 !important;
+  cursor: pointer;
+}
 
 /* Modal CSS */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 9999; }

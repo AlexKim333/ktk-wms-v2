@@ -550,8 +550,8 @@
             <tbody>
               <tr v-for="(v, idx) in activeGroup.variants" :key="idx">
                 <td class="color-name">{{ v.custom_color || t('pos.default_color') }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}{{ $t('pos.pack_unit') }})</span></td>
-                <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
-                <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
+                <td class="input-green"><input type="number" min="0" v-model.number="v.input_box" placeholder="0" /></td>
+                <td class="input-green"><input type="number" min="0" v-model.number="v.input_each" placeholder="0" /></td>
                 <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}{{ $t('pos.unit_ea') }}</td>
                 <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
               </tr>
@@ -2825,8 +2825,17 @@ const submitReservation = async () => {
 .btn-delete-row { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; }
 .btn-delete-row:hover { background: #fee2e2; }
 
-.input-green { background-color: #00e676 !important; width: 52px; padding: 2px; }
-.input-green input { width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; }
+.input-green { background-color: #00e676 !important; width: 80px; padding: 2px; height: 35px !important; }
+.input-green input { width: 100%; height: 100%; background: transparent; border: none; text-align: center; font-size: 16px; font-weight: bold; outline: none; }
+.input-green input[type="number"]::-webkit-inner-spin-button,
+.input-green input[type="number"]::-webkit-outer-spin-button {
+  width: 20px !important;
+  height: 30px !important; 
+  transform: scale(1.2);
+  transform-origin: center right;
+  opacity: 1 !important;
+  cursor: pointer;
+}
 .product-cell { text-align: left; }
 .p-name { font-weight: bold; }
 .p-stock-info { font-size: 11px; color: #64748b; }
