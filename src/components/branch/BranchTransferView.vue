@@ -336,10 +336,15 @@
       </div>
     </div>
   </div>
+  <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
 </template>
-
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted , nextTick} from 'vue'
+import ReceiptPrint from '../ReceiptPrint.vue'
+
+const receiptPrintRef = ref(null)
+const receiptPrintData = ref({ summary: {} })
+const receiptPrintItems = ref([])
 import { useAuthStore } from '../../stores/auth.js'
 import QuickClerkAddModal from '../QuickClerkAddModal.vue'
 import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
