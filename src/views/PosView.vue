@@ -457,7 +457,7 @@
                   <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
                     <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
                       {{ item.item_name }}
-                      <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getStock(item.name, transactionMode === 'inbound' ? currentTab.selectedTarget : currentTab.selectedSource) / (item.custom_pack_qty || 1)) }} 박스]</span>
+                      <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getAvailableStock(item.name) / (item.custom_pack_qty || 1)) }} 박스]</span>
                     </div>
                     <div class="p-stock-info" style="font-size: 11px; color: #64748b; margin-top: 4px;">
                       {{ item.custom_color || t('pos.default_color') }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
