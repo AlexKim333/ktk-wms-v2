@@ -155,7 +155,7 @@
                @click="assignSlotItem(item)"
                style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #e2e8f0; cursor:pointer;">
             <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || '기본' }})</div>
-            <div class="item-stock">{{ getStock(item.name, authStore.user?.branch_name) }} 개</div>
+            <div class="item-stock">{{ getFormattedStockFor(item) }}</div>
           </div>
           <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색된 상품이 없습니다.</div>
         </div>
