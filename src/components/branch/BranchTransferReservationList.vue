@@ -108,13 +108,21 @@
             </div>
           </div>
 
+          <div v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" style="margin: 10px 0; padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; color: #b45309; font-weight: bold; text-align: right;">
+            📦 필요한 박스(Caja) 및 낱장(Pza) 수량을 바로 입력하세요.
+          </div>
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목명</th>
-                <th>예약 수량</th>
-                <th>기출고</th>
-                <th>잔여 수량</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">품목명</th>
+                <th v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">출고 요청 수량</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">예약 수량</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">기출고</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">잔여 수량</th>
+              </tr>
+              <tr v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Caja(박스)</th>
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Pza(낱장)</th>
               </tr>
             </thead>
             <tbody>
@@ -125,12 +133,20 @@
                     {{ item.custom_color || '-' }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
                   </div>
                 </td>
+                <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
+                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
+                    <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  </td>
+                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
+                    <input type="number" v-model.number="item.request_pza" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  </td>
+                </template>
                 <td style="font-weight:bold; color:#64748b; text-align:center;">{{ item.qty }}</td>
                 <td style="font-weight:bold; color:#0ea5e9; text-align:center;">{{ Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
                 <td style="font-weight:bold; color:#ef4444; text-align:center;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
               </tr>
               <tr v-if="selectedReservationItems.length === 0">
-                <td colspan="4" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+                <td :colspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 6 : 4" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
               </tr>
             </tbody>
           </table>
