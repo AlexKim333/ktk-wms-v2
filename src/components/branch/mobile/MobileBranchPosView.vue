@@ -480,12 +480,7 @@ const isSlotEditModalOpen = ref(false)
 const editSlotIndex = ref(-1)
 const slotSearchQuery = ref('')
 
-const filteredSlotItems = computed(() => {
-  if (!slotSearchQuery.value.trim()) return []
-  const q = slotSearchQuery.value.trim()
-  const hits = searchItemsOrAll(q, { limit: 100 })
-  return rankItemNameMatches(hits, q)
-})
+const filteredSlotItems = computed(() => searchItemsOrAll(slotSearchQuery.value, { limit: 100, allLimit: 300 }))
 
 const openSlotEdit = (idx) => {
   editSlotIndex.value = idx
