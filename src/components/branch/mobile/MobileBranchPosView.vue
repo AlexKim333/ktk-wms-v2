@@ -46,22 +46,16 @@
           <table class="inventory-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr>
-                <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">품명 (상품명)</th>
-                <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">컬러</th>
-                <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">팩 수량</th>
-                <th class="highlight-branch" style="background: #e0f2fe; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 재고 ({{ authStore.user?.branch_name }})</th>
-                <th class="highlight-main" style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 재고</th>
+                <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">상품 코드</th>
+                <th class="highlight-branch" style="background: #e0f2fe; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 ({{ authStore.user?.branch_name }})</th>
+                <th class="highlight-main" style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 (ALARCON)</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in displayedItems" :key="item.name" class="inventory-row clickable" @click="addToCart(item)">
-                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">
-                  <strong>{{ item.item_name }}</strong><br/>
-                  <span style="font-size: 11px; color: #94a3b8;">{{ item.name }}</span>
-                </td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">{{ item.custom_color || '-' }}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b; font-weight: bold;">
-                  {{ item.custom_pack_qty || 1 }}
+                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; word-break: break-all;">
+                  <strong>{{ item.name }}</strong><br/>
+                  <span style="font-size: 11px; color: #94a3b8;">{{ item.item_name }}</span>
                 </td>
                 <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">
                   <strong>{{ getStock(item.name, authStore.user?.branch_name) }}</strong>
@@ -71,14 +65,14 @@
                 </td>
               </tr>
               <tr v-if="listHasMore">
-                <td colspan="5" style="text-align:center; padding: 16px; background:#fffbeb;">
+                <td colspan="3" style="text-align:center; padding: 16px; background:#fffbeb;">
                   <button type="button" @click.stop="loadMoreItems" style="background:#fef3c7;border:1px solid #f59e0b;color:#b45309;font-weight:bold;padding:10px 20px;border-radius:6px;cursor:pointer;">
                     결과 더보기 (+{{ listRemaining }})
                   </button>
                 </td>
               </tr>
               <tr v-if="displayedItems.length === 0">
-                <td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8;">검색 결과가 없습니다.</td>
+                <td colspan="3" style="text-align: center; padding: 40px; color: #94a3b8;">검색 결과가 없습니다.</td>
               </tr>
             </tbody>
           </table>
@@ -230,18 +224,14 @@
                   {{ cartItem.custom_color || '-' }} | 1박스 = {{ cartItem.pack_qty }}개
                 </div>
               </td>
-              <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dbeafe !important;">
-                <input type="number" v-model.number="cartItem.boxQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="9999" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb;" />
-              </td>
-              <td class="input-blue pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
+              <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
                 <div style="display: flex; width: 100%; height: 100%;">
-                  <!-- 왼쪽 10단위 스피너 -->
-                  <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; flex-shrink: 0; background: #bfdbfe; border-right: 1px solid #93c5fd;">
-                    <button type="button" @click="changeQtyBy10(cartItem, 10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
-                    <button type="button" @click="changeQtyBy10(cartItem, -10)" :disabled="isClerk && currentTab.docName" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #93c5fd; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
-                  </div>
-                  <!-- 기존 1단위 (오른쪽 native 스피너) -->
-                  <input type="number" v-model.number="cartItem.eachQty" @input="updateTotalQty(cartItem)" :disabled="isClerk && currentTab.docName" min="0" max="99999" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb; min-width: 0;" />
+                  <input type="text" readonly :value="cartItem.boxQty" @click="openNumpadForExistingItem(cartItem)" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb; min-width: 0; cursor: pointer;" />
+                </div>
+              </td>
+              <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
+                <div style="display: flex; width: 100%; height: 100%;">
+                  <input type="text" readonly :value="cartItem.eachQty" @click="openNumpadForExistingItem(cartItem)" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb; min-width: 0; cursor: pointer;" />
                 </div>
               </td>
               <td class="total-qty-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center; vertical-align: middle;">
@@ -318,8 +308,8 @@
           <tbody>
             <tr v-for="(v, idx) in activeGroup?.variants" :key="idx">
               <td class="color-name">{{ v.custom_color || '기본 색상' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
-              <td class="input-green"><input type="number" min="0" v-model.number="v.input_box" placeholder="0" /></td>
-              <td class="input-green"><input type="number" min="0" v-model.number="v.input_each" placeholder="0" /></td>
+              <td class="input-green"><input type="text" readonly :value="v.input_box || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
+              <td class="input-green"><input type="text" readonly :value="v.input_each || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
               <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}개</td>
               <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
             </tr>
@@ -329,9 +319,23 @@
       <button class="close-text-btn" @click="isGridModalOpen = false">닫기</button>
     </div>
   </div>
+
+  <!-- 커스텀 모바일 숫자 패드 -->
+  <MobileNumpadModal
+    :is-open="isNumpadModalOpen"
+    :item="numpadItem"
+    :initial-box="numpadInitialBox"
+    :initial-each="numpadInitialEach"
+    :available-stock="numpadAvailableStock"
+    :has-next-item="numpadHasNextItem"
+    :is-new="numpadIsNew"
+    @submit="handleNumpadSubmit"
+    @close="closeNumpadModal"
+  />
 </template>
 <script setup>
 import { ref, computed, watch, onMounted , nextTick} from 'vue'
+import MobileNumpadModal from './MobileNumpadModal.vue'
 import ReceiptPrint from '../../ReceiptPrint.vue'
 
 const receiptPrintRef = ref(null)
@@ -703,8 +707,17 @@ onMounted(async () => {
   }
 })
 
-// Cart Logic
-const addToCart = (item) => {
+// Numpad Modal State
+const isNumpadModalOpen = ref(false)
+const numpadItem = ref(null)
+const numpadInitialBox = ref(1)
+const numpadInitialEach = ref(0)
+const numpadAvailableStock = ref('')
+const numpadIsNew = ref(false)
+const numpadHasNextItem = ref(false)
+const gridNumpadVariant = ref(null)
+
+const openNumpadForNewItem = (item) => {
   if (!currentTab.value) return
   if (isClerk.value && currentTab.value.docName) {
     alert('이미 제출된 DRAFT는 수정할 수 없습니다.')
@@ -712,34 +725,140 @@ const addToCart = (item) => {
   }
   
   const mainQty = getStock(item.name, '[MAIN] ALARCON - K')
-  const packQty = item.custom_pack_qty || 1
+  const packQty = item.custom_pack_qty || item.pack_qty || 1
   const mainBoxQty = Math.floor(mainQty / packQty)
+  
+  if (mainBoxQty < 1) {
+    alert('알라르꼰(메인창고)에 해당 상품의 가용 재고(박스)가 부족합니다.')
+    return
+  }
+  
+  numpadItem.value = item
+  numpadAvailableStock.value = getFormattedStockFor(item)
+  gridNumpadVariant.value = null
   
   const existing = currentTab.value.cartItems.find(c => c.item_code === item.name)
   if (existing) {
-    if (existing.boxQty + 1 > mainBoxQty) {
-      alert(`알라르꼰(메인창고) 가용 재고(${mainBoxQty} 박스)를 초과할 수 없습니다.`)
-      return
-    }
-    existing.boxQty += 1
-    updateTotalQty(existing)
+    numpadInitialBox.value = existing.boxQty
+    numpadInitialEach.value = existing.eachQty
+    numpadIsNew.value = false
+    const idx = currentTab.value.cartItems.findIndex(c => c.item_code === item.name)
+    numpadHasNextItem.value = idx < currentTab.value.cartItems.length - 1
   } else {
-    if (mainBoxQty < 1) {
-      alert('알라르꼰(메인창고)에 해당 상품의 가용 재고(박스)가 부족합니다.')
-      return
+    numpadInitialBox.value = 1
+    numpadInitialEach.value = 0
+    numpadIsNew.value = true
+    numpadHasNextItem.value = false
+  }
+  
+  isNumpadModalOpen.value = true
+}
+
+const openNumpadForExistingItem = (cartItem) => {
+  if (isClerk.value && currentTab.value.docName) return
+  
+  numpadItem.value = {
+    name: cartItem.item_code,
+    item_code: cartItem.item_code,
+    item_name: cartItem.item_name,
+    custom_color: cartItem.custom_color,
+    pack_qty: cartItem.pack_qty,
+    custom_pack_qty: cartItem.pack_qty
+  }
+  numpadAvailableStock.value = getFormattedStockFor(numpadItem.value)
+  numpadInitialBox.value = cartItem.boxQty
+  numpadInitialEach.value = cartItem.eachQty
+  numpadIsNew.value = false
+  gridNumpadVariant.value = null
+  
+  const idx = currentTab.value.cartItems.findIndex(c => c.item_code === cartItem.item_code)
+  numpadHasNextItem.value = idx < currentTab.value.cartItems.length - 1
+  
+  isNumpadModalOpen.value = true
+}
+
+const openNumpadForGridItem = (v) => {
+  numpadItem.value = {
+    ...v,
+    name: v.name || v.item_code,
+    item_code: v.name || v.item_code,
+    item_name: v.item_name || v.name,
+    pack_qty: v.custom_pack_qty || 1
+  }
+  numpadAvailableStock.value = getFormattedStockFor(v)
+  numpadInitialBox.value = v.input_box || 0
+  numpadInitialEach.value = v.input_each || 0
+  numpadIsNew.value = false
+  gridNumpadVariant.value = v
+  
+  const idx = activeGroup.value.variants.findIndex(variant => variant.name === v.name)
+  numpadHasNextItem.value = idx < activeGroup.value.variants.length - 1
+  
+  isNumpadModalOpen.value = true
+}
+
+const closeNumpadModal = () => {
+  isNumpadModalOpen.value = false
+  gridNumpadVariant.value = null
+}
+
+const handleNumpadSubmit = ({ item, box, each, action }) => {
+  // Handle Grid Item
+  if (gridNumpadVariant.value) {
+    gridNumpadVariant.value.input_box = box
+    gridNumpadVariant.value.input_each = each
+    
+    if (action === 'next') {
+      const idx = activeGroup.value.variants.findIndex(v => v.name === gridNumpadVariant.value.name)
+      if (idx < activeGroup.value.variants.length - 1) {
+        openNumpadForGridItem(activeGroup.value.variants[idx + 1])
+        return
+      } else {
+        alert('목록의 끝입니다.')
+      }
     }
+    closeNumpadModal()
+    if (typeof cancelSearch === 'function') cancelSearch()
+    return
+  }
+
+  // Handle Cart Item
+  const packQty = item.custom_pack_qty || item.pack_qty || 1
+  const existingIdx = currentTab.value.cartItems.findIndex(c => c.item_code === (item.name || item.item_code))
+  
+  if (existingIdx !== -1) {
+    const existing = currentTab.value.cartItems[existingIdx]
+    existing.boxQty = box
+    existing.eachQty = each
+    existing.totalQty = (box * packQty) + each
+    
+    if (action === 'next') {
+      if (existingIdx < currentTab.value.cartItems.length - 1) {
+        openNumpadForExistingItem(currentTab.value.cartItems[existingIdx + 1])
+        return
+      } else {
+        alert('목록의 끝입니다.')
+      }
+    }
+  } else {
     currentTab.value.cartItems.push({
-      item_code: item.name,
+      item_code: item.name || item.item_code,
       item_name: item.item_name,
       custom_color: item.custom_color,
       pack_qty: packQty,
       uom: item.stock_uom || 'Nos',
-      boxQty: 1,
-      eachQty: 0,
-      totalQty: packQty
+      boxQty: box,
+      eachQty: each,
+      totalQty: (box * packQty) + each
     })
   }
-  cancelSearch()
+
+  closeNumpadModal()
+}
+
+// Cart Logic Wrapper for old calls
+const addToCart = (item) => {
+  openNumpadForNewItem(item)
 }
 
 const updateTotalQty = (cartItem) => {
