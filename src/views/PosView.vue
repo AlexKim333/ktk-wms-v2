@@ -454,15 +454,28 @@
               </thead>
               <tbody>
                 <tr v-for="item in currentTab.cartItems" :key="item.name">
-                  <td class="product-cell">
-                    <div class="p-name">{{ item.item_name }} ({{ item.custom_color || t('pos.default_color') }})</div>
-                    <div class="p-stock-info">{{ item.custom_pack_qty || 1 }}入</div>
+                  <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
+                    <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
+                      {{ item.item_name }}
+                      <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getStock(item.name, transactionMode === 'inbound' ? currentTab.selectedTarget : currentTab.selectedSource) / (item.custom_pack_qty || 1)) }} 박스]</span>
+                    </div>
+                    <div class="p-stock-info" style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                      {{ item.custom_color || t('pos.default_color') }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
+                    </div>
                   </td>
-                  <td class="input-green">
-                    <input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="item.input_box" placeholder="0" />
+                  <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dbeafe !important;">
+                    <input type="number" v-model.number="item.input_box" min="0" max="9999" style="width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb;" />
                   </td>
-                  <td class="input-green">
-                    <input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="item.input_each" placeholder="0" />
+                  <td class="input-blue pza-cell" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
+                    <div style="display: flex; width: 100%; height: 100%;">
+                      <!-- 왼쪽 10단위 스피너 -->
+                      <div class="custom-spinner-left" style="display: flex; flex-direction: column; width: 26px; flex-shrink: 0; background: #bfdbfe; border-right: 1px solid #93c5fd;">
+                        <button type="button" @click="changeQtyBy10(item, 10)" class="left-spin-btn" style="flex: 1; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▲</button>
+                        <button type="button" @click="changeQtyBy10(item, -10)" class="left-spin-btn" style="flex: 1; border: none; border-top: 1px solid #93c5fd; background: transparent; cursor: pointer; font-size: 12px; color: #1e40af; display: flex; align-items: center; justify-content: center; padding: 0; outline: none;">▼</button>
+                      </div>
+                      <!-- 기존 1단위 (오른쪽 native 스피너) -->
+                      <input type="number" v-model.number="item.input_each" min="0" max="99999" style="flex: 1; width: 100%; background: transparent; border: none; text-align: center; font-size: 14px; font-weight: bold; outline: none; color: #2563eb; min-width: 0;" />
+                    </div>
                   </td>
                   <td class="total-qty-cell"><strong>{{ (item.input_box * (item.custom_pack_qty || 1)) + item.input_each }}</strong> {{ $t('pos.unit_ea') }}</td>
                   <td class="delete-cell">
@@ -2169,6 +2182,15 @@ const addSingleToCartInternal = (prod) => {
     existing.input_box += 1 
   } else { 
     currentTab.value.cartItems.push({ ...prod, input_box: 1, input_each: 0 }) 
+  }
+}
+
+const changeQtyBy10 = (cartItem, amount) => {
+  const newQty = (cartItem.input_each || 0) + amount
+  if (newQty < 0) {
+    cartItem.input_each = 0
+  } else {
+    cartItem.input_each = newQty
   }
 }
 
