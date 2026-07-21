@@ -49,7 +49,7 @@ const paginatedPages = computed(() => {
   return pages
 })
 
-// Function to copy to clipboard
+// Function to copy to clipboard (with download fallback)
 const copyToClipboard = async () => {
   if (!clipboardContent.value) return false
   
@@ -67,7 +67,20 @@ const copyToClipboard = async () => {
           await navigator.clipboard.write([item])
           resolve(true)
         } catch (e) {
-          reject(e)
+          console.warn("Clipboard copy failed, falling back to download:", e)
+          try {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `Receipt_${props.receiptData?.no || 'Order'}.png`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            resolve(true) // Treat as success if downloaded
+          } catch (err) {
+            reject(err)
+          }
         }
       }, 'image/png')
     })
