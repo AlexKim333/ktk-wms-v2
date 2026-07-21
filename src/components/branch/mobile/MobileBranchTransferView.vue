@@ -850,31 +850,90 @@ const submitTransfer = async () => {
     scheduleDate.setDate(scheduleDate.getDate() + 1)
     const dateStr = scheduleDate.toISOString().split('T')[0]
 
-    const payload = {
-      doctype: 'Material Request',
-      material_request_type: 'Material Transfer',
-      set_from_warehouse: '[MAIN] ALARCON - K',
-      set_warehouse: authStore.user?.branch_name,
-      schedule_date: dateStr,
-      docstatus: 1, // 지점에서도 즉시 펜딩(Submit) 상태로 생성
-      owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 드롭다운 반영
-      custom_branch: authStore.user?.branch_name,
-      custom_orderer: currentTab.value.selectedRequester,
-      custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
-      items: currentTab.value.cartItems.map(item => ({
-        item_code: item.item_code,
-        qty: item.totalQty,
-        s_warehouse: '[MAIN] ALARCON - K',
-        t_warehouse: authStore.user?.branch_name,
-        uom: item.uom || 'Nos',
-        conversion_factor: 1
-      }))
-    }
+    let docName = ''
 
-    const res = await adminApi.post('/api/resource/Material Request', payload)
-    const docName = res.data.data.name
-    
-    alert(`[예약 완료] 재고이동 요청(${docName})이 성공적으로 대기 중(Pending) 상태로 전송되었습니다!`)
+    if (orderType.value === 'immediate') {
+      const payload = {
+        doctype: 'Stock Entry',
+        docstatus: 0, // Draft 상태로 생성
+        stock_entry_type: 'Material Transfer',
+        from_warehouse: '[MAIN] ALARCON - K',
+        to_warehouse: authStore.user?.branch_name,
+        custom_ordering_branch: authStore.user?.branch_name,
+        custom_orderer: currentTab.value.selectedRequester,
+        items: currentTab.value.cartItems.map(item => ({
+          item_code: item.item_code,
+          qty: item.totalQty,
+          s_warehouse: '[MAIN] ALARCON - K',
+          t_warehouse: authStore.user?.branch_name,
+          uom: item.uom || 'Nos',
+          conversion_factor: 1,
+          allow_zero_valuation_rate: 1
+        }))
+      }
+      const res = await adminApi.post('/api/resource/Stock Entry', payload)
+      docName = res.data.data.name
+      
+      let totalQtyCount = 0
+      currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+      
+      receiptPrintData.value = {
+        title: '즉배요청 (Stock Entry)',
+        no: docName,
+        date: dateStr,
+        ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
+        vendedor: currentTab.value.selectedRequester || authStore.user?.email,
+        mode: '즉시 출고',
+        solicitante: currentTab.value.selectedRequester,
+        creador: authStore.user?.email,
+        shippingInfo: null,
+        summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+      }
+      
+      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
+        name: item.item_code,
+        item_name: item.item_name || item.item_code,
+        input_box: item.totalQty,
+        input_each: 0,
+        price_list_rate: item.price_list_rate || 0
+      }))))
+      
+      await nextTick()
+      if (receiptPrintRef.value) {
+        const success = await receiptPrintRef.value.copyToClipboard()
+        if (success) {
+          alert(`[즉배요청 성공] 즉시 출고 전표(${docName}) 생성 및 주문서 이미지가 기기에 저장되었습니다! (클립보드 또는 갤러리)`)
+        } else {
+          alert(`[즉배요청 성공] 즉시 출고 전표(${docName})가 대기열(Draft)에 성공적으로 생성되었습니다! (이미지 복사 실패)`)
+        }
+      } else {
+        alert(`[즉배요청 성공] 즉시 출고 전표(${docName})가 대기열(Draft)에 성공적으로 생성되었습니다!`)
+      }
+    } else {
+      const payload = {
+        doctype: 'Material Request',
+        material_request_type: 'Material Transfer',
+        set_from_warehouse: '[MAIN] ALARCON - K',
+        set_warehouse: authStore.user?.branch_name,
+        schedule_date: dateStr,
+        docstatus: 1, // 제출(Submit) 상태로 생성하여 Pending으로 넘김
+        owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 강제 지정
+        custom_branch: authStore.user?.branch_name,
+        custom_orderer: currentTab.value.selectedRequester,
+        custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
+        items: currentTab.value.cartItems.map(item => ({
+          item_code: item.item_code,
+          qty: item.totalQty,
+          s_warehouse: '[MAIN] ALARCON - K',
+          t_warehouse: authStore.user?.branch_name,
+          uom: item.uom || 'Nos',
+          conversion_factor: 1
+        }))
+      }
+      const res = await adminApi.post('/api/resource/Material Request', payload)
+      docName = res.data.data.name
+      alert(`[예약 완료] 재고이동 요청(${docName})이 성공적으로 대기 중(Pending) 상태로 전송되었습니다!`)
+    }
     
     if(!isClerk) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
