@@ -5,6 +5,8 @@
     :bin-data="binDataMap"
     :pending-reserved="pendingReservedMap"
     :branch-list="branchList"
+    :editing-draft-name="editingBranchDraftName"
+    @edit-reservation="handleBranchEditReservation"
     @refresh-items="fetchFrappeItems"
   />
   <div v-else class="pos-app-layout">

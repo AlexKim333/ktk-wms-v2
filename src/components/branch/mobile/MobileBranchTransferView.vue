@@ -342,7 +342,8 @@ const props = defineProps({
   binData: { type: Object, default: () => ({}) },
   pendingReserved: { type: Object, default: () => ({}) },
   branchList: { type: Array, default: () => [] },
-  injectedItem: { type: String, default: null } // Optional: To auto-add from BranchInventoryList
+  injectedItem: { type: String, default: null },
+  editingDraftName: { type: String, default: null }
 })
 
 const emit = defineEmits(['refresh-items', 'clear-injected'])
@@ -793,26 +794,86 @@ const rejectDraft = async (docName) => {
   }
 }
 
+watch(() => props.editingDraftName, async (newDraftName) => {
+  if (newDraftName) {
+    if (!tabs.value.find(t => t.docName === newDraftName)) {
+      try {
+        const isStockEntry = newDraftName.includes('STE') || newDraftName.startsWith('MAT-STE');
+        const docTypeUrl = isStockEntry ? 'Stock Entry' : 'Material Request';
+        const detailRes = await frappeApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
+        const doc = detailRes.data.data
+        
+        const newTab = {
+          id: nextTabId.value++,
+          title: doc.custom_orderer || '알 수 없는 점원',
+          docName: doc.name,
+          selectedRequester: doc.custom_orderer || '',
+          selectedCreator: doc.owner || '',
+          cartItems: doc.items.map(i => {
+            const rawItem = props.rawItems.find(r => r.name === i.item_code) || {}
+            const packQty = rawItem.custom_pack_qty || 1
+            return {
+              item_code: i.item_code,
+              item_name: rawItem.item_name || i.item_name,
+              custom_color: rawItem.custom_color || '',
+              pack_qty: packQty,
+              uom: i.uom || rawItem.stock_uom || 'Nos',
+              boxQty: Math.floor(i.qty / packQty),
+              eachQty: i.qty % packQty,
+              totalQty: i.qty
+            }
+          })
+        }
+        tabs.value.push(newTab)
+        currentTabIndex.value = tabs.value.length - 1
+      } catch (e) {
+        console.error('Error fetching specific draft:', e)
+        alert('예약 정보를 불러오는 중 오류가 발생했습니다.')
+      }
+    } else {
+      const idx = tabs.value.findIndex(t => t.docName === newDraftName)
+      currentTabIndex.value = idx
+    }
+  }
+}, { immediate: true })
+
 const updateDraft = async (isFinalApproval) => {
   if (!currentTab.value || !currentTab.value.docName) return
   isSubmitting.value = true
   
   try {
-    const payload = {
-      set_from_warehouse: '[MAIN] ALARCON - K',
-      set_warehouse: authStore.user?.branch_name,
-      custom_approval_stage: isFinalApproval ? '지점장 승인' : '점원 요청',
-      items: currentTab.value.cartItems.map(item => ({
-        item_code: item.item_code,
-        qty: item.totalQty,
-        s_warehouse: '[MAIN] ALARCON - K',
-        t_warehouse: authStore.user?.branch_name,
-        uom: item.uom || 'Nos',
-        conversion_factor: 1
-      }))
+    const isStockEntry = currentTab.value.docName.includes('STE') || currentTab.value.docName.startsWith('MAT-STE');
+    const docTypeUrl = isStockEntry ? 'Stock Entry' : 'Material Request';
+    
+    let payload = {}
+    if (isStockEntry) {
+      payload = {
+        items: currentTab.value.cartItems.map(item => ({
+          item_code: item.item_code,
+          qty: item.totalQty,
+          s_warehouse: '[MAIN] ALARCON - K',
+          t_warehouse: authStore.user?.branch_name,
+          uom: item.uom || 'Nos',
+          conversion_factor: 1
+        }))
+      }
+    } else {
+      payload = {
+        set_from_warehouse: '[MAIN] ALARCON - K',
+        set_warehouse: authStore.user?.branch_name,
+        custom_approval_stage: isFinalApproval ? '지점장 승인' : '점원 요청',
+        items: currentTab.value.cartItems.map(item => ({
+          item_code: item.item_code,
+          qty: item.totalQty,
+          s_warehouse: '[MAIN] ALARCON - K',
+          t_warehouse: authStore.user?.branch_name,
+          uom: item.uom || 'Nos',
+          conversion_factor: 1
+        }))
+      }
     }
     
-    await adminApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
+    await adminApi.put(`/api/resource/${docTypeUrl}/${currentTab.value.docName}`, payload)
     
     if (isFinalApproval) {
       alert(`성공적으로 2차 DRAFT 승인이 완료되었습니다.\n본부 관리자 예약 현황에 등록됩니다.`)

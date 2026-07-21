@@ -84,58 +84,53 @@
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>결재 단계</label>
-              <div class="val text-yellow-600">{{ selectedReservation.custom_approval_stage }}</div>
+              <label>상태</label>
+              <div class="val">
+                <span class="status-badge" style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:12px; font-size:12px; font-weight:bold;">
+                  {{ selectedReservation.is_stock_entry ? 'Draft(지점장 승인)' : (selectedReservation.status || '대기중') }}
+                </span>
+              </div>
             </div>
             <div class="detail-card">
-              <label>생성 날짜</label>
-              <div class="val">{{ selectedReservation.creation?.split(' ')[0] }}</div>
+              <label>📍 소스 (출발 창고)</label>
+              <div class="val">{{ selectedReservation.set_from_warehouse || '[MAIN] ALARCON - K' }}</div>
             </div>
             <div class="detail-card">
-              <label>담당 지점장</label>
-              <div class="val">{{ selectedReservation.custom_orderer }}</div>
+              <label>📍 타겟 (도착 창고)</label>
+              <div class="val">
+                {{ selectedReservation.set_warehouse || selectedReservation.custom_branch || '-' }}
+                <div style="font-size:0.8em; color:#666; margin-top:2px;">{{ selectedReservation.custom_orderer || '-' }}</div>
+              </div>
             </div>
-          </div>
-          <div v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
-            <span style="font-size:12px; color:#64748b; font-weight:bold;">📦 필요한 박스(Caja) 및 낱장(Pza) 수량을 바로 입력하세요.</span>
+            <div class="detail-card">
+              <label>날짜</label>
+              <div class="val">{{ selectedReservation.schedule_date || selectedReservation.creation?.split(' ')[0] }}</div>
+            </div>
           </div>
 
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th rowspan="2">품목 코드</th>
-                <th colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">수량 입력</th>
-                <th rowspan="2">{{ $t('branch.res_list.col_total_qty') }}</th>
-                <th rowspan="2">기출고</th>
-                <th rowspan="2">잔여</th>
-              </tr>
-              <tr>
-                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Caja(박스)</th>
-                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Pza(낱장)</th>
+                <th>품목명</th>
+                <th>예약 수량</th>
+                <th>기출고</th>
+                <th>잔여 수량</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in selectedReservationItems" :key="item.name">
-                <td style="font-weight:bold;">{{ item.item_code }}</td>
-                
-                <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
-                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
-                    <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
-                  </td>
-                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
-                    <input type="number" v-model.number="item.request_pza" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
-                  </td>
-                </template>
-                <template v-else>
-                  <td colspan="2" style="background:#f1f5f9; color:#94a3b8; font-size:12px; text-align:center;">수정 불가</td>
-                </template>
-                
+                <td style="text-align: left;">
+                  <div style="font-weight: bold;">{{ item.item_name || item.item_code }}</div>
+                  <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
+                    {{ item.custom_color || '-' }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
+                  </div>
+                </td>
                 <td style="font-weight:bold; color:#64748b; text-align:center;">{{ item.qty }}</td>
-                <td style="font-weight:bold; color:#059669; text-align:center;">{{ item.ordered_qty || 0 }}</td>
-                <td style="font-weight:bold; color:#0ea5e9; text-align:center;">{{ item.remain_qty }}</td>
+                <td style="font-weight:bold; color:#0ea5e9; text-align:center;">{{ Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
+                <td style="font-weight:bold; color:#ef4444; text-align:center;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
               </tr>
               <tr v-if="selectedReservationItems.length === 0">
-                <td colspan="6" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+                <td colspan="4" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
               </tr>
             </tbody>
           </table>

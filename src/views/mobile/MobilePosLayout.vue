@@ -25,6 +25,7 @@
         :bin-data="binData"
         :pending-reserved="pendingReserved"
         :branch-list="branchList"
+        :editing-draft-name="editingDraftName"
         @refresh-items="$emit('refresh-items')"
       />
       <MobileBranchTransferReservationList 
@@ -64,10 +65,11 @@ import MobileBranchTransferView from '../../components/branch/mobile/MobileBranc
 import MobileBranchTransferReservationList from '../../components/branch/mobile/MobileBranchTransferReservationList.vue'
 
 const props = defineProps({
-  rawItems: Array,
-  binData: Object,
-  pendingReserved: Object,
-  branchList: Array
+  rawItems: { type: Array, default: () => [] },
+  binData: { type: Object, default: () => ({}) },
+  pendingReserved: { type: Object, default: () => ({}) },
+  branchList: { type: Array, default: () => [] },
+  editingDraftName: { type: String, default: null }
 })
 
 const emit = defineEmits(['refresh-items', 'edit-reservation'])
