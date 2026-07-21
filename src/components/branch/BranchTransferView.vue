@@ -337,6 +337,32 @@
     </div>
   </div>
   <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
+
+  <div class="modal-overlay" v-if="isGridModalOpen">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="product-title">선택된 묶음 상품: <strong>{{ activeGroup?.group_name }}</strong></div>
+        <button class="submit-btn" @click="submitGridSelection">선택 완료</button>
+      </div>
+      <div style="max-height: 60vh; overflow-y: auto; margin-top: 15px;">
+        <table class="grid-table" style="margin-top: 0;">
+          <thead>
+            <tr><th style="position: sticky; top: 0; background: #fff; z-index: 1;">품명(컬러) 및 묶음 수량</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;" colspan="2">수량 입력</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">선택 총 수량</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">현재 가용 재고</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(v, idx) in activeGroup?.variants" :key="idx">
+              <td class="color-name">{{ v.custom_color || '기본 색상' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
+              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_box" placeholder="0" /></td>
+              <td class="input-green"><input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="v.input_each" placeholder="0" /></td>
+              <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}개</td>
+              <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="close-text-btn" @click="isGridModalOpen = false">닫기</button>
+    </div>
+  </div>
 </template>
 <script setup>
 import { ref, computed, watch, onMounted , nextTick} from 'vue'
@@ -555,8 +581,70 @@ const clearGridSlot = () => {
   isGridSlotEditModalOpen.value = false
 }
 
+const isGridModalOpen = ref(false)
+const activeGroup = ref(null)
+
 const openGridModal = (group) => {
-  if (group) emit('open-grid-modal', group)
+  if (group) {
+    // 깊은 복사하여 초기화 (박스/낱장 0으로 리셋)
+    activeGroup.value = JSON.parse(JSON.stringify(group))
+    activeGroup.value.variants.forEach(v => {
+      v.input_box = null
+      v.input_each = null
+    })
+    isGridModalOpen.value = true
+  }
+}
+
+const submitGridSelection = () => {
+  if (!currentTab.value || !activeGroup.value) return
+  
+  const selectedVariants = activeGroup.value.variants.filter(v => v.input_box > 0 || v.input_each > 0)
+  if (selectedVariants.length === 0) {
+    isGridModalOpen.value = false
+    return
+  }
+
+  selectedVariants.forEach(v => {
+    const boxQty = Number(v.input_box) || 0
+    const eachQty = Number(v.input_each) || 0
+    const packQty = v.custom_pack_qty || 1
+    
+    // 임시로 qty 속성을 만들어서 addToCart 재사용
+    const tempItem = {
+      ...v,
+      name: v.name || v.item_code,
+      item_name: v.item_name || v.name,
+      _addQty: (boxQty * packQty) + eachQty
+    }
+    
+    // 기존 장바구니에 아이템이 있으면 수량 추가 로직을 addToCart를 반복 호출하는 것으로 해결할 수도 있지만,
+    // BranchTransferView의 addToCart는 무조건 +1이 아니라 박스 단위 처리 로직이 섞여 있을 수 있음.
+    // BranchTransferView의 addToCart 로직을 모방하여 직접 카트에 넣기:
+    
+    const mainQty = getStock(tempItem.name, '[MAIN] ALARCON - K')
+    const mainBoxQty = Math.floor(mainQty / packQty)
+    
+    const existing = currentTab.value.cartItems.find(c => c.item_code === tempItem.name)
+    if (existing) {
+      existing.boxQty += boxQty
+      existing.eachQty += eachQty
+      updateTotalQty(existing)
+    } else {
+      currentTab.value.cartItems.push({
+        item_code: tempItem.name,
+        item_name: tempItem.item_name,
+        custom_color: tempItem.custom_color || '',
+        pack_qty: packQty,
+        uom: tempItem.stock_uom || 'Nos',
+        boxQty: boxQty,
+        eachQty: eachQty,
+        totalQty: (boxQty * packQty) + eachQty
+      })
+    }
+  })
+
+  isGridModalOpen.value = false
 }
 // ------------------------
 
