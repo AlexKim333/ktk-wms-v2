@@ -63,24 +63,46 @@ const copyToClipboard = async () => {
     return new Promise((resolve, reject) => {
       canvas.toBlob(async (blob) => {
         try {
-          const item = new ClipboardItem({ 'image/png': blob })
-          await navigator.clipboard.write([item])
-          resolve(true)
-        } catch (e) {
-          console.warn("Clipboard copy failed, falling back to download:", e)
+          const fileName = `Receipt_${props.receiptData?.no || 'Order'}.png`
+          
+          // 1. Try Mobile Share API first if supported
+          if (navigator.share && navigator.canShare) {
+            const file = new File([blob], fileName, { type: 'image/png' })
+            if (navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({
+                  files: [file],
+                  title: 'Receipt',
+                  text: fileName
+                })
+                return resolve(true) // Share sheet opened successfully
+              } catch (shareErr) {
+                console.warn('Share cancelled or failed', shareErr)
+                // Continue to clipboard/download fallback if share was just cancelled
+              }
+            }
+          }
+          
+          // 2. Try Clipboard API
           try {
+            const item = new ClipboardItem({ 'image/png': blob })
+            await navigator.clipboard.write([item])
+            return resolve(true)
+          } catch (clipErr) {
+            console.warn("Clipboard copy failed, falling back to download:", clipErr)
+            // 3. Fallback to Download
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `Receipt_${props.receiptData?.no || 'Order'}.png`
+            a.download = fileName
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
             URL.revokeObjectURL(url)
             resolve(true) // Treat as success if downloaded
-          } catch (err) {
-            reject(err)
           }
+        } catch (e) {
+          reject(e)
         }
       }, 'image/png')
     })
