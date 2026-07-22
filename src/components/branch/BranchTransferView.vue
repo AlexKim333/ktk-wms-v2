@@ -461,7 +461,7 @@ const handleClerkAdded = (newClerk) => {
 }
 
 // --- Quick Pick Logic ---
-const userKey = authStore.user?.email || 'guest'
+const userKey = authStore.user?.member_name || 'guest'
 const singleStorageKey = `wms_quick_pick_slots_${userKey}`
 const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
 

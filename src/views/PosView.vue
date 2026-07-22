@@ -1014,7 +1014,7 @@ const quickAdjustForm = ref({ input_box: 0, input_each: 0, valuation_rate: 0 })
 const isAdjusting = ref(false)
 const pendingCartAction = ref(null)
 
-const userKey = authStore.user?.name || authStore.user?.email || 'default_user'
+const userKey = authStore.user?.member_name || 'default_user'
 const singleStorageKey = `wms_quick_pick_slots_${userKey}`
 const gridStorageKey = `wms_grid_quick_pick_slots_${userKey}`
 const customerStorageKey = `wms_customer_quick_pick_slots_${userKey}`
