@@ -6,7 +6,7 @@
       <div class="m-user" v-if="authStore.user">
         {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? '본부' }})
       </div>
-      <button class="m-logout" @click="handleLogout">{{ $t('common.logout') }}</button>
+      <button class="m-logout" @click="handleLogout">{{ $t('nav.logout') }}</button>
     </header>
 
     <!-- 메인 렌더링 영역 -->
@@ -50,16 +50,16 @@
     <!-- 모바일 하단 탭 바 (지점 4종 메뉴) -->
     <nav class="mobile-bottom-nav">
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-inventory' }" @click="activeNav = 'branch-inventory'">
-        🔍<br/>재고검색
+        🔍<br/>{{ $t('mobile.nav_inventory') }}
       </button>
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="activeNav = 'branch-pos'">
-        🛒<br/>즉시출고
+        🛒<br/>{{ $t('mobile.nav_outbound') }}
       </button>
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-transfer' }" @click="activeNav = 'branch-transfer'">
-        🚚<br/>재고이동
+        🚚<br/>{{ $t('mobile.nav_transfer') }}
       </button>
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-reservation' }" @click="activeNav = 'branch-reservation'">
-        📅<br/>예약내역
+        📅<br/>{{ $t('mobile.nav_reservation') }}
       </button>
     </nav>
   </div>
