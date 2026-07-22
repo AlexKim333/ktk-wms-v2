@@ -939,7 +939,7 @@ const fetchPendingDrafts = async () => {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
-          ['custom_approval_stage', '=', 'Clerk Request'],
+          ['custom_approval_stage', '=', '점원 요청'],
           ['custom_branch', '=', authStore.user?.branch_name || '']
         ]),
         fields: JSON.stringify(['name', 'custom_branch_requester', 'owner']),
@@ -1069,7 +1069,7 @@ const updateDraft = async (isFinalApproval) => {
       payload = {
         set_from_warehouse: '[MAIN] ALARCON - K',
         set_warehouse: authStore.user?.branch_name,
-        custom_approval_stage: isFinalApproval ? 'Manager Approval' : 'Clerk Request',
+        custom_approval_stage: isFinalApproval ? '지점장 승인' : '점원 요청',
         items: currentTab.value.cartItems.map(item => ({
           item_code: item.item_code,
           qty: item.totalQty,
@@ -1189,7 +1189,7 @@ const submitTransfer = async () => {
         owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 강제 지정
         custom_branch: authStore.user?.branch_name,
         custom_orderer: currentTab.value.selectedRequester,
-        custom_approval_stage: isClerk ? 'Clerk Request' : 'Manager Approval',
+        custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
         items: currentTab.value.cartItems.map(item => ({
           item_code: item.item_code,
           qty: item.totalQty,
