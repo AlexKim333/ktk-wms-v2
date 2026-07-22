@@ -253,9 +253,20 @@ const saveUser = async () => {
     } else {
       // Create new user
       userPayload.email = userEmail;
-      userPayload.send_welcome_email = 0;
-      userPayload.new_password = form.value.password;
-      await frappeApi.post('/api/resource/User', userPayload);
+        userPayload.send_welcome_email = 0;
+        userPayload.new_password = form.value.password;
+        await frappeApi.post('/api/resource/User', userPayload);
+
+        // Create corresponding Sales Person
+        try {
+          await frappeApi.post('/api/resource/Sales Person', {
+            sales_person_name: form.value.full_name,
+            enabled: 1,
+            custom_branch: form.value.branch || ''
+          });
+        } catch(e) {
+          console.warn('Sales Person creation failed:', e);
+        }
     }
     
     alert(isEditing.value ? t('staff.msg_save_success_edit') : t('staff.msg_save_success_add'));
@@ -435,3 +446,4 @@ onMounted(() => {
 }
 .save-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 </style>
+
