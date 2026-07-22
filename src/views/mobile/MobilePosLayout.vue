@@ -38,7 +38,7 @@
         v-else-if="activeNav === 'branch-reservation'" 
         :raw-items="rawItems"
         @create-new="activeNav = 'branch-transfer'"
-        @edit-reservation="$emit('edit-reservation', $event)"
+        @edit-reservation="$emit('edit-reservation', $event); activeNav = 'branch-transfer'"
         @refresh-items="$emit('refresh-items')"
       />
       <div v-else class="mobile-not-supported">

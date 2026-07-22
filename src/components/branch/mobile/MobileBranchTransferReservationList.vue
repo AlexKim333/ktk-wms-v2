@@ -83,17 +83,6 @@
               </div>
             </div>
             <div class="detail-card">
-              <label>📍 Source</label>
-              <div class="val">{{ selectedReservation.set_from_warehouse || '[MAIN] ALARCON - K' }}</div>
-            </div>
-            <div class="detail-card">
-              <label>📍 {{ $t('branch.res_list.modal_target') }}</label>
-              <div class="val">
-                {{ selectedReservation.set_warehouse || selectedReservation.custom_branch || '-' }}
-                <div style="font-size:0.8em; color:#666; margin-top:2px;">{{ selectedReservation.custom_orderer || '-' }}</div>
-              </div>
-            </div>
-            <div class="detail-card">
               <label>{{ $t('branch.res_list.col_date') }}</label>
               <div class="val">{{ selectedReservation.schedule_date || selectedReservation.creation?.split(' ')[0] }}</div>
             </div>
@@ -595,7 +584,7 @@ onUnmounted(() => {
 .modal-header h3 { margin: 0; font-size: 18px; color: #0f172a; }
 .close-btn { background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; padding: 0; line-height: 1; }
 .modal-body { padding: 20px; overflow-y: auto; }
-.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
 .detail-card { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
 .detail-card label { display: block; font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px; }
 .val { font-size: 14px; font-weight: bold; color: #334155; }
@@ -617,6 +606,8 @@ onUnmounted(() => {
   pointer-events: none;
 }
 </style>
+
+
 
 
 
