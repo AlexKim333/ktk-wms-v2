@@ -35,7 +35,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row" @mouseenter="showHover($event, res)" @mouseleave="hideHover">
+          <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row">
             <td class="res-id" @click="openDetail(res)">{{ res.name }}</td>
             <td @click="openDetail(res)">{{ res.creation ? res.creation.split(' ')[0] : (res.schedule_date || '-') }}</td>
             <td @click="openDetail(res)">
@@ -193,37 +193,6 @@
         </div>
       </div>
     </div>
-    <!-- Hover Tooltip -->
-    <div v-if="hoverTooltip.visible" class="hover-tooltip" :style="{ top: hoverTooltip.y + 'px', left: hoverTooltip.x + 'px' }">
-      <div style="font-weight: bold; font-size: 13px; color: #3b82f6; margin-bottom: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-        요청자: {{ hoverTooltip.data.requester }}
-      </div>
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-        <thead>
-          <tr style="border-bottom: 1px solid #cbd5e1; color: #64748b;">
-            <th style="text-align: left; padding: 2px 4px;">{{ $t('branch.res_list.modal_col_item') }}</th>
-            <th style="text-align: right; padding: 2px 4px;">Box</th>
-            <th style="text-align: right; padding: 2px 4px;">{{ $t('branch.transfer.th_each') }}</th>
-            <th style="text-align: right; padding: 2px 4px;">{{ $t('branch.res_list.col_total_qty') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="hoverTooltip.loading">
-            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">{{ $t('common.loading') }}</td>
-          </tr>
-          <tr v-else-if="hoverTooltip.items.length === 0">
-            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">{{ $t('branch.inventory.empty_msg') }}</td>
-          </tr>
-          <tr v-for="item in hoverTooltip.items" :key="item.item_code">
-            <td style="font-weight: 500; padding: 2px 4px;">{{ item.item_code }} ({{ item.custom_color || '-' }})</td>
-            <td style="text-align: right; padding: 2px 4px;">{{ Math.floor(item.qty / getPackQty(item.item_code)) || 0 }}</td>
-            <td style="text-align: right; padding: 2px 4px;">{{ Math.floor(item.qty % getPackQty(item.item_code)) || 0 }}</td>
-            <td style="text-align: right; font-weight: bold; color: #0f172a; padding: 2px 4px;">{{ item.qty }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
   </div>
 </template>
 
@@ -566,52 +535,7 @@ const cancelReservation = async (res) => {
   }
 }
 
-// Hover Tooltip Logic
-const itemCache = ref({})
-const hoverTooltip = ref({
-  visible: false,
-  x: 0,
-  y: 0,
-  items: [],
-  loading: false,
-  data: {}
-})
 
-const showHover = async (event, res) => {
-  const rowRect = event.currentTarget.getBoundingClientRect()
-  
-  hoverTooltip.value = {
-    visible: true,
-    x: rowRect.left,
-    y: rowRect.top - 10,
-    items: [],
-    loading: true,
-    data: { requester: res.custom_orderer || res.owner || 'Unknown' }
-  }
-
-  if (itemCache.value[res.name]) {
-    hoverTooltip.value.items = itemCache.value[res.name]
-    hoverTooltip.value.loading = false
-    return
-  }
-
-  try {
-    const detailRes = await frappeApi.get(`/api/resource/${res.is_stock_entry ? 'Stock Entry' : 'Material Request'}/${res.name}`)
-    const items = detailRes.data?.data?.items || []
-    itemCache.value[res.name] = items
-    if (hoverTooltip.value.visible && hoverTooltip.value.data.requester === (res.custom_orderer || res.owner || 'Unknown')) {
-      hoverTooltip.value.items = items
-      hoverTooltip.value.loading = false
-    }
-  } catch (e) {
-    console.error(e)
-    if (hoverTooltip.value.visible) hoverTooltip.value.loading = false
-  }
-}
-
-const hideHover = () => {
-  hoverTooltip.value.visible = false
-}
 
 watch([statusFilter, searchQuery], () => applyFilters())
 
@@ -693,5 +617,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 </style>
+
 
 
