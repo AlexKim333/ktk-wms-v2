@@ -5,23 +5,23 @@
       <!-- 헤더 (상품 정보 및 가용 재고) -->
       <div class="numpad-header">
         <div class="item-title">
-          {{ item?.item_name }} ({{ item?.custom_color || '기본색상' }}, 1박스={{ packQty }}개)
+          {{ item?.item_name }} ({{ item?.custom_color || $t('common.default') || 'Default' }}, {{ $t('branch.transfer.lbl_pack_info', { qty: packQty }) }})
         </div>
         <div class="item-stock">
-          [가용재고: {{ availableStock }}]
+          {{ $t('mobile.lbl_avail_stock', { qty: availableStock }) }}
         </div>
       </div>
 
       <!-- 총 수량 계산 표시 -->
       <div class="numpad-total">
-        총 수량: <strong>{{ totalQty }}</strong> 개
+        {{ $t('mobile.lbl_total_qty') }} <strong>{{ totalQty }}</strong> 개
       </div>
 
       <!-- 수량 입력부 -->
       <div class="numpad-inputs">
         <!-- 박스 수량 -->
         <div class="input-row" :class="{ active: activeField === 'box' }" @click="activeField = 'box'">
-          <div class="input-label">선택 박스수량</div>
+          <div class="input-label">{{ $t('mobile.lbl_sel_box') }}</div>
           <div class="input-field-wrapper">
             <input type="text" readonly :value="boxValue" class="numpad-display" />
           </div>
@@ -33,7 +33,7 @@
 
         <!-- 낱개 수량 -->
         <div class="input-row" :class="{ active: activeField === 'each' }" @click="activeField = 'each'">
-          <div class="input-label">선택 낱개수량</div>
+          <div class="input-label">{{ $t('mobile.lbl_sel_each') }}</div>
           <div class="input-field-wrapper">
             <input type="text" readonly :value="eachValue" class="numpad-display" />
           </div>
@@ -53,22 +53,23 @@
           <button v-for="n in [6,7,8,9,0]" :key="n" class="num-btn" @click="appendNum(n)">{{ n }}</button>
         </div>
         <div class="numpad-row backspace-row">
-          <button class="backspace-btn" @click="backspace">← 지우기</button>
-          <button class="clear-btn" @click="clearField">초기화</button>
+          <button class="backspace-btn" @click="backspace">{{ $t('mobile.btn_backspace') }}</button>
+          <button class="clear-btn" @click="clearField">{{ $t('mobile.btn_clear') }}</button>
         </div>
       </div>
 
       <!-- 하단 버튼 -->
       <div class="numpad-actions">
         <button 
-          class="action-btn next-btn" 
+          v-if="!isGridMode" 
+          class="action-btn next-btn"
           :disabled="isNew || !hasNextItem"
           @click="submit('next')"
         >
-          다음상품
+          {{ $t('mobile.btn_next') }}
         </button>
-        <button class="action-btn done-btn" @click="submit('done')">완료</button>
-        <button class="action-btn close-btn" @click="close">닫기</button>
+        <button class="action-btn done-btn" @click="submit('done')">{{ $t('mobile.btn_done') }}</button>
+        <button class="action-btn close-btn" @click="close">{{ $t('mobile.btn_close') }}</button>
       </div>
 
     </div>
@@ -77,6 +78,10 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
+
 
 const props = defineProps({
   isOpen: Boolean,

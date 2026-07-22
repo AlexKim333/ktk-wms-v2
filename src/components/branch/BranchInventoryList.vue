@@ -4,10 +4,10 @@
       <h2>{{ $t('branch.inventory.title', { branch: authStore.user?.branch_name }) }}</h2>
       <div class="action-buttons">
         <button class="btn-action outline" @click="$emit('handle-migration')">
-          <span class="icon">📤</span> CSV 업로드
+          <span class="icon">📤</span>{{ $t('common.csv_up') }}<
         </button>
         <button class="btn-action outline" @click="exportCSV">
-          <span class="icon">📥</span> CSV 다운로드
+          <span class="icon">📥</span>{{ $t('common.csv_down') }}<
         </button>
       </div>
     </header>

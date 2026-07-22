@@ -22,10 +22,10 @@
         <thead>
           <tr>
             <th>{{ $t('branch.history.col_no') }}<</th>
-            <th>날짜</th>
-            <th>담당자 / 요청자</th>
-            <th>출발 ➔ 도착 창고</th>
-            <th>상태</th>
+            <th>{{ $t('branch.res_list.col_date') }}</th>
+            <th>{{ $t('branch_hist.col_manager') }}</th>
+            <th>{{ $t('branch_hist.col_route') }}</th>
+            <th>{{ $t('branch_hist.col_status') }}</th>
             <th class="action-cell"></th>
           </tr>
         </thead>
@@ -38,9 +38,9 @@
               {{ res.from_warehouse }} ➔ {{ res.to_warehouse }}
             </td>
             <td @click="openDetail(res)">
-              <span v-if="res.docstatus === 1" class="status-badge status-completed">이동 완료</span>
-              <span v-else-if="res.docstatus === 0" class="status-badge status-pending">이동 예약</span>
-              <span v-else class="status-badge status-cancelled">취소됨</span>
+              <span v-if="res.docstatus === 1" class="status-badge status-completed">{{ $t('branch_hist.status_comp') }}</span>
+              <span v-else-if="res.docstatus === 0" class="status-badge status-pending">{{ $t('branch_hist.status_res') }}</span>
+              <span v-else class="status-badge status-cancelled">{{ $t('branch_hist.status_cancel') }}</span>
             </td>
             <td>
               <button v-if="res.docstatus === 0" class="btn-delete" @click.stop="deleteHistory(res.name)" title="삭제">🗑️</button>
@@ -48,7 +48,7 @@
           </tr>
           <tr v-if="filteredHistory.length === 0">
             <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
-              조회된 내역이 없습니다.
+              {{ $t('branch_hist.empty_msg') }}
             </td>
           </tr>
         </tbody>
@@ -59,23 +59,23 @@
     <div v-if="selectedHistory" class="modal-overlay" @click.self="selectedHistory = null">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>상세 정보 ({{ selectedHistory.name }})</h3>
+          <h3>{{ $t('branch_hist.modal_title') }} ({{ selectedHistory.name }})</h3>
           <button class="close-btn" @click="selectedHistory = null">&times;</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>담당자</label>
+              <label>Manager</label>
               <div class="val">{{ selectedHistory.custom_orderer || selectedHistory.owner }}</div>
             </div>
             <div class="detail-card">
-              <label>날짜</label>
+              <label>{{ $t('branch.res_list.col_date') }}</label>
               <div class="val">{{ selectedHistory.posting_date || selectedHistory.creation?.split(' ')[0] }}</div>
             </div>
             <div class="detail-card">
-              <label>상태</label>
+              <label>{{ $t('branch_hist.col_status') }}</label>
               <div class="val" :class="{'text-green-600': selectedHistory.docstatus === 1, 'text-yellow-600': selectedHistory.docstatus === 0}">
-                {{ selectedHistory.docstatus === 1 ? '이동 완료' : '이동 예약' }}
+                {{ selectedHistory.docstatus === 1 ? $t('branch_hist.status_comp') : $t('branch_hist.status_res') }}
               </div>
             </div>
           </div>
@@ -83,10 +83,10 @@
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th>품목 코드</th>
-                <th>품명</th>
-                <th>컬러</th>
-                <th>요청 수량 (낱장)</th>
+                <th>{{ $t('branch_hist.col_item_code') }}</th>
+                <th>{{ $t('branch_hist.col_item_name') }}</th>
+                <th>{{ $t('branch_hist.col_color') }}</th>
+                <th>{{ $t('branch_hist.col_req_qty') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -94,10 +94,10 @@
                 <td style="font-weight:bold;">{{ item.item_code }}</td>
                 <td>{{ item.item_name }}</td>
                 <td>{{ item.custom_color || '-' }}</td>
-                <td style="font-weight:bold; color:#0ea5e9;">{{ item.qty }} 개</td>
+                <td style="font-weight:bold; color:#0ea5e9;">{{ item.qty }} {{ $t('branch.transfer.lbl_unit_ea') }}</td>
               </tr>
               <tr v-if="selectedHistoryItems.length === 0">
-                <td colspan="4" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+                <td colspan="4" style="text-align: center; padding: 15px; color: #94a3b8;">{{ $t('common.loading') }}</td>
               </tr>
             </tbody>
           </table>
@@ -149,7 +149,7 @@ const fetchHistory = async () => {
     historys.value = res.data.data || []
   } catch (error) {
     console.error('재고 이동 이력을 불러오는 중 오류 발생:', error)
-    alert('재고 이동 이력을 불러오지 못했습니다. 네트워크/권한을 확인하세요.')
+    alert(t('branch_hist.msg_load_err'))
   }
 }
 
@@ -181,12 +181,12 @@ const openDetail = async (res) => {
 }
 
 const deleteHistory = async (name) => {
-  if (!confirm(`예약 건(${name})을 삭제하시겠습니까?`)) return
+  if (!confirm(t('branch.res_list.msg_confirm_cancel', { name: name }))) return
   try {
     await frappeApi.delete(`/api/resource/Stock Entry/${name}`)
     fetchHistory()
   } catch (error) {
-    alert('삭제에 실패했습니다.')
+    alert(t('branch_hist.msg_del_err'))
     console.error('삭제 오류:', error)
   }
 }

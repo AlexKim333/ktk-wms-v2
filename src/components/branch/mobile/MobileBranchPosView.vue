@@ -20,7 +20,7 @@
             type="text"
             v-model="searchQuery"
             @focus="isSearching = true"
-            :placeholder="'상품명 또는 속성 검색...'"
+            :placeholder="$t('branch.inventory.ph_search')"
             class="search-bar"
             style="width: 100%; padding: 12px 12px 12px 35px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; box-sizing: border-box;"
             autocomplete="off"
@@ -31,13 +31,13 @@
           <span class="search-icon" style="position: absolute; left: 12px; font-size: 14px; color: #f59e0b;">🏷️</span>
           <input
             type="text"
-            placeholder="바코드 스캔..."
+            :placeholder="$t('branch.transfer.ph_search_barcode')"
             class="search-bar barcode-bar"
             style="width: 100%; padding: 12px 12px 12px 35px; border-radius: 6px; border: 1px solid #fcd34d; font-size: 14px; box-sizing: border-box; background: #fffbeb;"
             autocomplete="off"
           />
         </div>
-        <button v-if="isSearching" class="btn-cancel-search" @click="cancelSearch" style="padding: 10px 15px; border: 1px solid #cbd5e1; background: white; border-radius: 6px; cursor: pointer; color: #475569; font-weight: bold;">✕ 닫기</button>
+        <button v-if="isSearching" class="btn-cancel-search" @click="cancelSearch" style="padding: 10px 15px; border: 1px solid #cbd5e1; background: white; border-radius: 6px; cursor: pointer; color: #475569; font-weight: bold;">{{ $t('branch.transfer.btn_cancel_search') }}</button>
       </div>
 
       <div class="quick-pick-zone" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; position: relative;">
@@ -46,9 +46,9 @@
           <table class="inventory-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr>
-                <th style="width: 50%; background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">상품 코드</th>
-                <th class="highlight-branch" style="width: 25%; background: #e0f2fe; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 ({{ authStore.user?.branch_name }})</th>
-                <th class="highlight-main" style="width: 25%; background: #f1f5f9; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 (ALARCON)</th>
+                <th style="width: 50%; background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_item_name') }}</th>
+                <th class="highlight-branch" style="width: 25%; background: #e0f2fe; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_my_stock', { branch: authStore.user?.branch_name }) }}</th>
+                <th class="highlight-main" style="width: 25%; background: #f1f5f9; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_main_stock') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -67,12 +67,12 @@
               <tr v-if="listHasMore">
                 <td colspan="3" style="text-align:center; padding: 16px; background:#fffbeb;">
                   <button type="button" @click.stop="loadMoreItems" style="background:#fef3c7;border:1px solid #f59e0b;color:#b45309;font-weight:bold;padding:10px 20px;border-radius:6px;cursor:pointer;">
-                    결과 더보기 (+{{ listRemaining }})
+                    {{ $t('common.show_more', { n: listRemaining }) }}
                   </button>
                 </td>
               </tr>
               <tr v-if="displayedItems.length === 0">
-                <td colspan="3" style="text-align: center; padding: 40px; color: #94a3b8;">검색 결과가 없습니다.</td>
+                <td colspan="3" style="text-align: center; padding: 40px; color: #94a3b8;">{{ $t('branch.inventory.empty_msg') }}</td>
               </tr>
             </tbody>
           </table>
@@ -82,24 +82,24 @@
           
           <div class="hotkey-block">
             <div class="block-header">
-              <h3>⚡ Quick Pick (단일 베스트)</h3>
+              <h3>{{ $t('branch.transfer.qp_single') }}</h3>
             </div>
             <div class="grid-3x4">
               <div v-for="(slot, idx) in 8" :key="'slot-'+idx" class="hotkey-card">
                 <template v-if="quickPickSlots[idx]">
                   <button class="hotkey-btn-core" @click="addSingleHotkeyToCart(quickPickSlots[idx])">
                     <div class="line-1">{{ quickPickSlots[idx].item_name }}</div>
-                    <div class="line-2">({{ quickPickSlots[idx].custom_color || '기본' }} · {{ quickPickSlots[idx].custom_pack_qty || 1 }}入)</div>
+                    <div class="line-2">({{ quickPickSlots[idx].custom_color || $t('common.default') || 'Default' }} · {{ quickPickSlots[idx].custom_pack_qty || 1 }}入)</div>
                     <div class="line-3 stock-info">{{ getFormattedStockFor(quickPickSlots[idx]) }}</div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙ edit</button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">{{ $t('branch.transfer.btn_edit') }}</button>
                 </template>
                 <template v-else>
                   <button class="hotkey-btn-core empty-slot" @click="openSlotEdit(idx)">
                     <span class="empty-icon">➕</span>
-                    <div class="line-2">상품 지정</div>
+                    <div class="line-2">{{ $t('branch.transfer.lbl_assign_item') }}</div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">⚙ edit</button>
+                  <button class="hotkey-sub-edit-btn" @click="openSlotEdit(idx)">{{ $t('branch.transfer.btn_edit') }}</button>
                 </template>
               </div>
             </div>
@@ -107,7 +107,7 @@
 
           <div class="hotkey-block">
             <div class="block-header">
-              <h3 style="color: #00a896;">🌐 Grid Quick Pick (묶음 품목)</h3>
+              <h3 style="color: #00a896;">{{ $t('branch.transfer.qp_grid') }}</h3>
             </div>
             <div class="grid-3x4">
               <div v-for="(slot, idx) in 8" :key="'g-slot-'+idx" class="hotkey-card">
@@ -116,14 +116,14 @@
                     <div class="line-1">{{ gridPickSlots[idx].group_name }}</div>
                     <div class="line-2 text-teal">({{ gridPickSlots[idx].variants.length }} Colors)</div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙ edit</button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">{{ $t('branch.transfer.btn_edit') }}</button>
                 </template>
                 <template v-else>
                   <button class="hotkey-btn-core empty-slot" @click="openGridSlotEdit(idx)">
                     <span class="empty-icon">➕</span>
-                    <div class="line-2">상품 지정</div>
+                    <div class="line-2">{{ $t('branch.transfer.lbl_assign_item') }}</div>
                   </button>
-                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">⚙ edit</button>
+                  <button class="hotkey-sub-edit-btn" @click="openGridSlotEdit(idx)">{{ $t('branch.transfer.btn_edit') }}</button>
                 </template>
               </div>
             </div>
@@ -137,24 +137,24 @@
     <div class="modal-overlay" v-if="isSlotEditModalOpen">
       <div class="modal-content slot-edit-modal">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">단일 상품 지정 (슬롯 {{ editSlotIndex + 1 }})</h3>
+          <h3 style="margin:0;">{{ $t('branch.transfer.modal_assign_title', { slot: editSlotIndex + 1 }) }}</h3>
           <button class="close-text-btn" @click="isSlotEditModalOpen = false" style="margin:0; background:none; border:none; color:#64748b; cursor:pointer;">✕</button>
         </div>
         <div class="search-section" style="margin-top: 15px; padding: 0 15px;">
-          <input type="text" v-model="slotSearchQuery" placeholder="상품명 검색..." class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input type="text" v-model="slotSearchQuery" :placeholder="$t('branch.inventory.ph_search')" class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
         </div>
         <div class="slot-item-list" style="padding: 15px; overflow-y: auto; max-height: 400px;">
           <div v-for="item in filteredSlotItems" :key="item.name" 
                class="slot-list-item" 
                @click="assignSlotItem(item)"
                style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #e2e8f0; cursor:pointer;">
-            <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || '기본' }})</div>
+            <div class="item-desc"><strong>{{ item.item_name }}</strong> ({{ item.custom_color || $t('common.default') || 'Default' }})</div>
             <div class="item-stock">{{ getFormattedStockFor(item) }}</div>
           </div>
-          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색된 상품이 없습니다.</div>
+          <div v-if="filteredSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('branch.inventory.empty_msg') }}</div>
         </div>
         <div style="padding: 15px;">
-          <button class="btn-clear-slot" @click="clearSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">슬롯 비우기 (삭제)</button>
+          <button class="btn-clear-slot" @click="clearSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">{{ $t('branch.transfer.btn_clear_slot') }}</button>
         </div>
       </div>
     </div>
@@ -163,11 +163,11 @@
     <div class="modal-overlay" v-if="isGridSlotEditModalOpen">
       <div class="modal-content slot-edit-modal">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">묶음 상품 지정 (슬롯 {{ editGridSlotIndex + 1 }})</h3>
+          <h3 style="margin:0;">{{ $t('branch.transfer.modal_assign_title', { slot: editGridSlotIndex + 1 }) }}</h3>
           <button class="close-text-btn" @click="isGridSlotEditModalOpen = false" style="margin:0; background:none; border:none; color:#64748b; cursor:pointer;">✕</button>
         </div>
         <div class="search-section" style="margin-top: 15px; padding: 0 15px;">
-          <input type="text" v-model="gridSlotSearchQuery" placeholder="묶음명(아이템명) 검색..." class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input type="text" v-model="gridSlotSearchQuery" :placeholder="$t('branch.inventory.ph_search')" class="search-bar" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;" />
         </div>
         <div class="slot-item-list" style="padding: 15px; overflow-y: auto; max-height: 400px;">
           <div v-for="group in filteredGridSlotItems" :key="group.id" 
@@ -176,10 +176,10 @@
                style="padding:10px; border-bottom:1px solid #e2e8f0; cursor:pointer;">
             <div class="item-desc"><strong>{{ group.group_name }}</strong> ({{ group.variants.length }} color)</div>
           </div>
-          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">검색된 묶음이 없습니다.</div>
+          <div v-if="filteredGridSlotItems.length === 0" class="empty-msg" style="padding: 20px; text-align: center; color: #888;">{{ $t('branch.inventory.empty_msg') }}</div>
         </div>
         <div style="padding: 15px;">
-          <button class="btn-clear-slot" @click="clearGridSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">슬롯 비우기 (삭제)</button>
+          <button class="btn-clear-slot" @click="clearGridSlot" style="width:100%; padding:10px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; border-radius:6px; font-weight:bold; cursor:pointer;">{{ $t('branch.transfer.btn_clear_slot') }}</button>
         </div>
       </div>
     </div>
@@ -198,19 +198,19 @@
       <!-- Cart Table -->
       <div class="cart-table-wrapper" style="flex: 1; overflow-y: auto; padding: 15px; position: relative;">
         <div v-if="currentTab && currentTab.docName && !isClerk" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
-          <button @click="rejectDraft(currentTab.docName)" style="background: white; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">🗑️ 일괄 취소 (반려)</button>
+          <button @click="rejectDraft(currentTab.docName)" style="background: white; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">{{ $t('branch.transfer.btn_reject_all') }}</button>
         </div>
         <table class="pos-cart-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
           <thead>
             <tr>
-              <th rowspan="2" style="width: 35%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">품명(컬러)</th>
-              <th colspan="2" class="sub-th" style="width: 40%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">수량 입력</th>
-              <th rowspan="2" style="width: 15%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">총 수량</th>
-              <th rowspan="2" style="width: 10%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">삭제</th>
+              <th rowspan="2" style="width: 35%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">{{ $t('branch.transfer.th_item_color') }}</th>
+              <th colspan="2" class="sub-th" style="width: 40%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">{{ $t('branch.transfer.th_qty_input') }}</th>
+              <th rowspan="2" style="width: 15%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">{{ $t('branch.transfer.th_total_qty') }}</th>
+              <th rowspan="2" style="width: 10%; background: #f8fafc; font-weight: bold; color: #334155; border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: center;">{{ $t('branch.transfer.th_delete') }}</th>
             </tr>
             <tr>
-              <th class="sub-th" style="width: 35%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Caja(박스)</th>
-              <th class="sub-th" style="width: 65%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">Pza(낱장)</th>
+              <th class="sub-th" style="width: 35%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">{{ $t('branch.transfer.th_box') }}</th>
+              <th class="sub-th" style="width: 65%; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px; text-align: center;">{{ $t('branch.transfer.th_each') }}</th>
             </tr>
           </thead>
           <tbody v-if="currentTab">
@@ -218,10 +218,10 @@
               <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
                 <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
                   {{ cartItem.item_name }}
-                  <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getStock(cartItem.item_code, '[MAIN] ALARCON - K') / (cartItem.pack_qty || 1)) }} 박스]</span>
+                  <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">{{ $t('branch.transfer.lbl_available', { box: Math.floor(getStock(cartItem.item_code, '[MAIN] ALARCON - K') / (cartItem.pack_qty || 1)) }) }}</span>
                 </div>
                 <div class="p-stock-info" style="font-size: 11px; color: #64748b; margin-top: 4px;">
-                  {{ cartItem.custom_color || '-' }} | 1박스 = {{ cartItem.pack_qty }}개
+                  {{ cartItem.custom_color || '-' }} | {{ $t('branch.transfer.lbl_pack_info', { qty: cartItem.pack_qty }) }}
                 </div>
               </td>
               <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 0 !important; background-color: #dbeafe !important;">
@@ -243,7 +243,7 @@
               </td>
             </tr>
             <tr v-if="currentTab.cartItems.length === 0">
-              <td colspan="5" class="empty-cart-msg" style="border: 1px solid #e2e8f0; text-align: center !important; padding: 40px !important; color: #94a3b8; font-style: italic;">이동할 상품을 검색하여 추가해주세요.</td>
+              <td colspan="5" class="empty-cart-msg" style="border: 1px solid #e2e8f0; text-align: center !important; padding: 40px !important; color: #94a3b8; font-style: italic;">{{ $t('branch.transfer.empty_cart') }}</td>
             </tr>
           </tbody>
         </table>
@@ -263,31 +263,31 @@
         <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
           <template v-if="currentTab.docName && !isClerk">
             <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(false)" :disabled="isSubmitting">
-              {{ isSubmitting ? '처리 중...' : '수정 내역 저장' }}
+              {{ isSubmitting ? $t('common.loading') : $t('branch.transfer.btn_save_edit') }}
             </button>
             <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(true)" :disabled="isSubmitting">
-              {{ isSubmitting ? '처리 중...' : '2차 DRAFT 승인 (지점장)' }}
+              {{ isSubmitting ? $t('common.loading') : $t('branch.transfer.btn_submit_2nd') }}
             </button>
           </template>
           <template v-else>
             <div style="grid-column: 1 / -1; display: flex; justify-content: center; gap: 20px; padding-bottom: 10px;">
               <label style="font-size: 15px; font-weight: bold; color: #334155; display: flex; align-items: center; gap: 5px;">
-                <input type="radio" v-model="orderType" value="reservation" style="transform: scale(1.2);"> 예약 (단일품목 대량)
+                <input type="radio" v-model="orderType" value="reservation" style="transform: scale(1.2);"> {{ $t('branch.transfer.req_reserve') }} {{ $t('branch.transfer.req_reserve_desc') }}
               </label>
               <label style="font-size: 15px; font-weight: bold; color: #334155; display: flex; align-items: center; gap: 5px;">
-                <input type="radio" v-model="orderType" value="immediate" style="transform: scale(1.2);"> 즉배요청 (즉시 출고)
+                <input type="radio" v-model="orderType" value="immediate" style="transform: scale(1.2);"> {{ $t('branch.transfer.req_urgent') }} {{ $t('branch.transfer.req_urgent_desc') }}
               </label>
             </div>
             <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="clearCart">
-              비우기
+              {{ $t('branch.transfer.btn_empty_cart') }}
             </button>
             <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="submitTransfer" :disabled="currentTab.cartItems.length === 0 || isSubmitting">
-              주문요청
+              {{ $t('branch.transfer.btn_submit_final') }}
             </button>
           </template>
         </div>
         <div v-else style="text-align: center; padding: 15px; color: #64748b; font-weight: bold; background: #f1f5f9; border-radius: 6px;">
-          🚫 제출이 완료된 DRAFT 탭입니다. 수정할 수 없습니다.
+          🚫 {{ $t('branch.transfer.msg_readonly') }}
         </div>
       </div>
     </div>
@@ -297,26 +297,26 @@
   <div class="modal-overlay" v-if="isGridModalOpen">
     <div class="modal-content">
       <div class="modal-header">
-        <div class="product-title">선택된 묶음 상품: <strong>{{ activeGroup?.group_name }}</strong></div>
-        <button class="submit-btn" @click="submitGridSelection">선택 완료</button>
+        <div class="product-title">Selected Grid Item: <strong>{{ activeGroup?.group_name }}</strong></div>
+        <button class="submit-btn" @click="submitGridSelection">{{ $t('mobile.btn_done') }}</button>
       </div>
       <div style="max-height: 60vh; overflow-y: auto; margin-top: 15px;">
         <table class="grid-table" style="margin-top: 0;">
           <thead>
-            <tr><th style="position: sticky; top: 0; background: #fff; z-index: 1;">품명(컬러) 및 묶음 수량</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;" colspan="2">수량 입력</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">선택 총 수량</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">현재 가용 재고</th></tr>
+            <tr><th style="position: sticky; top: 0; background: #fff; z-index: 1;">{{ $t('branch.transfer.th_item_color') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;" colspan="2">{{ $t('branch.transfer.th_qty_input') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">{{ $t('branch.transfer.th_total_qty') }}</th><th style="position: sticky; top: 0; background: #fff; z-index: 1;">Current Stock</th></tr>
           </thead>
           <tbody>
             <tr v-for="(v, idx) in activeGroup?.variants" :key="idx">
-              <td class="color-name">{{ v.custom_color || '기본 색상' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
+              <td class="color-name">{{ v.custom_color || $t('common.default') || 'Default' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
               <td class="input-green"><input type="text" readonly :value="v.input_box || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
               <td class="input-green"><input type="text" readonly :value="v.input_each || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
-              <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }}개</td>
+              <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }} {{ $t('branch.transfer.lbl_unit_ea') }}</td>
               <td class="stock-info-cell">{{ getFormattedStockFor(v) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <button class="close-text-btn" @click="isGridModalOpen = false">닫기</button>
+      <button class="close-text-btn" @click="isGridModalOpen = false">{{ $t('mobile.btn_close') }}</button>
     </div>
   </div>
 
@@ -335,6 +335,10 @@
 </template>
 <script setup>
 import { ref, computed, watch, onMounted , nextTick} from 'vue'
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
+
 import MobileNumpadModal from './MobileNumpadModal.vue'
 import ReceiptPrint from '../../ReceiptPrint.vue'
 
@@ -386,7 +390,7 @@ const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 // Tabs State
 const tabs = ref([{
   id: 1,
-  title: '이동 1',
+  title: t('branch.transfer.tab_title') + ' 1',
   selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
   selectedCreator: authStore.user?.member_name || '',
   docName: null,
@@ -401,7 +405,7 @@ const currentTab = computed(() => tabs.value[currentTabIndex.value])
 const addNewTab = () => {
   tabs.value.push({
     id: nextTabId.value++,
-    title: `이동 ${tabs.value.length + 1}`,
+    title: t('branch.transfer.tab_title') + ' ' + (tabs.value.length + 1),
     selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
     selectedCreator: authStore.user?.member_name || '',
     docName: null,
@@ -448,11 +452,11 @@ const quickPickSlots = computed(() => {
 const gridHotkeys = computed(() => {
   const groupedByName = {};
   props.rawItems.forEach(item => {
-    const groupId = item.custom_grid_group_id || item.item_name || '미분류';
+    const groupId = item.custom_grid_group_id || item.item_name || t('common.unclassified') || 'Unclassified';
     if (!groupedByName[groupId]) {
       groupedByName[groupId] = {
         id: groupId,
-        group_name: item.item_name || '미분류',
+        group_name: item.item_name || t('common.unclassified') || 'Unclassified',
         variants: [],
         is_explicit_grid: false
       };
@@ -647,7 +651,7 @@ const getFormattedStockFor = (item) => {
   const packQty = item.custom_pack_qty || 1;
   const boxes = Math.floor(availableQty / packQty);
   const eaches = availableQty % packQty;
-  return `📦 ${boxes} Box / ${eaches} 개`;
+  return `📦 ${boxes} Box / ${eaches} ${t('branch.transfer.lbl_unit_ea')}`;
 }
 
 const cancelSearch = () => {
@@ -720,7 +724,7 @@ const gridNumpadVariant = ref(null)
 const openNumpadForNewItem = (item) => {
   if (!currentTab.value) return
   if (isClerk.value && currentTab.value.docName) {
-    alert('이미 제출된 DRAFT는 수정할 수 없습니다.')
+    alert(t('branch.transfer.msg_readonly'))
     return
   }
   
@@ -729,7 +733,7 @@ const openNumpadForNewItem = (item) => {
   const mainBoxQty = Math.floor(mainQty / packQty)
   
   if (mainBoxQty < 1) {
-    alert('알라르꼰(메인창고)에 해당 상품의 가용 재고(박스)가 부족합니다.')
+    alert(t('branch.inventory.msg_no_main_stock'))
     return
   }
   
@@ -814,7 +818,7 @@ const handleNumpadSubmit = ({ item, box, each, action }) => {
         openNumpadForGridItem(activeGroup.value.variants[idx + 1])
         return
       } else {
-        alert('목록의 끝입니다.')
+        alert(t('common.end_of_list') || 'End of list.')
       }
     }
     closeNumpadModal()
@@ -837,7 +841,7 @@ const handleNumpadSubmit = ({ item, box, each, action }) => {
         openNumpadForExistingItem(currentTab.value.cartItems[existingIdx + 1])
         return
       } else {
-        alert('목록의 끝입니다.')
+        alert(t('common.end_of_list') || 'End of list.')
       }
     }
   } else {
@@ -866,7 +870,7 @@ const updateTotalQty = (cartItem) => {
   const mainBoxQty = Math.floor(mainQty / (cartItem.pack_qty || 1))
   
   if (cartItem.boxQty > mainBoxQty) {
-    alert(`알라르꼰(메인창고) 가용 재고(${mainBoxQty} 박스)를 초과할 수 없습니다.`)
+    alert(`Cannot exceed main stock (${mainBoxQty} Boxes).`)
     cartItem.boxQty = mainBoxQty
   }
   
@@ -903,7 +907,7 @@ const removeItem = (index) => {
 
 const clearCart = () => {
   if (!currentTab.value) return
-  if(confirm('이동 장바구니를 정말 비우시겠습니까?')) {
+  if(confirm(t('branch.transfer.msg_confirm_reject'))) {
     currentTab.value.cartItems = []
   }
 }
@@ -928,7 +932,7 @@ const fetchPendingDrafts = async () => {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
-          ['custom_approval_stage', '=', '점원 요청'],
+          ['custom_approval_stage', '=', 'Clerk Request'],
           ['custom_branch', '=', authStore.user?.branch_name || '']
         ]),
         fields: JSON.stringify(['name', 'custom_branch_requester', 'owner']),
@@ -947,7 +951,7 @@ const fetchPendingDrafts = async () => {
           
           tabs.value.push({
             id: nextTabId.value++,
-            title: doc.custom_orderer || '알 수 없는 점원',
+            title: doc.custom_orderer || 'Unknown Clerk',
             docName: doc.name,
             selectedRequester: doc.custom_orderer || '',
             selectedCreator: doc.owner || '',
@@ -971,23 +975,23 @@ const fetchPendingDrafts = async () => {
     }
   } catch(e) {
     console.error('Error fetching drafts:', e)
-    alert('대기열을 불러오는 중 오류가 발생했습니다.')
+    alert('Error loading drafts.')
   }
 }
 
 const rejectDraft = async (docName) => {
-  if(!confirm('이 요청을 정말 일괄 취소(반려)하시겠습니까?\n(해당 프라페 문서는 삭제되며 즉시 가용 재고가 롤백됩니다.)')) return
+  if(!confirm(t('branch.transfer.msg_confirm_reject'))) return
   
   try {
     await frappeApi.delete(`/api/resource/Material Request/${docName}`)
-    alert('성공적으로 반려(삭제)되었습니다.')
+    alert(t('branch.transfer.msg_reject_success'))
     const idx = tabs.value.findIndex(t => t.docName === docName)
     if(idx !== -1) removeTab(idx)
     emit('refresh-items')
     fetchPendingDrafts()
   } catch(e) {
     console.error(e)
-    alert('반려 처리 중 오류가 발생했습니다.')
+    alert(t('branch.transfer.msg_reject_err'))
   }
 }
 
@@ -999,7 +1003,7 @@ const updateDraft = async (isFinalApproval) => {
     const payload = {
       set_from_warehouse: '[MAIN] ALARCON - K',
       set_warehouse: authStore.user?.branch_name,
-      custom_approval_stage: isFinalApproval ? '지점장 승인' : '점원 요청',
+      custom_approval_stage: isFinalApproval ? 'Manager Approval' : 'Clerk Request',
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
         qty: item.totalQty,
@@ -1013,17 +1017,17 @@ const updateDraft = async (isFinalApproval) => {
     await adminApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
     
     if (isFinalApproval) {
-      alert(`성공적으로 2차 DRAFT 승인이 완료되었습니다.\n본부 관리자 예약 현황에 등록됩니다.`)
+      alert(t('branch.transfer.msg_submit_success'))
       const idx = tabs.value.findIndex(t => t.id === currentTab.value.id)
       if(idx !== -1) removeTab(idx)
     } else {
-      alert('성공적으로 수정 내용이 저장되었습니다.')
+      alert('Edit saved successfully.')
     }
     emit('refresh-items')
     if (isFinalApproval) fetchPendingDrafts()
   } catch(e) {
     console.error(e)
-    alert('업데이트 중 오류가 발생했습니다.')
+    alert(t('branch.transfer.msg_err_transfer'))
   } finally {
     isSubmitting.value = false
   }
@@ -1034,7 +1038,7 @@ const updateDraft = async (isFinalApproval) => {
 const submitTransfer = async () => {
   if (!currentTab.value || currentTab.value.cartItems.length === 0) return
   if (!currentTab.value.selectedRequester) {
-    alert('지점 요청자를 선택해주세요.')
+    alert('Please select a clerk.')
     return
   }
 
@@ -1076,12 +1080,12 @@ const submitTransfer = async () => {
       currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
       
       receiptPrintData.value = {
-        title: '즉배요청 (Stock Entry)',
+        title: 'Immediate (Stock Entry)',
         no: docName,
         date: dateStr,
         ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
         vendedor: currentTab.value.selectedRequester || authStore.user?.email,
-        mode: '즉시 출고',
+        mode: 'Immediate Outbound',
         solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
@@ -1100,12 +1104,12 @@ const submitTransfer = async () => {
       if (receiptPrintRef.value) {
         const success = await receiptPrintRef.value.copyToClipboard()
         if (success) {
-          alert(`[즉배요청 성공] 즉시 출고 전표(${docName}) 생성 및 주문서 이미지가 기기에 저장되었습니다! (클립보드 또는 갤러리)`)
+          alert(t('branch.transfer.msg_submit_success'))
         } else {
-          alert(`[즉배요청 성공] 즉시 출고 전표(${docName})가 대기열(Draft)에 성공적으로 생성되었습니다! (이미지 복사 실패)`)
+          alert(t('branch.transfer.msg_draft_success'))
         }
       } else {
-        alert(`[즉배요청 성공] 즉시 출고 전표(${docName})가 대기열(Draft)에 성공적으로 생성되었습니다!`)
+        alert(t('branch.transfer.msg_draft_success'))
       }
     } else {
       const payload = {
@@ -1118,7 +1122,7 @@ const submitTransfer = async () => {
         owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 강제 지정
         custom_branch: authStore.user?.branch_name,
         custom_orderer: currentTab.value.selectedRequester,
-        custom_approval_stage: isClerk ? '점원 요청' : '지점장 승인',
+        custom_approval_stage: isClerk ? 'Clerk Request' : 'Manager Approval',
         items: currentTab.value.cartItems.map(item => ({
           item_code: item.item_code,
           qty: item.totalQty,
@@ -1130,14 +1134,14 @@ const submitTransfer = async () => {
       }
       const res = await adminApi.post('/api/resource/Material Request', payload)
       docName = res.data.data.name
-      alert(`[예약 완료] 출고(판매) 요청(${docName})이 성공적으로 대기 중(Pending) 상태로 전송되었습니다!`)
+      alert($t('branch.transfer.msg_submit_success'))
     }
     
     if(!isClerk) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
   } catch (error) {
     console.error('Submit error:', error)
-    let errorMsg = '예약 전송 중 오류가 발생했습니다.'
+    let errorMsg = t('branch.transfer.msg_err_transfer')
     if (error.response && error.response.data) {
       const data = error.response.data
       if (data.exc_type) errorMsg = data.exc_type

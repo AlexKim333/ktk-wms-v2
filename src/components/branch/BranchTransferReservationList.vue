@@ -1,24 +1,24 @@
 <template>
   <div class="reservation-list-container">
     <div class="header-actions">
-      <h2>📅 지점 재고이동 예약 현황</h2>
+      <h2>{{ $t('branch.res_list.title') }}</h2>
       <div style="display: flex; gap: 10px;">
         <button class="btn-action outline" @click="isSummaryModalOpen = true" style="background: white; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; padding: 10px 15px; cursor: pointer; color: #475569;">
-          📦 품목별 요약 보기
+          📦 {{ $t('branch.res_list.btn_summary', 'Summary by Item') }}
         </button>
-        <button class="btn-create" @click="emit('create-new')">➕ 새 예약 작성</button>
+        <button class="btn-create" @click="emit('create-new')">{{ $t('branch.res_list.btn_new') }}</button>
       </div>
     </div>
 
     <div class="filters">
-      <input type="text" v-model="searchQuery" placeholder="검색 (예약번호 등)" class="filter-input" />
+      <input type="text" v-model="searchQuery" :placeholder="$t('branch.res_list.ph_search')" class="filter-input" />
       <select v-model="statusFilter" class="filter-select">
-        <option value="all">모든 상태 (All)</option>
+        <option value="all">{{ $t('branch.res_list.status_all') }}</option>
         <option value="incomplete">{{ $t('branch.res_list.status_incomplete') }}<</option>
-        <option value="completed">완료 (Completed)</option>
+        <option value="completed">{{ $t('branch.res_list.status_completed') }}</option>
       </select>
       <button class="btn-refresh" @click="fetchReservations" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
-        🔄 새로고침
+        🔄 {{ $t('branch.inventory.btn_refresh') }}
       </button>
     </div>
 
@@ -27,13 +27,13 @@
         <thead>
           <tr>
             <th>{{ $t('branch.res_list.col_no') }}<</th>
-            <th>날짜</th>
-            <th>소스 (출발 창고)</th>
-            <th>타겟 (도착 창고)</th>
+            <th>{{ $t('branch.res_list.col_date') }}</th>
+            <th>Source</th>
+            <th>{{ $t('branch.res_list.col_target') }}</th>
             <th>{{ $t('branch.res_list.col_status') }}<</th>
             <th>{{ $t('branch.res_list.col_total_qty') }}</th>
             <th>{{ $t('branch.res_list.col_progress') }}<</th>
-            <th class="action-cell">작업</th>
+            <th class="action-cell">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -50,7 +50,7 @@
             <td @click="openDetail(res)">
               <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage, res.is_stock_entry) }}</span>
             </td>
-            <td @click="openDetail(res)">{{ totalQtyMap[res.name] || 0 }} 개</td>
+            <td @click="openDetail(res)">{{ totalQtyMap[res.name] || 0 }} {{ $t('branch.transfer.lbl_unit_ea') }}</td>
             <td @click="openDetail(res)">
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: getProgressPercent(res) + '%' }"></div>
@@ -58,8 +58,8 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td>
-              <button v-if="userRole === 'Manager' && res.custom_approval_stage === '점원 요청' && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
-                ✅ 승인
+              <button v-if="userRole === 'Manager' && res.custom_approval_stage === 'Clerk Request' && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
+                ✅ {{ $t('common.approve', 'Approve') }}
               </button>
               <button v-if="res.docstatus === 0 && !res.is_stock_entry" class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
               <button class="btn-delete" @click.stop="cancelReservation(res)" title="삭제" style="margin-left:5px;">🗑️</button>
@@ -67,7 +67,7 @@
           </tr>
           <tr v-if="filteredReservations.length === 0">
             <td colspan="8" style="text-align: center; padding: 30px; color: #94a3b8;">
-              진행 중인 예약 내역이 없습니다.
+              {{ $t('branch.res_list.empty_msg') }}
             </td>
           </tr>
         </tbody>
@@ -78,51 +78,51 @@
     <div v-if="selectedReservation" class="modal-overlay" @click.self="selectedReservation = null">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>상세 정보 ({{ selectedReservation.name }})</h3>
+          <h3>{{ $t('branch.res_list.modal_title', { name: selectedReservation.name }) }}</h3>
           <button class="close-btn" @click="selectedReservation = null">&times;</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-card">
-              <label>상태</label>
+              <label>{{ $t('branch.res_list.modal_status') }}</label>
               <div class="val">
                 <span class="status-badge" style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:12px; font-size:12px; font-weight:bold;">
-                  {{ selectedReservation.is_stock_entry ? 'Draft(지점장 승인)' : (selectedReservation.status || '대기중') }}
+                  {{ selectedReservation.is_stock_entry ? 'Draft(Manager Approval)' : (selectedReservation.status || 'Pending') }}
                 </span>
               </div>
             </div>
             <div class="detail-card">
-              <label>📍 소스 (출발 창고)</label>
+              <label>📍 Source</label>
               <div class="val">{{ selectedReservation.set_from_warehouse || '[MAIN] ALARCON - K' }}</div>
             </div>
             <div class="detail-card">
-              <label>📍 타겟 (도착 창고)</label>
+              <label>📍 {{ $t('branch.res_list.modal_target') }}</label>
               <div class="val">
                 {{ selectedReservation.set_warehouse || selectedReservation.custom_branch || '-' }}
                 <div style="font-size:0.8em; color:#666; margin-top:2px;">{{ selectedReservation.custom_orderer || '-' }}</div>
               </div>
             </div>
             <div class="detail-card">
-              <label>날짜</label>
+              <label>{{ $t('branch.res_list.col_date') }}</label>
               <div class="val">{{ selectedReservation.schedule_date || selectedReservation.creation?.split(' ')[0] }}</div>
             </div>
           </div>
 
           <div v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" style="margin: 10px 0; padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; color: #b45309; font-weight: bold; text-align: right;">
-            📦 필요한 박스(Caja) 및 낱장(Pza) 수량을 바로 입력하세요.
+            📦 Enter Box and Pcs quantities directly.
           </div>
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">품목명</th>
-                <th v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">출고 요청 수량</th>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">예약 수량</th>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">기출고</th>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">잔여 수량</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_item') }}</th>
+                <th v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">Request Qty</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_req') }}</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_issued') }}</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_remain') }}</th>
               </tr>
               <tr v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
-                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Caja(박스)</th>
-                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">Pza(낱장)</th>
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">{{ $t('branch.transfer.th_box') }}</th>
+                <th style="background:#e0f2fe; font-size: 11px; text-align:center; padding: 4px;">{{ $t('branch.transfer.th_each') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +130,7 @@
                 <td style="text-align: left;">
                   <div style="font-weight: bold;">{{ item.item_name || item.item_code }}</div>
                   <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
-                    {{ item.custom_color || '-' }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
+                    {{ item.custom_color || '-' }} | {{ $t('branch.transfer.lbl_pack_info', { qty: item.custom_pack_qty || 1 }) }}
                   </div>
                 </td>
                 <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
@@ -146,7 +146,7 @@
                 <td style="font-weight:bold; color:#ef4444; text-align:center;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
               </tr>
               <tr v-if="selectedReservationItems.length === 0">
-                <td :colspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 6 : 4" style="text-align: center; padding: 15px; color: #94a3b8;">데이터를 불러오는 중입니다...</td>
+                <td :colspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 6 : 4" style="text-align: center; padding: 15px; color: #94a3b8;">{{ $t('common.loading') }}</td>
               </tr>
             </tbody>
           </table>
@@ -156,7 +156,7 @@
               닫기
             </button>
             <button v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" @click="submitPartialRequest" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;" :disabled="isSubmittingPartial">
-              {{ isSubmittingPartial ? '전송 중...' : '🔥 입력한 수량만큼 즉시 출고 대기열로 넘기기' }}
+              {{ isSubmittingPartial ? '전송 중...' : '🔥 Move entered qty to immediate outbound queue' }}
             </button>
             <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="$emit('edit-reservation', selectedReservation.name)" style="background: #0ea5e9; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
               🛒 장바구니로 이동하여 수정/출고
@@ -169,17 +169,17 @@
     <div v-if="isSummaryModalOpen" class="modal-overlay" @click.self="isSummaryModalOpen = false">
       <div class="modal-content modal-large">
         <div class="modal-header">
-          <h3>📦 드래프트 품목 요약 보기</h3>
+          <h3>📦 Draft Items Summary</h3>
           <button class="close-btn" @click="isSummaryModalOpen = false">×</button>
         </div>
         <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
           <table class="history-table" style="margin: 0;">
             <thead>
               <tr>
-                <th style="background: #f8fafc;">아이템코드</th>
-                <th style="background: #f8fafc; text-align: right;">주문 박스총 수량</th>
-                <th style="background: #f8fafc; text-align: right;">주문낱개총수량</th>
-                <th style="background: #f8fafc; text-align: right;">주문총수량</th>
+                <th style="background: #f8fafc;">{{ $t('branch.inventory.col_item_name') }}</th>
+                <th style="background: #f8fafc; text-align: right;">Total Box Qty</th>
+                <th style="background: #f8fafc; text-align: right;">Total Pcs Qty</th>
+                <th style="background: #f8fafc; text-align: right;">{{ $t('branch.res_list.col_total_qty') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -190,7 +190,7 @@
                 <td style="text-align: right; font-weight: bold; color: #0f172a;">{{ item.total_qty }}</td>
               </tr>
               <tr v-if="aggregatedSummaryItems.length === 0">
-                <td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">진행 중인(Draft) 재고 이동 품목이 없습니다.</td>
+                <td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">{{ $t('branch.res_list.empty_msg') }}</td>
               </tr>
             </tbody>
           </table>
@@ -210,18 +210,18 @@
       <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
         <thead>
           <tr style="border-bottom: 1px solid #cbd5e1; color: #64748b;">
-            <th style="text-align: left; padding: 2px 4px;">품목 (Color)</th>
+            <th style="text-align: left; padding: 2px 4px;">{{ $t('branch.res_list.modal_col_item') }}</th>
             <th style="text-align: right; padding: 2px 4px;">Box</th>
-            <th style="text-align: right; padding: 2px 4px;">낱개</th>
-            <th style="text-align: right; padding: 2px 4px;">총수량</th>
+            <th style="text-align: right; padding: 2px 4px;">{{ $t('branch.transfer.th_each') }}</th>
+            <th style="text-align: right; padding: 2px 4px;">{{ $t('branch.res_list.col_total_qty') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="hoverTooltip.loading">
-            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">로딩 중...</td>
+            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">{{ $t('common.loading') }}</td>
           </tr>
           <tr v-else-if="hoverTooltip.items.length === 0">
-            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">품목이 없습니다.</td>
+            <td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">{{ $t('branch.inventory.empty_msg') }}</td>
           </tr>
           <tr v-for="item in hoverTooltip.items" :key="item.item_code">
             <td style="font-weight: 500; padding: 2px 4px;">{{ item.item_code }} ({{ item.custom_color || '-' }})</td>
@@ -389,21 +389,21 @@ const fetchReservations = async () => {
     applyFilters()
   } catch (error) {
     console.error('Fetch reservations error:', error)
-    alert('예약 목록을 불러오지 못했습니다. 네트워크/권한을 확인하세요.')
+    alert('Failed to load reservations.')
   }
 }
 
 const translateStatus = (status, docstatus, approval_stage, is_stock_entry) => {
-  if (is_stock_entry && docstatus === 0) return '본점 출고 대기'
+  if (is_stock_entry && docstatus === 0) return 'Pending Main Outbound'
   if (docstatus === 0) {
     if (approval_stage) return `Draft(${approval_stage})`
     return 'Draft'
   }
-  if (docstatus === 2) return '취소됨'
-  if (status === 'Pending' || status === 'Draft') return '대기 중'
-  if (status === 'Partially Ordered') return '부분 주문됨'
-  if (status === 'Ordered') return '주문 완료'
-  return status || '알 수 없음'
+  if (docstatus === 2) return 'Cancelled'
+  if (status === 'Pending' || status === 'Draft') return 'Pending'
+  if (status === 'Partially Ordered') return 'Partially Ordered'
+  if (status === 'Ordered') return 'Ordered'
+  return status || 'Unknown'
 }
 
 const getStatusClass = (res) => {
@@ -496,7 +496,7 @@ const handleQtyChange = (item) => {
   
   if (!selectedReservation.value?.is_stock_entry) {
     if (total > item.remain_qty) {
-      alert(`예약물량이 부족합니다. (최대 ${item.remain_qty}개 까지만 가능)`)
+      alert(`Insufficient reservation qty. (Max ${item.remain_qty})`)
       total = item.remain_qty
       item.request_caja = Math.floor(total / cap)
       item.request_pza = total % cap
@@ -509,7 +509,7 @@ const handleQtyChange = (item) => {
 const submitPartialRequest = async () => {
   const validItems = selectedReservationItems.value.filter(item => item.request_qty > 0)
   if (validItems.length === 0) {
-    alert('요청할 수량이 없습니다. 수량을 먼저 입력해주세요.')
+    alert('Please enter qty first.')
     return
   }
 
@@ -535,12 +535,12 @@ const submitPartialRequest = async () => {
     }
     
     await adminApi.post('/api/resource/Stock Entry', sePayload)
-    alert(`성공적으로 부분 출고 요청(초안)이 생성되었습니다! 본점 대기열로 전송되었습니다.`)
+    alert(t('branch.transfer.msg_draft_success'))
     selectedReservation.value = null
     fetchReservations()
   } catch (error) {
     console.error('Partial request error:', error)
-    alert('부분 출고 요청 중 오류가 발생했습니다.')
+    alert(t('branch.transfer.msg_err_transfer'))
   } finally {
     isSubmittingPartial.value = false
   }
@@ -551,7 +551,7 @@ const isUpdatingDraft = ref(false)
 const updateDraftRequest = async () => {
   const validItems = selectedReservationItems.value.filter(item => item.request_qty > 0)
   if (validItems.length === 0) {
-    alert('요청할 수량이 0인 항목은 수정이 불가능합니다. (삭제는 메인화면을 이용해주세요)')
+    alert('Cannot modify items with 0 request qty.')
     return
   }
 
@@ -566,28 +566,28 @@ const updateDraftRequest = async () => {
     
     // Frappe requires PUT for updates
     await adminApi.put(`/api/resource/Stock Entry/${selectedReservation.value.name}`, payload)
-    alert('드래프트 수량이 성공적으로 수정되었습니다.')
+    alert('Draft qty successfully updated.')
     selectedReservation.value = null
     fetchReservations()
   } catch (error) {
     console.error('Update draft error:', error)
-    alert('수량 업데이트 중 오류가 발생했습니다.')
+    alert('Error updating qty.')
   } finally {
     isUpdatingDraft.value = false
   }
 }
 
 const approveDraft = async (res) => {
-  if (!confirm('지점장 승인(2차 DRAFT)을 진행하시겠습니까?')) return
+  if (!confirm(t('branch.transfer.msg_confirm_submit'))) return
   try {
     await frappeApi.put(`/api/resource/Material Request/${res.name}`, {
       custom_approval_stage: '지점장 승인'
     })
-    alert('승인되었습니다.')
+    alert(t('branch.transfer.msg_submit_success'))
     fetchReservations()
   } catch (err) {
     console.error('Approve error:', err)
-    alert('승인 중 오류가 발생했습니다.')
+    alert(t('branch.transfer.msg_err_transfer'))
   }
 }
 
@@ -596,18 +596,18 @@ const editReservation = (res) => {
 }
 
 const cancelReservation = async (res) => {
-  if (!confirm(`예약(${res.name})을 정말 삭제하시겠습니까?`)) return
+  if (!confirm(t('branch.res_list.msg_confirm_cancel', { name: res.name }))) return
   try {
     if (res.is_stock_entry) {
       await adminApi.delete(`/api/resource/Stock Entry/${res.name}`)
     } else {
       await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
     }
-    alert('삭제되었습니다.')
+    alert(t('branch.res_list.msg_cancel_success'))
     fetchReservations()
   } catch (error) {
     console.error('삭제 권한 오류:', error)
-    alert('삭제할 권한이 없거나, 이미 진행중인 예약입니다.')
+    alert(t('branch.res_list.msg_cancel_error'))
   }
 }
 

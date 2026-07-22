@@ -1,8 +1,8 @@
 <template>
   <div class="staff-management-container">
     <div class="header-actions">
-      <h2>👨‍👩‍👧 가족(직원) 관리</h2>
-      <button class="add-btn" @click="openModal">새 가족 추가 ➕</button>
+      <h2>{{ $t('staff.title') }}</h2>
+      <button class="add-btn" @click="openModal">{{ $t('staff.btn_add') }}</button>
     </div>
 
     <!-- 리스트 테이블 -->
@@ -10,11 +10,11 @@
       <table class="staff-table">
         <thead>
           <tr>
-            <th>이름</th>
-            <th>이메일 (ID)</th>
-            <th>권한(Role)</th>
-            <th>담당 지점</th>
-            <th>관리</th>
+            <th>{{ $t('staff.col_name') }}</th>
+            <th>{{ $t('staff.col_email') }}</th>
+            <th>{{ $t('staff.col_role') }}</th>
+            <th>{{ $t('staff.col_branch') }}</th>
+            <th>{{ $t('staff.col_manage') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -22,11 +22,11 @@
             <td>{{ user.full_name }}</td>
             <td>{{ user.email }}</td>
             <td>
-              <span class="badge" :class="getRoleBadgeClass(user.role)">{{ user.role || '권한 없음' }}</span>
+              <span class="badge" :class="getRoleBadgeClass(user.role)">{{ user.role || $t('staff.no_role') }}</span>
             </td>
             <td>{{ user.branch || '-' }}</td>
             <td>
-              <button class="edit-btn" @click="editUser(user)">수정</button>
+              <button class="edit-btn" @click="editUser(user)">{{ $t('staff.btn_edit') }}</button>
             </td>
           </tr>
           <tr v-if="staffList.length === 0">
@@ -41,18 +41,18 @@
     <!-- 등록/수정 모달 -->
     <div v-if="isModalOpen" class="modal-overlay" @click.self="closeModal">
       <div class="modal-content">
-        <h3>{{ isEditing ? '가족 정보 수정' : '새 가족 등록' }}</h3>
+        <h3>{{ isEditing ? $t('staff.modal_title_edit') : $t('staff.modal_title_add') }}</h3>
         <form @submit.prevent="saveUser">
           <div class="form-group">
-            <label>이름 (Full Name)</label>
-            <input type="text" v-model="form.full_name" required placeholder="예: MONSE" :disabled="isEditing" />
+            <label>{{ $t('staff.lbl_name') }}</label>
+            <input type="text" v-model="form.full_name" required :placeholder="$t('staff.ph_name')" :disabled="isEditing" />
           </div>
           <div class="form-group">
-            <label>이메일 (ID)</label>
-            <input type="email" v-model="form.email" required placeholder="로그인에 사용할 이메일" :disabled="isEditing" />
+            <label>{{ $t('staff.col_email') }}</label>
+            <input type="email" v-model="form.email" required :placeholder="$t('staff.ph_email')" :disabled="isEditing" />
           </div>
           <div class="form-group" v-if="!isEditing">
-            <label>비밀번호</label>
+            <label>{{ $t('staff.lbl_pw') }}</label>
             <div style="position: relative; display: flex; align-items: center;">
               <input :type="showPassword ? 'text' : 'password'" v-model="form.password" required style="width: 100%; padding-right: 40px;" />
               <button type="button" @click="showPassword = !showPassword" style="position: absolute; right: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; padding: 0;">
@@ -61,19 +61,19 @@
             </div>
           </div>
           <div class="form-group">
-            <label>권한 (역할)</label>
+            <label>{{ $t('staff.lbl_role') }}</label>
             <select v-model="form.role" required>
-              <option value="">-- 권한 선택 --</option>
-              <option value="System Manager">본사 관리자 (System Manager)</option>
-              <option value="Branch Manager">지점장 (Branch Manager)</option>
-              <option value="Branch Clerk">일반 점원 (Branch Clerk)</option>
+              <option value="">{{ $t('staff.sel_role') }}</option>
+              <option value="System Manager">{{ $t('staff.role_sys') }}</option>
+              <option value="Branch Manager">{{ $t('staff.role_branch') }}</option>
+              <option value="Branch Clerk">{{ $t('staff.role_clerk') }}</option>
             </select>
           </div>
           <div class="form-group">
-            <label>담당 지점 (Warehouse)</label>
+            <label>{{ $t('staff.lbl_warehouse') }}</label>
             <select v-model="form.branch" :required="form.role !== 'System Manager'">
-              <option value="">-- 지점 선택 --</option>
-              <option value="ALL" v-if="form.role === 'System Manager'">🏢 본사 전체 관리 (지점 제한 없음)</option>
+              <option value="">{{ $t('staff.sel_branch') }}</option>
+              <option value="ALL" v-if="form.role === 'System Manager'">{{ $t('staff.opt_all_branch') }}</option>
               <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">
                 {{ wh.warehouse_name || wh.name }}
               </option>
@@ -81,9 +81,9 @@
           </div>
           
           <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="closeModal">취소</button>
+            <button type="button" class="cancel-btn" @click="closeModal">{{ $t('staff.btn_cancel') }}</button>
             <button type="submit" class="save-btn" :disabled="isSaving">
-              {{ isSaving ? '저장 중...' : '저장' }}
+              {{ isSaving ? $t('common.loading') : $t('staff.btn_save') }}
             </button>
           </div>
         </form>
@@ -94,6 +94,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
+
 import frappeApi from '../api/frappe.js'
 
 const staffList = ref([])
@@ -122,7 +126,7 @@ const fetchWarehouses = async () => {
     })
     if (res.data?.data) warehouseList.value = res.data.data
   } catch (e) {
-    console.error('창고 로드 실패', e)
+    console.error('Failed to load warehouses', e)
   }
 }
 
@@ -174,7 +178,7 @@ const fetchStaff = async () => {
       })
     }
   } catch (e) {
-    console.error('직원 로드 실패', e)
+    console.error('Failed to load staff', e)
   }
 }
 
@@ -254,12 +258,12 @@ const saveUser = async () => {
       await frappeApi.post('/api/resource/User', userPayload);
     }
     
-    alert(`가족 정보가 성공적으로 ${isEditing.value ? '수정' : '저장'}되었습니다!`);
+    alert(isEditing.value ? t('staff.msg_save_success_edit') : t('staff.msg_save_success_add'));
     closeModal();
     fetchStaff();
   } catch (error) {
     console.error('Save error', error);
-    alert('저장 중 오류가 발생했습니다.');
+    alert(t('staff.msg_save_err'));
   } finally {
     isSaving.value = false;
   }

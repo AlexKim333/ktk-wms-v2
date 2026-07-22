@@ -34,7 +34,7 @@
             <button class="hotkey-btn-core grid-style">
               <span class="line-1">AD2015</span>
               <span class="line-2">(SURTIDO - 100入)</span>
-              <span class="p-stock-info">📦 7 상자 / 10 개</span>
+              <span class="p-stock-info">📦 7 {{ $t('branch.transfer.th_box') }} / 10 {{ $t('branch.transfer.lbl_unit_ea') }}</span>
             </button>
             <button class="hotkey-sub-edit-btn">{{ $t('branch.transfer.btn_edit') }}</button>
           </div>
@@ -50,7 +50,7 @@
           <div class="hotkey-card" v-for="i in 4" :key="'g'+i">
             <button class="hotkey-btn-core" style="border-left: 4px solid #0ea5e9;">
               <span class="line-1">P-160</span>
-              <span class="line-2">(26 가지 컬러)</span>
+              <span class="line-2">(26 {{ $t('branch.transfer.th_item_color') }})</span>
             </button>
           </div>
         </div>
@@ -78,7 +78,7 @@
       <div class="tabs-control-header outbound-mode">
         <div class="tabs-list">
           <div class="tab-wrapper-item active outbound-mode">
-            <span class="tab-title-text">출고 1</span>
+            <span class="tab-title-text">{{ $t('branch.transfer.tab_title') }} 1</span>
             <button class="tab-close-x-btn">×</button>
           </div>
         </div>
@@ -132,7 +132,7 @@
                 <th colspan="2" class="sub-th" style="background:#f1f5f9;">{{ $t('pos.th_qty_input') }}</th>
                 <th rowspan="2">{{ $t('pos.th_total_qty') }}</th>
                 <th rowspan="2">{{ $t('stock_adj.col_unit_cost') }}</th>
-                <th rowspan="2">금액</th>
+                <th rowspan="2">Amount</th>
                 <th rowspan="2" style="width: 40px;"></th>
               </tr>
               <tr class="sub-th" style="background:#f1f5f9;">
@@ -145,7 +145,7 @@
               <tr>
                 <td class="product-cell">
                   <div class="p-name">AD2015</div>
-                  <div class="p-stock-info">지점: 7 / 메인: 10</div>
+                  <div class="p-stock-info">{{ $t('branch.inventory.col_my_stock', { branch: '' }) }}: 7 / {{ $t('branch.inventory.col_main_stock') }}: 10</div>
                 </td>
                 <td class="input-green">
                   <input type="number" value="1" />
@@ -171,8 +171,8 @@
         <!-- 하단 액션 존 -->
         <div class="right-footer-action-zone">
           <div class="truck-counter-info-grid">
-            <div class="summary-label-box">📦 박스 총 개수: <strong>0 상자</strong></div>
-            <div class="summary-label-box" style="color:#0284c7;">👕 낱장 총 개수: <strong style="color:#0284c7;">0 개</strong></div>
+            <div class="summary-label-box">📦 Total Boxes: <strong>0 {{ $t('branch.transfer.th_box') }}</strong></div>
+            <div class="summary-label-box" style="color:#0284c7;">👕 Total Pcs: <strong style="color:#0284c7;">0 {{ $t('branch.transfer.lbl_unit_ea') }}</strong></div>
           </div>
           <div class="action-btn-double-group">
             <button class="btn-outbound-reserve" style="background:#475569;">{{ $t('branch.transfer.btn_save_draft') }}</button>

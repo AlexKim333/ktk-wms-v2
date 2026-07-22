@@ -7,7 +7,7 @@
           <span class="search-icon" style="position: absolute; left: 12px; font-size: 14px; color: #94a3b8;">🔍</span>
           <input 
             type="text" 
-            placeholder="상품명 또는 속성 검색..." 
+            placeholder="{{ $t('branch.inventory.ph_search') }}" 
             v-model="searchQuery"
             class="search-bar"
             style="width: 100%; padding: 12px 12px 12px 35px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none;"
@@ -17,7 +17,7 @@
           <span class="search-icon" style="position: absolute; left: 12px; font-size: 14px; color: #f59e0b;">🏷️</span>
           <input 
             type="text" 
-            placeholder="바코드 스캔..." 
+            placeholder="{{ $t('branch.transfer.ph_search_barcode') }}" 
             v-model="barcodeQuery"
             class="search-bar barcode-bar"
             style="width: 100%; padding: 12px 12px 12px 35px; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; font-size: 14px; outline: none;"
@@ -31,9 +31,9 @@
       <table class="inventory-table" style="width: 100%; border-collapse: collapse;">
         <thead>
           <tr>
-            <th style="width: 50%; background: #f1f5f9; padding: 12px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">상품 코드</th>
-            <th style="width: 25%; background: #e0f2fe; padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 ({{ authStore.user?.branch_name }})</th>
-            <th style="width: 25%; background: #f1f5f9; padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 (ALARCON)</th>
+            <th style="width: 50%; background: #f1f5f9; padding: 12px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_item_name') }}</th>
+            <th style="width: 25%; background: #e0f2fe; padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_my_stock', { branch: authStore.user?.branch_name }) }}</th>
+            <th style="width: 25%; background: #f1f5f9; padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_main_stock') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -52,7 +52,7 @@
           <tr v-if="listHasMore">
             <td colspan="3" style="text-align:center; padding: 20px; background:#fffbeb;">
               <button type="button" @click="loadMoreItems" style="background:#fef3c7;border:1px solid #f59e0b;color:#b45309;font-weight:bold;padding:12px 24px;border-radius:8px;cursor:pointer;width: 100%;font-size: 14px;">
-                결과 더보기 (+{{ listRemaining }})
+                {{ $t('common.show_more', { n: listRemaining }) }}
               </button>
             </td>
           </tr>
@@ -69,6 +69,10 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
+
 import { useAuthStore } from '../../../stores/auth.js'
 import { useItemSearch } from '../../../composables/useItemSearch.js'
 
