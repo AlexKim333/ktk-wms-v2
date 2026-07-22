@@ -266,7 +266,7 @@ const saveUser = async () => {
           });
           if (spRes.data?.data?.name) {
             try {
-              await frappeApi.put(/api/resource/Sales Person/, { docstatus: 1 });
+              await frappeApi.put(`/api/resource/Sales Person/${spRes.data.data.name}`, { docstatus: 1 });
             } catch(e) {}
           }
         } catch(e) {
@@ -451,5 +451,6 @@ onMounted(() => {
 }
 .save-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 </style>
+
 
 
