@@ -256,8 +256,11 @@
           </div>
         </div>
         
-        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
+        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.3fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
           <template v-if="currentTab.docName && !isClerk">
+            <button style="background: #e2e8f0; color: #475569; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s;" @click="cancelEdit">
+              수정 취소<br>(목록으로)
+            </button>
             <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(false)" :disabled="isSubmitting">
               {{ isSubmitting ? $t('common.loading') : $t('branch.transfer.btn_save_edit') }}
             </button>
@@ -376,7 +379,7 @@ const props = defineProps({
   editingDraftName: { type: String, default: null }
 })
 
-const emit = defineEmits(['refresh-items', 'clear-injected'])
+const emit = defineEmits(['refresh-items', 'clear-injected', 'back'])
 
 // Search UI State
 const isSearching = ref(false)
@@ -910,6 +913,15 @@ const clearCart = () => {
   }
 }
 
+const cancelEdit = () => {
+  if (!currentTab.value) return
+  if(confirm('수정을 취소하고 목록으로 돌아가시겠습니까?')) {
+    currentTab.value.cartItems = []
+    currentTab.value.docName = null
+    emit('back')
+  }
+}
+
 const totalBoxCount = computed(() => {
   if (!currentTab.value) return 0
   return currentTab.value.cartItems.reduce((sum, item) => sum + (item.boxQty || 0), 0)
@@ -1298,3 +1310,4 @@ const submitTransfer = async () => {
 
 .m-tab-btn.active { background: #3b82f6 !important; color: white !important; border-color: #2563eb !important; }
 </style>
+

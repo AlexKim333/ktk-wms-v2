@@ -33,6 +33,7 @@
         :branch-list="branchList"
         :editing-draft-name="editingDraftName"
         @refresh-items="$emit('refresh-items')"
+        @back="activeNav = 'branch-reservation'"
       />
       <MobileBranchTransferReservationList 
         v-else-if="activeNav === 'branch-reservation'" 
