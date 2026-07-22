@@ -222,7 +222,7 @@
             </div>
             <select v-if="currentTab" v-model="currentTab.selectedRequester" class="form-select" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; background: white;">
               <option value="">-- Select Clerk --</option>
-              <option v-for="user in branchUsers" :key="user.email" :value="user.name || user.email">{{ user.full_name }}</option>
+              <option v-for="user in branchUsers" :key="user.email" :value="user.full_name">{{ user.full_name }}</option>
             </select>
           </div>
           <div class="field-group">
@@ -422,7 +422,7 @@ const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 const tabs = ref([{
   id: 1,
   title: t('branch.transfer.tab_title') + ' 1',
-  selectedRequester: authStore.user?.member_name || '',
+  selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
   selectedCreator: authStore.user?.member_name || '',
   docName: null,
   cartItems: []
@@ -436,7 +436,7 @@ const addNewTab = () => {
   tabs.value.push({
     id: nextTabId.value++,
     title: t('branch.transfer.tab_title') + ' ' + (tabs.value.length + 1),
-    selectedRequester: authStore.user?.member_name || '',
+    selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
     selectedCreator: authStore.user?.member_name || '',
     docName: null,
     cartItems: []
@@ -459,7 +459,7 @@ const isQuickClerkModalOpen = ref(false)
 const handleClerkAdded = (newClerk) => {
   fetchBranchUsers().then(() => {
     if (currentTab.value) {
-      currentTab.value.selectedRequester = newClerk.email || newClerk.name
+      currentTab.value.selectedRequester = newClerk.full_name || newClerk.name || newClerk.email
     }
   })
 }
@@ -1063,9 +1063,9 @@ const submitTransfer = async () => {
         no: docName,
         date: dateStr,
         ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
-        vendedor: getClerkName(currentTab.value.selectedRequester) || authStore.user?.member_name,
-          mode: 'Immediate Outbound',
-          solicitante: getClerkName(currentTab.value.selectedRequester),
+        vendedor: currentTab.value.selectedRequester || authStore.user?.email,
+        mode: 'Immediate Outbound',
+        solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
         summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
@@ -1217,4 +1217,3 @@ const submitTransfer = async () => {
 .submit-btn { background: white; border: 1px solid #333; padding: 6px 20px; font-weight: bold; cursor: pointer; }
 .close-text-btn { float: right; background: none; border: none; color: #888; cursor: pointer; margin-top: 10px; font-size: 12px; }
 </style>
-

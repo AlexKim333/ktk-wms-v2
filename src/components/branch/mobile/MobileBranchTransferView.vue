@@ -388,7 +388,7 @@ const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 const tabs = ref([{
   id: 1,
   title: t('branch.transfer.tab_title') + ' 1',
-  selectedRequester: authStore.user?.member_name || '',
+  selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
   selectedCreator: authStore.user?.member_name || '',
   docName: null,
   cartItems: []
@@ -403,7 +403,7 @@ const addNewTab = () => {
   tabs.value.push({
     id: nextTabId.value++,
     title: t('branch.transfer.tab_title') + ' ' + (tabs.value.length + 1),
-    selectedRequester: authStore.user?.member_name || '',
+    selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
     selectedCreator: authStore.user?.member_name || '',
     docName: null,
     cartItems: []
@@ -426,7 +426,7 @@ const isQuickClerkModalOpen = ref(false)
 const handleClerkAdded = (newClerk) => {
   fetchBranchUsers().then(() => {
     if (currentTab.value) {
-      currentTab.value.selectedRequester = newClerk.email || newClerk.name
+      currentTab.value.selectedRequester = newClerk.full_name || newClerk.name || newClerk.email
     }
   })
 }
@@ -1142,9 +1142,9 @@ const submitTransfer = async () => {
         no: docName,
         date: dateStr,
         ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
-        vendedor: getClerkName(currentTab.value.selectedRequester) || authStore.user?.member_name,
-          mode: 'Immediate Outbound',
-          solicitante: getClerkName(currentTab.value.selectedRequester),
+        vendedor: currentTab.value.selectedRequester || authStore.user?.email,
+        mode: 'Immediate Outbound',
+        solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
         summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
@@ -1298,4 +1298,3 @@ const submitTransfer = async () => {
 
 .m-tab-btn.active { background: #3b82f6 !important; color: white !important; border-color: #2563eb !important; }
 </style>
-
