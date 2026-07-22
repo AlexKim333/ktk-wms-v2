@@ -46,9 +46,9 @@
           <table class="inventory-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr>
-                <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">상품 코드</th>
-                <th class="highlight-branch" style="background: #e0f2fe; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 ({{ authStore.user?.branch_name }})</th>
-                <th class="highlight-main" style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 (ALARCON)</th>
+                <th style="width: 50%; background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">상품 코드</th>
+                <th class="highlight-branch" style="width: 25%; background: #e0f2fe; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">지점 ({{ authStore.user?.branch_name }})</th>
+                <th class="highlight-main" style="width: 25%; background: #f1f5f9; padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">메인 (ALARCON)</th>
               </tr>
             </thead>
             <tbody>
@@ -57,10 +57,10 @@
                   <strong>{{ item.name }}</strong><br/>
                   <span style="font-size: 11px; color: #94a3b8;">{{ item.item_name }}</span>
                 </td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">
                   <strong>{{ getStock(item.name, authStore.user?.branch_name) }}</strong>
                 </td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">
                   <strong>{{ getStock(item.name, '[MAIN] ALARCON - K') }}</strong>
                 </td>
               </tr>

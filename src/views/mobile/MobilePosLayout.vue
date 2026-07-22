@@ -11,8 +11,14 @@
 
     <!-- 메인 렌더링 영역 -->
     <main class="mobile-main-content">
+      <MobileBranchInventoryView 
+        v-if="activeNav === 'branch-inventory'" 
+        :raw-items="rawItems"
+        :bin-data="binData"
+        :pending-reserved="pendingReserved"
+      />
       <MobileBranchPosView 
-        v-if="activeNav === 'branch-pos' || activeNav === 'pos'" 
+        v-else-if="activeNav === 'branch-pos' || activeNav === 'pos'" 
         :raw-items="rawItems"
         :bin-data="binData"
         :pending-reserved="pendingReserved"
@@ -37,14 +43,17 @@
       />
       <div v-else class="mobile-not-supported">
         <p>이 메뉴는 모바일에서 지원되지 않습니다.</p>
-        <button @click="activeNav = 'branch-pos'">지점 출고 화면으로 이동</button>
+        <button @click="activeNav = 'branch-inventory'">지점 재고검색으로 이동</button>
       </div>
     </main>
 
-    <!-- 모바일 하단 탭 바 (지점 3종 메뉴) -->
+    <!-- 모바일 하단 탭 바 (지점 4종 메뉴) -->
     <nav class="mobile-bottom-nav">
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="activeNav = 'branch-pos'">
+      <button class="m-nav-item" :class="{ active: activeNav === 'branch-inventory' }" @click="activeNav = 'branch-inventory'">
         🔍<br/>재고검색
+      </button>
+      <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="activeNav = 'branch-pos'">
+        🛒<br/>즉시출고
       </button>
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-transfer' }" @click="activeNav = 'branch-transfer'">
         🚚<br/>재고이동
@@ -60,6 +69,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
+import MobileBranchInventoryView from '../../components/branch/mobile/MobileBranchInventoryView.vue'
 import MobileBranchPosView from '../../components/branch/mobile/MobileBranchPosView.vue'
 import MobileBranchTransferView from '../../components/branch/mobile/MobileBranchTransferView.vue'
 import MobileBranchTransferReservationList from '../../components/branch/mobile/MobileBranchTransferReservationList.vue'
