@@ -26,13 +26,11 @@
       <table class="history-table">
         <thead>
           <tr>
-            <th>{{ $t('branch.res_list.col_no') }}<</th>
+            <th>{{ $t('branch.res_list.col_no') }}</th>
             <th>{{ $t('branch.res_list.col_date') }}</th>
-            <th>Source</th>
-            <th>{{ $t('branch.res_list.col_target') }}</th>
-            <th>{{ $t('branch.res_list.col_status') }}<</th>
+            <th>{{ $t('branch.res_list.col_status') }}</th>
             <th>{{ $t('branch.res_list.col_total_qty') }}</th>
-            <th>{{ $t('branch.res_list.col_progress') }}<</th>
+            <th>{{ $t('branch.res_list.col_progress') }}</th>
             <th class="action-cell">Action</th>
           </tr>
         </thead>
@@ -40,13 +38,6 @@
           <tr v-for="res in filteredReservations" :key="res.name" class="clickable-row" @mouseenter="showHover($event, res)" @mouseleave="hideHover">
             <td class="res-id" @click="openDetail(res)">{{ res.name }}</td>
             <td @click="openDetail(res)">{{ res.creation ? res.creation.split(' ')[0] : (res.schedule_date || '-') }}</td>
-            <td class="customer-name" @click="openDetail(res)">
-              <div>{{ res.set_from_warehouse || '-' }}</div>
-            </td>
-            <td @click="openDetail(res)">
-              <div>{{ res.set_warehouse || '-' }}</div>
-              <div style="font-size: 11.5px; color: #64748b; margin-top: 4px; font-weight: bold;">{{ res.custom_orderer || res.owner || '-' }}</div>
-            </td>
             <td @click="openDetail(res)">
               <span class="status-badge" :class="getStatusClass(res)">{{ translateStatus(res.status, res.docstatus, res.custom_approval_stage, res.is_stock_entry) }}</span>
             </td>
@@ -66,7 +57,7 @@
             </td>
           </tr>
           <tr v-if="filteredReservations.length === 0">
-            <td colspan="8" style="text-align: center; padding: 30px; color: #94a3b8;">
+            <td colspan="6" style="text-align: center; padding: 30px; color: #94a3b8;">
               {{ $t('branch.res_list.empty_msg') }}
             </td>
           </tr>
@@ -647,7 +638,7 @@ onUnmounted(() => {
 .filter-input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
 .filter-select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: white; }
 
-.table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; overflow-y: auto; flex: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.05); -webkit-overflow-scrolling: touch; }
 .history-table { width: 100%; border-collapse: collapse; text-align: left; }
 .history-table th, .history-table td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 13.5px; }
 .history-table th { background: #f1f5f9; font-weight: bold; color: #475569; }
@@ -702,3 +693,5 @@ onUnmounted(() => {
   pointer-events: none;
 }
 </style>
+
+
