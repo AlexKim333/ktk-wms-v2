@@ -6,7 +6,7 @@
       <div class="m-user" v-if="authStore.user">
         {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? '본부' }})
       </div>
-      <button class="m-logout" @click="handleLogout">로그아웃</button>
+      <button class="m-logout" @click="handleLogout">{{ $t('common.logout') }}</button>
     </header>
 
     <!-- 메인 렌더링 영역 -->
@@ -43,7 +43,7 @@
       />
       <div v-else class="mobile-not-supported">
         <p>이 메뉴는 모바일에서 지원되지 않습니다.</p>
-        <button @click="activeNav = 'branch-inventory'">지점 재고검색으로 이동</button>
+        <button @click="activeNav = 'branch-inventory'">{{ $t('mobile.btn_goto_inventory') }}</button>
       </div>
     </main>
 

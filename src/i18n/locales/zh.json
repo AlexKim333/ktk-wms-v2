@@ -713,7 +713,16 @@
     "btn_clear": "清除",
     "btn_next": "下一个商品",
     "btn_done": "完成",
-    "btn_close": "关闭"
+    "btn_close": "关闭",
+    "btn_goto_inventory": "前往分公司库存",
+    "nav_inventory": "库存搜索",
+    "nav_outbound": "即时出库",
+    "nav_transfer": "库存调拨",
+    "nav_reservation": "预约记录",
+    "btn_item_search": "商品搜索",
+    "btn_cart": "购物车",
+    "btn_edit_outbound": "前往购物车修改/出库",
+    "btn_edit_inbound": "前往购物车修改/入库"
   },
   "branch_hist": {
     "col_manager": "经理 / 申请人",
@@ -730,5 +739,15 @@
     "col_req_qty": "请求数量 (件)",
     "msg_load_err": "无法加载库存转移记录，请检查网络/权限。",
     "msg_del_err": "删除失败。"
+  },
+  "history": {
+    "transfer_history": "调拨取消/修改记录",
+    "outbound_history": "出库取消/修改记录",
+    "transfer_detail": "调拨详情",
+    "outbound_detail": "出库详情",
+    "prev_transfer": "上一条调拨",
+    "prev_outbound": "上一条出库",
+    "next_transfer": "下一条调拨",
+    "next_outbound": "下一条出库"
   }
 }

@@ -1,7 +1,7 @@
 <template>
   <div class="history-list-container">
     <div class="header-actions">
-      <h2>🔄 {{ listType === 'Material Transfer' ? '재고이동 취소/수정 내역' : '출고 취소/수정 내역' }}</h2>
+      <h2>🔄 {{ listType === 'Material Transfer' ? $t('history.transfer_history') : $t('history.outbound_history') }}</h2>
       <button class="btn-create" @click="$emit('create-new')">➕ CREAR (새 취소/수정 내역)</button>
     </div>
 
@@ -79,9 +79,9 @@
     <div class="modal-overlay" v-if="selectedOutboundHistory">
       <div class="modal-content modal-large">
         <div class="modal-header with-nav">
-          <button class="nav-arrow" @click="goToPreviousHistory" :title="listType === 'Material Transfer' ? '이전 재고이동' : '이전 출고'">◀</button>
-          <h3>{{ listType === 'Material Transfer' ? '재고이동 상세' : '출고 상세' }}: {{ selectedOutboundHistory.name }}</h3>
-          <button class="nav-arrow" @click="goToNextHistory" :title="listType === 'Material Transfer' ? '다음 재고이동' : '다음 출고'">▶</button>
+          <button class="nav-arrow" @click="goToPreviousHistory" :title="listType === 'Material Transfer' ? $t('history.prev_transfer') : $t('history.prev_outbound')">◀</button>
+          <h3>{{ listType === 'Material Transfer' ? $t('history.transfer_detail') : $t('history.outbound_detail') }}: {{ selectedOutboundHistory.name }}</h3>
+          <button class="nav-arrow" @click="goToNextHistory" :title="listType === 'Material Transfer' ? $t('history.next_transfer') : $t('history.next_outbound')">▶</button>
           <button class="close-btn" @click="selectedOutboundHistory = null">×</button>
         </div>
         <div class="modal-body">
@@ -136,7 +136,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn-load-cart" @click="loadToCart">
-            🛒 장바구니로 이동하여 수정/출고
+            🛒 {{ $t('mobile.btn_cart') }}로 이동하여 수정/출고
           </button>
         </div>
       </div>

@@ -713,7 +713,16 @@
     "btn_clear": "초기화",
     "btn_next": "다음상품",
     "btn_done": "완료",
-    "btn_close": "닫기"
+    "btn_close": "닫기",
+    "btn_goto_inventory": "지점 재고검색으로 이동",
+    "nav_inventory": "재고검색",
+    "nav_outbound": "즉시출고",
+    "nav_transfer": "재고이동",
+    "nav_reservation": "예약내역",
+    "btn_item_search": "상품 검색",
+    "btn_cart": "장바구니",
+    "btn_edit_outbound": "장바구니로 이동하여 수정/출고",
+    "btn_edit_inbound": "장바구니로 이동하여 수정/입고"
   },
   "branch_hist": {
     "col_manager": "담당자 / 요청자",
@@ -730,5 +739,15 @@
     "col_req_qty": "요청 수량 (낱장)",
     "msg_load_err": "재고 이동 이력을 불러오지 못했습니다. 네트워크/권한을 확인하세요.",
     "msg_del_err": "삭제에 실패했습니다."
+  },
+  "history": {
+    "transfer_history": "재고이동 취소/수정 내역",
+    "outbound_history": "출고 취소/수정 내역",
+    "transfer_detail": "재고이동 상세",
+    "outbound_detail": "출고 상세",
+    "prev_transfer": "이전 재고이동",
+    "prev_outbound": "이전 출고",
+    "next_transfer": "다음 재고이동",
+    "next_outbound": "다음 출고"
   }
 }

@@ -713,7 +713,16 @@
     "btn_clear": "Clear",
     "btn_next": "Next Item",
     "btn_done": "Done",
-    "btn_close": "Close"
+    "btn_close": "Close",
+    "btn_goto_inventory": "Go to Branch Inventory",
+    "nav_inventory": "Inventory",
+    "nav_outbound": "Outbound",
+    "nav_transfer": "Transfer",
+    "nav_reservation": "Reservation",
+    "btn_item_search": "Item Search",
+    "btn_cart": "Cart",
+    "btn_edit_outbound": "Edit/Outbound in Cart",
+    "btn_edit_inbound": "Edit/Inbound in Cart"
   },
   "branch_hist": {
     "col_manager": "Manager / Requester",
@@ -730,5 +739,15 @@
     "col_req_qty": "Req Qty (Pcs)",
     "msg_load_err": "Failed to load transfer history. Check network/permissions.",
     "msg_del_err": "Failed to delete."
+  },
+  "history": {
+    "transfer_history": "Transfer Cancel/Edit History",
+    "outbound_history": "Outbound Cancel/Edit History",
+    "transfer_detail": "Transfer Detail",
+    "outbound_detail": "Outbound Detail",
+    "prev_transfer": "Prev Transfer",
+    "prev_outbound": "Prev Outbound",
+    "next_transfer": "Next Transfer",
+    "next_outbound": "Next Outbound"
   }
 }

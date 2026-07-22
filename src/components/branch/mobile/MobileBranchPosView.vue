@@ -3,10 +3,10 @@
     <!-- 모바일 모드 탭 -->
     <div class="mobile-tabs" style="display: flex; gap: 10px;">
       <button :class="['m-tab-btn', { active: mobileMode === 'search' }]" @click="mobileMode = 'search'" style="flex:1; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-weight: bold; color: #475569;">
-        🔍 상품 검색
+        🔍 {{ $t('mobile.btn_item_search') }}
       </button>
       <button :class="['m-tab-btn', { active: mobileMode === 'cart' }]" @click="mobileMode = 'cart'" style="flex:1; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-weight: bold; color: #475569;">
-        🛒 장바구니 ({{ currentTab?.cartItems?.length || 0 }})
+        🛒 {{ $t('mobile.btn_cart') }} ({{ currentTab?.cartItems?.length || 0 }})
       </button>
     </div>
 

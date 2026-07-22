@@ -713,7 +713,16 @@
     "btn_clear": "Limpiar",
     "btn_next": "Siguiente",
     "btn_done": "Hecho",
-    "btn_close": "Cerrar"
+    "btn_close": "Cerrar",
+    "btn_goto_inventory": "Ir a Inventario de Sucursal",
+    "nav_inventory": "Inventario",
+    "nav_outbound": "Salida",
+    "nav_transfer": "Transferencia",
+    "nav_reservation": "Reserva",
+    "btn_item_search": "Búsqueda",
+    "btn_cart": "Carrito",
+    "btn_edit_outbound": "Editar/Salida en Carrito",
+    "btn_edit_inbound": "Editar/Entrada en Carrito"
   },
   "branch_hist": {
     "col_manager": "Gerente / Solicitante",
@@ -730,5 +739,15 @@
     "col_req_qty": "Cant Solicitada (Pzas)",
     "msg_load_err": "Error al cargar historial. Verifique red/permisos.",
     "msg_del_err": "Error al eliminar."
+  },
+  "history": {
+    "transfer_history": "Historial de Cancelación/Edición de Transferencia",
+    "outbound_history": "Historial de Cancelación/Edición de Salida",
+    "transfer_detail": "Detalle de Transferencia",
+    "outbound_detail": "Detalle de Salida",
+    "prev_transfer": "Transferencia Anterior",
+    "prev_outbound": "Salida Anterior",
+    "next_transfer": "Siguiente Transferencia",
+    "next_outbound": "Siguiente Salida"
   }
 }

@@ -141,7 +141,7 @@
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
         @open-detail="openProductDetail"
-        @handle-migration="handleMigration"
+        
       />
       
       <OutboundListView v-else-if="activeNav === 'outbound-list'" :branch-list="branchList" :raw-items="rawSingleItems" @edit-outbound="loadOutboundToCart" @refresh-items="fetchFrappeItems" list-type="Material Issue" />

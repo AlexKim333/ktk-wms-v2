@@ -123,7 +123,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn-load-cart" @click="loadToCart">
-            🛒 장바구니로 이동하여 수정/입고
+            🛒 {{ $t('mobile.btn_cart') }}로 이동하여 수정/입고
           </button>
         </div>
       </div>
