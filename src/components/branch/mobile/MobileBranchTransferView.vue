@@ -935,7 +935,7 @@ const totalEachCount = computed(() => {
 // ----------------------------------------------------
 const fetchPendingDrafts = async () => {
   try {
-    const res = await frappeApi.get('/api/resource/Material Request', {
+    const res = await adminApi.get('/api/resource/Material Request', {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
@@ -953,7 +953,7 @@ const fetchPendingDrafts = async () => {
       
       for (const draft of drafts) {
         if (!tabs.value.find(t => t.docName === draft.name)) {
-          const detailRes = await frappeApi.get(`/api/resource/Material Request/${draft.name}`)
+          const detailRes = await adminApi.get(`/api/resource/Material Request/${draft.name}`)
           const doc = detailRes.data.data
           
           tabs.value.push({
@@ -990,7 +990,7 @@ const rejectDraft = async (docName) => {
   if(!confirm(t('branch.transfer.msg_confirm_reject'))) return
   
   try {
-    await frappeApi.delete(`/api/resource/Material Request/${docName}`)
+    await adminApi.delete(`/api/resource/Material Request/${docName}`)
     alert(t('branch.transfer.msg_reject_success'))
     const idx = tabs.value.findIndex(t => t.docName === docName)
     if(idx !== -1) removeTab(idx)
@@ -1008,7 +1008,7 @@ watch(() => props.editingDraftName, async (newDraftName) => {
       try {
         const isStockEntry = newDraftName.includes('STE') || newDraftName.startsWith('MAT-STE');
         const docTypeUrl = isStockEntry ? 'Stock Entry' : 'Material Request';
-        const detailRes = await frappeApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
+        const detailRes = await adminApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
         const doc = detailRes.data.data
         
         const newTab = {
@@ -1307,4 +1307,5 @@ const submitTransfer = async () => {
 
 .m-tab-btn.active { background: #3b82f6 !important; color: white !important; border-color: #2563eb !important; }
 </style>
+
 
