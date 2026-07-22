@@ -58,8 +58,9 @@
       <button class="m-nav-item" :class="{ active: activeNav === 'branch-transfer' }" @click="activeNav = 'branch-transfer'">
         🚚<br/>{{ $t('mobile.nav_transfer') }}
       </button>
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-reservation' }" @click="activeNav = 'branch-reservation'">
+      <button class="m-nav-item" :class="{ active: activeNav === 'branch-reservation' }" @click="activeNav = 'branch-reservation'" style="position: relative;">
         📅<br/>{{ $t('mobile.nav_reservation') }}
+        <span v-if="branchReservationCount > 0" class="mobile-badge">{{ branchReservationCount }}</span>
       </button>
     </nav>
   </div>
@@ -79,7 +80,8 @@ const props = defineProps({
   binData: { type: Object, default: () => ({}) },
   pendingReserved: { type: Object, default: () => ({}) },
   branchList: { type: Array, default: () => [] },
-  editingDraftName: { type: String, default: null }
+  editingDraftName: { type: String, default: null },
+  branchReservationCount: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['refresh-items', 'edit-reservation'])
@@ -191,5 +193,20 @@ const handleLogout = () => {
 
 .m-nav-item.active {
   color: #3b82f6;
+}
+
+.mobile-badge {
+  position: absolute;
+  top: 4px;
+  right: 15%;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 </style>

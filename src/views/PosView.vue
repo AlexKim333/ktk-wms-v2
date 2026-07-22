@@ -6,6 +6,7 @@
     :pending-reserved="pendingReservedMap"
     :branch-list="branchList"
     :editing-draft-name="editingBranchDraftName"
+    :branch-reservation-count="branchReservationCount"
     @edit-reservation="handleBranchEditReservation"
     @refresh-items="fetchFrappeItems"
   />
