@@ -256,16 +256,13 @@
           </div>
         </div>
         
-        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.3fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
+        <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
           <template v-if="currentTab.docName && !isClerk">
             <button style="background: #e2e8f0; color: #475569; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s;" @click="cancelEdit">
               수정 취소<br>(목록으로)
             </button>
-            <button class="btn-outbound-reserve" style="background: #475569; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(false)" :disabled="isSubmitting">
-              {{ isSubmitting ? $t('common.loading') : $t('branch.transfer.btn_save_edit') }}
-            </button>
             <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(true)" :disabled="isSubmitting">
-              {{ isSubmitting ? $t('common.loading') : $t('branch.transfer.btn_submit_2nd') }}
+              {{ isSubmitting ? $t('common.loading') : '수정 완료 (저장)' }}
             </button>
           </template>
           <template v-else>
