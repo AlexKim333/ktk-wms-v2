@@ -94,7 +94,7 @@
           <table class="detail-items-table">
             <thead>
               <tr>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_item') }}</th>
+                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">아이템 코드</th>
                 <th v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">Request Qty</th>
                 <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_req') }}</th>
                 <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_issued') }}</th>
@@ -108,7 +108,7 @@
             <tbody>
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="text-align: left;">
-                  <div style="font-weight: bold;">{{ item.item_name || item.item_code }}</div>
+                  <div style="font-weight: bold;">{{ item.item_code }}</div>
                   <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
                     {{ item.custom_color || '-' }} | {{ $t('branch.transfer.lbl_pack_info', { qty: item.custom_pack_qty || 1 }) }}
                   </div>
@@ -139,7 +139,7 @@
               {{ isSubmittingPartial ? '전송 중...' : '🔥 Move entered qty to immediate outbound queue' }}
             </button>
             <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="$emit('edit-reservation', selectedReservation.name)" style="background: #0ea5e9; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
-              🛒 {{ $t('mobile.btn_cart') }}로 이동하여 수정/출고
+              🛒 장바구니에서 수정
             </button>
           </div>
         </div>
