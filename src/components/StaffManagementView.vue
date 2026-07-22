@@ -53,7 +53,12 @@
           </div>
           <div class="form-group" v-if="!isEditing">
             <label>비밀번호</label>
-            <input type="password" v-model="form.password" required />
+            <div style="position: relative; display: flex; align-items: center;">
+              <input :type="showPassword ? 'text' : 'password'" v-model="form.password" required style="width: 100%; padding-right: 40px;" />
+              <button type="button" @click="showPassword = !showPassword" style="position: absolute; right: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; padding: 0;">
+                {{ showPassword ? '🙈' : '👁️' }}
+              </button>
+            </div>
           </div>
           <div class="form-group">
             <label>권한 (역할)</label>
@@ -97,6 +102,7 @@ const warehouseList = ref([])
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const isSaving = ref(false)
+const showPassword = ref(false)
 
 const form = ref({
   full_name: '',
