@@ -64,9 +64,10 @@ const copyToClipboard = async () => {
       canvas.toBlob(async (blob) => {
         try {
           const fileName = `Receipt_${props.receiptData?.no || 'Order'}.png`
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
           
-          // 1. Try Mobile Share API first if supported
-          if (navigator.share && navigator.canShare) {
+          // 1. Try Mobile Share API first ONLY if on Mobile
+          if (isMobile && navigator.share && navigator.canShare) {
             const file = new File([blob], fileName, { type: 'image/png' })
             if (navigator.canShare({ files: [file] })) {
               try {
