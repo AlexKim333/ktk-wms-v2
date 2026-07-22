@@ -1,26 +1,20 @@
 <template>
   <div class="reservation-list-container">
-    <div class="header-actions">
-      <h2>{{ $t('branch.res_list.title') }}</h2>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-action outline" @click="isSummaryModalOpen = true" style="background: white; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; padding: 10px 15px; cursor: pointer; color: #475569;">
-          📦 {{ $t('branch.res_list.btn_summary', 'Summary by Item') }}
-        </button>
-        <button class="btn-create" @click="emit('create-new')">{{ $t('branch.res_list.btn_new') }}</button>
+      <div class="header-actions" style="margin-bottom: 10px;">
+        <h2>{{ $t('branch.res_list.title') }}</h2>
       </div>
-    </div>
-
-    <div class="filters">
-      <input type="text" v-model="searchQuery" :placeholder="$t('branch.res_list.ph_search')" class="filter-input" />
-      <select v-model="statusFilter" class="filter-select">
-        <option value="all">{{ $t('branch.res_list.status_all') }}</option>
-        <option value="incomplete">{{ $t('branch.res_list.status_incomplete') }}<</option>
-        <option value="completed">{{ $t('branch.res_list.status_completed') }}</option>
-      </select>
-      <button class="btn-refresh" @click="fetchReservations" style="padding: 10px 15px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569;">
-        🔄 {{ $t('branch.inventory.btn_refresh') }}
-      </button>
-    </div>
+  
+      <div class="action-buttons" style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <button class="btn-action outline" @click="isSummaryModalOpen = true" style="flex: 1; background: white; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; padding: 8px 10px; cursor: pointer; color: #475569; font-size: 13px; text-align: center;">
+          📦 {{ $t('branch.res_list.btn_summary', '품목별 요약') }}
+        </button>
+        <button class="btn-create" @click="emit('create-new')" style="flex: 1; padding: 8px 10px; font-size: 13px; text-align: center;">
+          {{ $t('branch.res_list.btn_new') }}
+        </button>
+        <button class="btn-refresh" @click="fetchReservations" style="background: white; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; color: #475569; padding: 8px 12px; font-size: 14px;">
+          🔄
+        </button>
+      </div>
 
     <div class="table-wrapper">
       <table class="history-table">
