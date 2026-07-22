@@ -259,11 +259,16 @@ const saveUser = async () => {
 
         // Create corresponding Sales Person
         try {
-          await frappeApi.post('/api/resource/Sales Person', {
+          const spRes = await frappeApi.post('/api/resource/Sales Person', {
             sales_person_name: form.value.full_name,
             enabled: 1,
             custom_branch: form.value.branch || ''
           });
+          if (spRes.data?.data?.name) {
+            try {
+              await frappeApi.put(/api/resource/Sales Person/, { docstatus: 1 });
+            } catch(e) {}
+          }
         } catch(e) {
           console.warn('Sales Person creation failed:', e);
         }
@@ -446,4 +451,5 @@ onMounted(() => {
 }
 .save-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 </style>
+
 
