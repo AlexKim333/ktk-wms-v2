@@ -306,12 +306,7 @@ const fetchReservations = async () => {
             ['docstatus', 'in', [0, 1]],
             ['material_request_type', '=', 'Material Transfer'],
             ['set_warehouse', '=', branch]
-          ])
-
-      if (!mrRes || !seRes || !userRes) {
-        console.warn('API fetch failed during polling. Keeping existing list.');
-        return;
-      },
+          ]),
           limit_page_length: 500,
           order_by: 'creation desc'
         }
@@ -323,12 +318,7 @@ const fetchReservations = async () => {
             ['docstatus', '=', 0],
             ['stock_entry_type', '=', 'Material Transfer'],
             ['to_warehouse', '=', branch]
-          ])
-
-      if (!mrRes || !seRes || !userRes) {
-        console.warn('API fetch failed during polling. Keeping existing list.');
-        return;
-      },
+          ]),
           limit_page_length: 500,
           order_by: 'creation desc'
         }
