@@ -921,7 +921,7 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items,
   if (receiptPrintRef.value) {
     const success = await receiptPrintRef.value.copyToClipboard()
     if (success) {
-      alert("영수증이 클립보드에 자동 복사되었습니다. (와츠앱 공유 가능)")
+      alert('✅ 영수증이 클립보드에 복사되었습니다!\n\n🚨 잊지 말고 꼭 [WhatsApp]에 붙여넣기(Ctrl+V) 해주세요!')
     } else {
       alert("영수증 클립보드 복사에 실패했습니다.")
     }

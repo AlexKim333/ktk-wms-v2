@@ -1104,7 +1104,7 @@ const submitTransfer = async () => {
       if (receiptPrintRef.value) {
         const success = await receiptPrintRef.value.copyToClipboard()
         if (success) {
-          alert(t('branch.transfer.msg_submit_success'))
+          alert('✅ 영수증이 클립보드에 복사되었습니다!\n\n🚨 잊지 말고 꼭 [WhatsApp]에 붙여넣기(Ctrl+V) 해주세요!')
         } else {
           alert(t('branch.transfer.msg_draft_success'))
         }
