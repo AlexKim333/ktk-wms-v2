@@ -1111,10 +1111,45 @@ const submitTransfer = async () => {
           conversion_factor: 1
         }))
       }
-      const res = await adminApi.post('/api/resource/Material Request', payload)
-      docName = res.data.data.name
-      alert(t('branch.transfer.msg_submit_success'))
-    }
+        const res = await adminApi.post('/api/resource/Material Request', payload)
+        docName = res.data.data.name
+        
+        let totalQtyCount = 0
+        currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+        
+        receiptPrintData.value = {
+          title: 'Draft (Material Request)',
+          no: docName,
+          date: dateStr,
+          ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
+          vendedor: currentTab.value.selectedRequester || authStore.user?.email,
+          mode: 'Draft',
+          solicitante: currentTab.value.selectedRequester,
+          creador: authStore.user?.email,
+          shippingInfo: null,
+          summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+        }
+        
+        receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
+          name: item.item_code,
+          item_name: item.item_name || item.item_code,
+          input_box: item.totalQty,
+          input_each: 0,
+          price_list_rate: item.price_list_rate || 0
+        }))))
+        
+        await nextTick()
+        if (receiptPrintRef.value) {
+          const success = await receiptPrintRef.value.copyToClipboard()
+          if (success) {
+            alert(t('branch.transfer.msg_submit_success'))
+          } else {
+            alert(t('branch.transfer.msg_draft_success'))
+          }
+        } else {
+          alert(t('branch.transfer.msg_draft_success'))
+        }
+      }
     
     if(!isClerk) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
