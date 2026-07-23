@@ -91,7 +91,6 @@
                 <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">아이템 코드</th>
                 <th v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry" colspan="2" style="background:#e0f2fe; text-align:center; padding: 4px;">Request Qty</th>
                 <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_req') }}</th>
-                <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_issued') }}</th>
                 <th :rowspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 2 : 1">{{ $t('branch.res_list.modal_col_remain') }}</th>
               </tr>
               <tr v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
@@ -102,25 +101,28 @@
             <tbody>
               <tr v-for="item in selectedReservationItems" :key="item.name">
                 <td style="text-align: left;">
-                  <div style="font-weight: bold;">{{ item.item_code }}</div>
-                  <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
+                  <div style="font-weight: bold; font-size: 0.9em;">{{ item.item_code }}</div>
+                  <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
                     {{ item.custom_color || '-' }} | {{ $t('branch.transfer.lbl_pack_info', { qty: item.custom_pack_qty || 1 }) }}
                   </div>
                 </td>
                 <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
-                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
-                    <input type="number" v-model.number="item.request_caja" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  <td style="background:#f0f9ff; text-align:center; padding: 2px;">
+                    <div @click="openNumpad(item, 'request_caja')" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
+                      {{ item.request_caja || 0 }}
+                    </div>
                   </td>
-                  <td style="background:#f0f9ff; text-align:center; padding: 4px;">
-                    <input type="number" v-model.number="item.request_pza" @input="handleQtyChange(item)" min="0" style="width:60px; padding:4px; text-align:center; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1;" />
+                  <td style="background:#f0f9ff; text-align:center; padding: 2px;">
+                    <div @click="openNumpad(item, 'request_pza')" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
+                      {{ item.request_pza || 0 }}
+                    </div>
                   </td>
                 </template>
                 <td style="font-weight:bold; color:#64748b; text-align:center;">{{ item.qty }}</td>
-                <td style="font-weight:bold; color:#0ea5e9; text-align:center;">{{ Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
                 <td style="font-weight:bold; color:#ef4444; text-align:center;">{{ item.qty - Number(item.ordered_qty || item.received_qty || item.issued_qty || 0) }}</td>
               </tr>
               <tr v-if="selectedReservationItems.length === 0">
-                <td :colspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 6 : 4" style="text-align: center; padding: 15px; color: #94a3b8;">{{ $t('common.loading') }}</td>
+                <td :colspan="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry ? 5 : 3" style="text-align: center; padding: 15px; color: #94a3b8;">{{ $t('common.loading') }}</td>
               </tr>
             </tbody>
           </table>
@@ -177,6 +179,13 @@
       </div>
     </div>
     <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
+    <MobileNumpadModal
+      v-if="isNumpadOpen"
+      :title="numpadTitle"
+      :initialValue="currentNumpadValue"
+      @confirm="handleNumpadConfirm"
+      @cancel="isNumpadOpen = false"
+    />
   </div>
 </template>
 
@@ -184,6 +193,7 @@
 import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import ReceiptPrint from '../../ReceiptPrint.vue'
+import MobileNumpadModal from './MobileNumpadModal.vue'
 import axios from 'axios'
 import frappeApi from '../../../api/frappe.js'
 import { useAuthStore } from '../../../stores/auth.js'
@@ -207,6 +217,29 @@ const emit = defineEmits(['create-new', 'edit-reservation'])
 const receiptPrintRef = ref(null)
 const receiptPrintData = ref({ summary: {} })
 const receiptPrintItems = ref([])
+
+// Numpad Logic
+const isNumpadOpen = ref(false)
+const numpadTitle = ref('')
+const activeNumpadItem = ref(null)
+const activeNumpadField = ref('')
+const currentNumpadValue = ref('0')
+
+const openNumpad = (item, field) => {
+  activeNumpadItem.value = item
+  activeNumpadField.value = field
+  currentNumpadValue.value = String(item[field] || 0)
+  numpadTitle.value = field === 'request_caja' ? t('branch.transfer.th_box') : t('branch.transfer.th_each')
+  isNumpadOpen.value = true
+}
+
+const handleNumpadConfirm = (val) => {
+  if (activeNumpadItem.value && activeNumpadField.value) {
+    activeNumpadItem.value[activeNumpadField.value] = Number(val) || 0
+    handleQtyChange(activeNumpadItem.value)
+  }
+  isNumpadOpen.value = false
+}
 
 const props = defineProps({
   rawItems: {
