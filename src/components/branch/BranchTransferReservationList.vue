@@ -232,13 +232,14 @@
         </tbody>
       </table>
     </div>
-
+    <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
   </div>
 </template>
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import ReceiptPrint from '../ReceiptPrint.vue'
 import axios from 'axios'
 import frappeApi from '../../api/frappe.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -258,6 +259,10 @@ const authStore = useAuthStore();
 const { t } = useI18n();
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
 const emit = defineEmits(['create-new', 'edit-reservation'])
+
+const receiptPrintRef = ref(null)
+const receiptPrintData = ref({ summary: {} })
+const receiptPrintItems = ref([])
 
 const props = defineProps({
   rawItems: {
@@ -534,8 +539,48 @@ const submitPartialRequest = async () => {
       }))
     }
     
-    await adminApi.post('/api/resource/Stock Entry', sePayload)
-    alert(t('branch.transfer.msg_draft_success'))
+    const res = await adminApi.post('/api/resource/Stock Entry', sePayload)
+    const docName = res.data.data.name
+    
+    let totalQtyCount = 0
+    validItems.forEach(item => totalQtyCount += Number(item.request_qty || 0))
+    
+    const scheduleDate = new Date()
+    const dateStr = scheduleDate.toISOString().split('T')[0]
+    
+    receiptPrintData.value = {
+      title: 'Partial (Stock Entry)',
+      no: docName,
+      date: dateStr,
+      ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',
+      vendedor: selectedReservation.value.custom_orderer || authStore.user?.email,
+      mode: 'Immediate Outbound',
+      solicitante: selectedReservation.value.custom_orderer,
+      creador: authStore.user?.email,
+      shippingInfo: null,
+      summary: { items: validItems.length, bulto: totalQtyCount, pzs: 0 }
+    }
+    
+    receiptPrintItems.value = JSON.parse(JSON.stringify(validItems.map(item => ({
+      name: item.item_code,
+      item_name: item.item_name || item.item_code,
+      input_box: item.request_qty,
+      input_each: 0,
+      price_list_rate: 0
+    }))))
+    
+    await nextTick()
+    if (receiptPrintRef.value) {
+      const success = await receiptPrintRef.value.copyToClipboard()
+      if (success) {
+        alert(t('branch.transfer.msg_submit_success'))
+      } else {
+        alert(t('branch.transfer.msg_draft_success'))
+      }
+    } else {
+      alert(t('branch.transfer.msg_draft_success'))
+    }
+    
     selectedReservation.value = null
     fetchReservations()
   } catch (error) {
