@@ -98,7 +98,7 @@ const props = defineProps({
 })
 </script>
 
-<style scoped>
+<style>
 .receipt-content {
   width: 100%;
   font-family: Arial, sans-serif;
@@ -108,46 +108,46 @@ const props = defineProps({
   padding: 10px;
   background: white;
 }
-.receipt-title {
+.receipt-content .receipt-title {
   text-align: center;
   font-size: 16px;
   font-weight: bold;
   margin-bottom: 15px;
   text-transform: uppercase;
 }
-.receipt-header p {
+.receipt-content .receipt-header p {
   margin: 3px 0;
   font-size: 12px;
 }
-.bold-blue {
+.receipt-content .bold-blue {
   font-weight: bold;
   color: blue;
   text-transform: uppercase;
 }
-.bold {
+.receipt-content .bold {
   font-weight: bold;
   text-transform: uppercase;
 }
-table {
+.receipt-content table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 10px;
 }
-th, td {
+.receipt-content th, .receipt-content td {
   border: 1px solid #000;
   text-align: center;
   padding: 4px;
 }
-th {
+.receipt-content th {
   font-weight: bold;
   background-color: #fff;
   font-size: 11px;
 }
-.summary-table {
+.receipt-content .summary-table {
   width: 60%;
   margin: 10px auto 15px;
 }
-.receipt-footer {
+.receipt-content .receipt-footer {
   display: flex;
   justify-content: space-between;
   margin-top: 20px;
