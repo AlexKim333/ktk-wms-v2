@@ -1076,8 +1076,12 @@ const submitTransfer = async () => {
       const res = await adminApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
       
-      let totalQtyCount = 0
-      currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+      let totalBultoCount = 0
+      let totalPzsCount = 0
+      currentTab.value.cartItems.forEach(item => {
+        totalBultoCount += Number(item.boxQty || 0)
+        totalPzsCount += Number(item.eachQty || 0)
+      })
       
       receiptPrintData.value = {
         title: 'Immediate (Stock Entry)',
@@ -1089,14 +1093,14 @@ const submitTransfer = async () => {
         solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
-        summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+        summary: { items: currentTab.value.cartItems.length, bulto: totalBultoCount, pzs: totalPzsCount }
       }
       
       receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
         name: item.item_code,
         item_name: item.item_name || item.item_code,
-        input_box: item.totalQty,
-        input_each: 0,
+        input_box: item.boxQty || 0,
+        input_each: item.eachQty || 0,
         price_list_rate: item.price_list_rate || 0
       }))))
       

@@ -306,7 +306,12 @@ const fetchReservations = async () => {
             ['docstatus', 'in', [0, 1]],
             ['material_request_type', '=', 'Material Transfer'],
             ['set_warehouse', '=', branch]
-          ]),
+          ])
+
+      if (!mrRes || !seRes || !userRes) {
+        console.warn('API fetch failed during polling. Keeping existing list.');
+        return;
+      },
           limit_page_length: 500,
           order_by: 'creation desc'
         }
@@ -318,7 +323,12 @@ const fetchReservations = async () => {
             ['docstatus', '=', 0],
             ['stock_entry_type', '=', 'Material Transfer'],
             ['to_warehouse', '=', branch]
-          ]),
+          ])
+
+      if (!mrRes || !seRes || !userRes) {
+        console.warn('API fetch failed during polling. Keeping existing list.');
+        return;
+      },
           limit_page_length: 500,
           order_by: 'creation desc'
         }
@@ -547,8 +557,14 @@ const submitPartialRequest = async () => {
     const res = await adminApi.post('/api/resource/Stock Entry', sePayload)
     const docName = res.data.data.name
     
-    let totalQtyCount = 0
-    validItems.forEach(item => totalQtyCount += Number(item.request_qty || 0))
+    let totalBultoCount = 0
+    let totalPzsCount = 0
+    validItems.forEach(item => {
+      const packQty = getPackQty(item.item_code)
+      const requestQty = Number(item.request_qty || 0)
+      totalBultoCount += Math.floor(requestQty / packQty)
+      totalPzsCount += requestQty % packQty
+    })
     
     const scheduleDate = new Date()
     const dateStr = scheduleDate.toISOString().split('T')[0]
@@ -563,16 +579,20 @@ const submitPartialRequest = async () => {
       solicitante: selectedReservation.value.custom_orderer,
       creador: authStore.user?.email,
       shippingInfo: null,
-      summary: { items: validItems.length, bulto: totalQtyCount, pzs: 0 }
+      summary: { items: validItems.length, bulto: totalBultoCount, pzs: totalPzsCount }
     }
     
-    receiptPrintItems.value = JSON.parse(JSON.stringify(validItems.map(item => ({
-      name: item.item_code,
-      item_name: item.item_name || item.item_code,
-      input_box: item.request_qty,
-      input_each: 0,
-      price_list_rate: 0
-    }))))
+    receiptPrintItems.value = JSON.parse(JSON.stringify(validItems.map(item => {
+      const packQty = getPackQty(item.item_code)
+      const requestQty = Number(item.request_qty || 0)
+      return {
+        name: item.item_code,
+        item_name: item.item_name || item.item_code,
+        input_box: Math.floor(requestQty / packQty),
+        input_each: requestQty % packQty,
+        price_list_rate: 0
+      }
+    })))
     
     await nextTick()
     if (receiptPrintRef.value) {
