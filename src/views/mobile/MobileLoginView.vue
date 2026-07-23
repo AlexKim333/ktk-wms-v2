@@ -280,7 +280,7 @@ const handleEmailLogin = async () => {
   padding: 50px 30px; 
   border-radius: 20px; 
   width: 90%; 
-  max-width: 100%; 
+  max-width: 400px; 
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
