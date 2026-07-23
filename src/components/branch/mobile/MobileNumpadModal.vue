@@ -5,7 +5,7 @@
       <!-- 헤더 (상품 정보 및 가용 재고) -->
       <div class="numpad-header">
         <div class="item-title">
-          {{ item?.item_code || item?.name }} ({{ $t('branch.transfer.lbl_pack_info', { qty: packQty }) }})
+          {{ item?.item_code || item?.name }}
         </div>
         <div class="item-stock">
           {{ $t('mobile.lbl_avail_stock', { qty: availableStock }) }}
