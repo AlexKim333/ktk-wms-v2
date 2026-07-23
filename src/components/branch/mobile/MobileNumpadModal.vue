@@ -116,21 +116,40 @@ const totalQty = computed(() => {
   return (boxValue.value * packQty.value) + eachValue.value
 })
 
-const changeQty = (field, amount) => {
-  activeField.value = field
-  if (field === 'box') {
-    boxValue.value = Math.max(0, boxValue.value + amount)
+const trySetQty = (newBox, newEach) => {
+  const newTotal = (newBox * packQty.value) + newEach
+  const maxAllowed = props.availableStock !== '' && props.availableStock !== undefined ? Number(props.availableStock) : Infinity
+  
+  if (newTotal > maxAllowed) {
+    boxValue.value = Math.floor(maxAllowed / packQty.value)
+    eachValue.value = maxAllowed % packQty.value
   } else {
-    eachValue.value = Math.max(0, eachValue.value + amount)
+    boxValue.value = newBox
+    eachValue.value = newEach
   }
 }
 
-const appendNum = (num) => {
-  if (activeField.value === 'box') {
-    boxValue.value = Number(boxValue.value.toString() + num)
+const changeQty = (field, amount) => {
+  activeField.value = field
+  let newBox = boxValue.value
+  let newEach = eachValue.value
+  if (field === 'box') {
+    newBox = Math.max(0, newBox + amount)
   } else {
-    eachValue.value = Number(eachValue.value.toString() + num)
+    newEach = Math.max(0, newEach + amount)
   }
+  trySetQty(newBox, newEach)
+}
+
+const appendNum = (num) => {
+  let newBox = boxValue.value
+  let newEach = eachValue.value
+  if (activeField.value === 'box') {
+    newBox = Number(newBox.toString() + num)
+  } else {
+    newEach = Number(newEach.toString() + num)
+  }
+  trySetQty(newBox, newEach)
 }
 
 const backspace = () => {
