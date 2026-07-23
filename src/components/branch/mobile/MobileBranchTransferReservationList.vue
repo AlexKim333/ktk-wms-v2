@@ -180,11 +180,11 @@
     </div>
     <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
     <MobileNumpadModal
-      :isOpen="isNumpadOpen"
+      :is-open="isNumpadOpen"
       :item="activeNumpadItem"
-      :initialBox="activeNumpadItem?.request_caja || 0"
-      :initialEach="activeNumpadItem?.request_pza || 0"
-      :availableStock="String(activeNumpadItem?.remain_qty || 0)"
+      :initial-box="activeNumpadItem?.request_caja || 0"
+      :initial-each="activeNumpadItem?.request_pza || 0"
+      :available-stock="String(activeNumpadItem?.remain_qty || 0)"
       @submit="handleNumpadConfirm"
       @close="isNumpadOpen = false"
     />
