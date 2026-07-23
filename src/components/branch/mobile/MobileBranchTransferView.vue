@@ -1206,7 +1206,7 @@ const submitTransfer = async () => {
       currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
       
       receiptPrintData.value = {
-        title: 'Draft (Material Request)',
+        title: 'Material Pending',
         no: docName,
         date: dateStr,
         ubicacion: authStore.user?.branch_name || '[MAIN] ALARCON - K',

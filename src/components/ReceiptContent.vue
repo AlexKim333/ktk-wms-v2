@@ -1,5 +1,61 @@
 <template>
   <div class="receipt-content">
+    <component is="style">
+      .receipt-content {
+        width: 100%;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        color: #000;
+        box-sizing: border-box;
+        padding: 10px;
+        background: white;
+      }
+      .receipt-content .receipt-title {
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+      }
+      .receipt-content .receipt-header p {
+        margin: 3px 0;
+        font-size: 12px;
+      }
+      .receipt-content .bold-blue {
+        font-weight: bold;
+        color: blue;
+        text-transform: uppercase;
+      }
+      .receipt-content .bold {
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+      .receipt-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 10px;
+      }
+      .receipt-content th, .receipt-content td {
+        border: 1px solid #000;
+        text-align: center;
+        padding: 4px;
+      }
+      .receipt-content th {
+        font-weight: bold;
+        background-color: #fff;
+        font-size: 11px;
+      }
+      .receipt-content .summary-table {
+        width: 60%;
+        margin: 10px auto 15px;
+      }
+      .receipt-content .receipt-footer {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+    </component>
     <h2 class="receipt-title">{{ data.title }}</h2>
     <div class="receipt-header">
       <p>No: {{ data.no }}</p>
@@ -97,60 +153,3 @@ const props = defineProps({
   }
 })
 </script>
-
-<style>
-.receipt-content {
-  width: 100%;
-  font-family: Arial, sans-serif;
-  font-size: 12px;
-  color: #000;
-  box-sizing: border-box;
-  padding: 10px;
-  background: white;
-}
-.receipt-content .receipt-title {
-  text-align: center;
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  text-transform: uppercase;
-}
-.receipt-content .receipt-header p {
-  margin: 3px 0;
-  font-size: 12px;
-}
-.receipt-content .bold-blue {
-  font-weight: bold;
-  color: blue;
-  text-transform: uppercase;
-}
-.receipt-content .bold {
-  font-weight: bold;
-  text-transform: uppercase;
-}
-.receipt-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 10px;
-}
-.receipt-content th, .receipt-content td {
-  border: 1px solid #000;
-  text-align: center;
-  padding: 4px;
-}
-.receipt-content th {
-  font-weight: bold;
-  background-color: #fff;
-  font-size: 11px;
-}
-.receipt-content .summary-table {
-  width: 60%;
-  margin: 10px auto 15px;
-}
-.receipt-content .receipt-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-  font-weight: bold;
-}
-</style>
