@@ -310,7 +310,7 @@ const fetchReservations = async () => {
           limit_page_length: 500,
           order_by: 'creation desc'
         }
-      }).catch(() => ({ data: { data: [] } })),
+      }).catch(() => null),
       frappeApi.get('/api/resource/Stock Entry', {
         params: {
           fields: JSON.stringify(['name', 'creation', 'docstatus', 'purpose', 'from_warehouse', 'to_warehouse', 'owner', 'custom_orderer']),
@@ -322,14 +322,19 @@ const fetchReservations = async () => {
           limit_page_length: 500,
           order_by: 'creation desc'
         }
-      }).catch(() => ({ data: { data: [] } })),
+      }).catch(() => null),
       frappeApi.get('/api/resource/User', {
         params: {
           fields: JSON.stringify(['name', 'full_name']),
           limit_page_length: 1000
         }
-      }).catch(() => ({ data: { data: [] } }))
+      }).catch(() => null)
     ])
+
+    if (!mrRes || !seRes || !userRes) {
+      console.warn('API fetch failed during polling. Keeping existing list.');
+      return;
+    }
 
     const userMap = {}
     const users = userRes?.data?.data || []
@@ -467,7 +472,7 @@ const openDetail = async (res) => {
           fields: JSON.stringify(['item_code', 'custom_pack_qty']),
           limit_page_length: 999
         }
-      }).catch(() => ({ data: { data: [] } }))
+      }).catch(() => null)
       
       itemRes.data?.data?.forEach(i => {
         packQtyMap[i.item_code] = i.custom_pack_qty || 1

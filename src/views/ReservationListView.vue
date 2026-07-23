@@ -239,7 +239,7 @@ const fetchReservations = async () => {
           limit_page_length: 100,
           order_by: 'creation desc'
         }
-      }).catch(() => ({ data: { data: [] } })),
+      }).catch(() => null),
       frappeApi.get('/api/resource/Material Request', {
         params: {
           fields: JSON.stringify(['name', 'creation', 'status', 'docstatus', 'schedule_date', 'customer', 'custom_customer', 'custom_orderer', 'set_warehouse', 'set_from_warehouse', 'material_request_type', 'custom_ordering_branch', 'custom_approval_stage', 'per_ordered', 'per_received', 'owner']),
@@ -251,16 +251,21 @@ const fetchReservations = async () => {
           limit_page_length: 100,
           order_by: 'creation desc'
         }
-      }).catch(() => ({ data: { data: [] } })),
+      }).catch(() => null),
       frappeApi.get('/api/resource/User', {
         params: {
           fields: JSON.stringify(['name', 'full_name']),
           limit_page_length: 1000
         }
-      }).catch(() => ({ data: { data: [] } }))
-    ])
-    
-    const userMap = {}
+      }).catch(() => null)
+      ])
+      
+      if (!resPending || !resDraft || !userRes) {
+        console.warn('API fetch failed during polling. Keeping existing list.');
+        return;
+      }
+      
+      const userMap = {}
     const users = userRes?.data?.data || []
     users.forEach(u => { userMap[u.name] = u.full_name })
     
@@ -275,9 +280,10 @@ const fetchReservations = async () => {
         limit_page_length: 200,
         order_by: 'creation desc'
       }
-    }).catch(() => ({ data: { data: [] } }))
+    }).catch(() => null)
     
-    const seData = draftsRes.data?.data || []
+    if (!draftsRes) { console.warn('Drafts fetch failed. Keeping old list.'); return; }
+      const seData = draftsRes.data?.data || []
     const normalizedSE = seData.map(se => ({
       ...se,
       is_stock_entry: true,
