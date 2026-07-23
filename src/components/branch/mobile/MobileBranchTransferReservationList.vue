@@ -108,12 +108,12 @@
                 </td>
                 <template v-if="selectedReservation.docstatus === 1 && !selectedReservation.is_stock_entry">
                   <td style="background:#f0f9ff; text-align:center; padding: 2px;">
-                    <div @click="openNumpad(item, 'request_caja')" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
+                    <div @click="openNumpad(item)" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
                       {{ item.request_caja || 0 }}
                     </div>
                   </td>
                   <td style="background:#f0f9ff; text-align:center; padding: 2px;">
-                    <div @click="openNumpad(item, 'request_pza')" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
+                    <div @click="openNumpad(item)" style="width:100%; min-width:40px; height:32px; display:flex; align-items:center; justify-content:center; background:white; border:1px solid #bae6fd; border-radius:4px; font-weight:bold; color:#0369a1; cursor:pointer;">
                       {{ item.request_pza || 0 }}
                     </div>
                   </td>
@@ -180,11 +180,13 @@
     </div>
     <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
     <MobileNumpadModal
-      v-if="isNumpadOpen"
-      :title="numpadTitle"
-      :initialValue="currentNumpadValue"
-      @confirm="handleNumpadConfirm"
-      @cancel="isNumpadOpen = false"
+      :isOpen="isNumpadOpen"
+      :item="activeNumpadItem"
+      :initialBox="activeNumpadItem?.request_caja || 0"
+      :initialEach="activeNumpadItem?.request_pza || 0"
+      :availableStock="String(activeNumpadItem?.remain_qty || 0)"
+      @submit="handleNumpadConfirm"
+      @close="isNumpadOpen = false"
     />
   </div>
 </template>
@@ -220,22 +222,17 @@ const receiptPrintItems = ref([])
 
 // Numpad Logic
 const isNumpadOpen = ref(false)
-const numpadTitle = ref('')
 const activeNumpadItem = ref(null)
-const activeNumpadField = ref('')
-const currentNumpadValue = ref('0')
 
-const openNumpad = (item, field) => {
+const openNumpad = (item) => {
   activeNumpadItem.value = item
-  activeNumpadField.value = field
-  currentNumpadValue.value = String(item[field] || 0)
-  numpadTitle.value = field === 'request_caja' ? t('branch.transfer.th_box') : t('branch.transfer.th_each')
   isNumpadOpen.value = true
 }
 
-const handleNumpadConfirm = (val) => {
-  if (activeNumpadItem.value && activeNumpadField.value) {
-    activeNumpadItem.value[activeNumpadField.value] = Number(val) || 0
+const handleNumpadConfirm = ({ box, each }) => {
+  if (activeNumpadItem.value) {
+    activeNumpadItem.value.request_caja = box || 0
+    activeNumpadItem.value.request_pza = each || 0
     handleQtyChange(activeNumpadItem.value)
   }
   isNumpadOpen.value = false
