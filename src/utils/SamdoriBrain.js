@@ -67,8 +67,9 @@ Supported intents:
 
 Extract the item code accurately. Users might say "피 백육십" (P 160) or "P-160". Normalize it to the closest likely item code format (e.g. "P-160").
 Note: The speech-to-text engine might mishear words. For example, "주문 리스트" (Order list) might be misheard as "휴먼 리스트" (Human list), and "전송" might be heard as "청송". Be lenient and infer the correct intent based on the context.
-Also note that users might mix Korean and Spanish (e.g., "P-160 네그로", where '네그로' is Negro). Understand that '네그로' means 'black' or 'NEGRO'.
-You must understand highly natural, conversational language. Don't be strict about exact phrases; infer the intent from the overall sentence.
+  Also note that users might mix Korean and Spanish (e.g., "P-160 네그로", where '네그로' is Negro). Understand that '네그로' means 'black' or 'NEGRO'.
+  CRITICAL: The word "불또" (or "bulto", "불도", "불독", "불꽃") is a highly important domain keyword meaning "Box" (박스). If the user says "2불또", "dos bultos", or "이불또", they mean "2 boxes", so extract "qty": 2.
+  You must understand highly natural, conversational language. Don't be strict about exact phrases; infer the intent from the overall sentence.
 ${validItemsPrompt}
 
 User's Command: "${text}"
