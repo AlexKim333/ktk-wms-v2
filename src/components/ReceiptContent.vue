@@ -91,21 +91,17 @@
     <table class="main-table">
       <thead>
         <tr>
-          <th>PRODUCTO</th>
-          <th>COLOR</th>
-          <th>BULTO</th>
-          <th>PZS</th>
-          <th>PZS/B</th>
-          <th>TOTAL</th>
+          <th>아이템코드</th>
+          <th>박스주문</th>
+          <th>낱개주문</th>
+          <th>총주문낱개수량</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(item, idx) in items" :key="idx">
           <td>{{ item.name }}</td>
-          <td>{{ item.custom_color || '' }}</td>
           <td>{{ item.input_box || 0 }}</td>
           <td>{{ item.input_each || 0 }}</td>
-          <td>{{ item.custom_pack_qty || 0 }}</td>
           <td>{{ (Number(item.input_box) * (Number(item.custom_pack_qty) || 1)) + Number(item.input_each) }}</td>
         </tr>
       </tbody>
