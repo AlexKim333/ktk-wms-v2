@@ -245,6 +245,8 @@ const processAwakeCommand = async (fullText) => {
     
     if (error.response && error.response.status === 503) {
       errorMsg = locale.value === 'es' ? 'El servidor de Google AI está muy ocupado. Inténtalo de nuevo.' : '현재 구글 AI 서버에 사용자가 몰려 지연되고 있습니다. 다시 시도해 주세요.'
+    } else if (error.response && error.response.status === 429) {
+      errorMsg = locale.value === 'es' ? 'Se ha superado el límite de uso de IA. Por favor, inténtelo de nuevo más tarde.' : 'AI 호출 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.'
     } else if (error.response && error.response.status === 404) {
       errorMsg = locale.value === 'es' ? 'Modelo de IA no encontrado.' : 'AI 모델을 찾을 수 없습니다.'
     } else if (error.name === 'SyntaxError') {
