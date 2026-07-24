@@ -308,13 +308,13 @@ const fetchReservations = async () => {
     const allDocs = reservations.value
     if (allDocs.length > 0) {
       const detailPromises = allDocs.map(r => {
-        if (totalQtyMap.value[r.name] !== undefined && r.docstatus !== 0 && r.status !== \'Draft\') {
+        if (totalQtyMap.value[r.name] !== undefined && r.docstatus !== 0 && r.status !== 'Draft') {
           return Promise.resolve({ data: { data: { name: r.name, _cached: true } } })
         }
-        if (r.is_stock_entry || r.name.startsWith(\'MAT-STE\') || r.name.startsWith(\'STE-\')) {
-          return frappeApi.get(/api/resource/Stock Entry/).catch(() => null)
+        if (r.is_stock_entry || r.name.startsWith('MAT-STE') || r.name.startsWith('STE-')) {
+          return frappeApi.get(`/api/resource/Stock Entry/${r.name}`).catch(() => null)
         } else {
-          return frappeApi.get(/api/resource/Material Request/).catch(() => null)
+          return frappeApi.get(`/api/resource/Material Request/${r.name}`).catch(() => null)
         }
       })
       const detailResArray = await Promise.all(detailPromises)
