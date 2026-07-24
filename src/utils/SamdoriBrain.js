@@ -18,9 +18,18 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * @param {string} text - User's voice transcribed text
  * @returns {Promise<Object>} - The parsed intent object
  */
-export async function parseIntent(text) {
+export async function parseIntent(text, validItems = []) {
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API Key is missing. Please check .env file.');
+  }
+
+  let validItemsPrompt = ''
+  if (validItems.length > 0) {
+    validItemsPrompt = `
+Here is a list of VALID item codes currently available in the warehouse:
+[${validItems.join(', ')}]
+If the user's spoken item code (e.g., "B-160") sounds similar or was misrecognized by STT, ALWAYS autocorrect it to the exact matching valid item code (e.g., "P-160") from this list.
+`
   }
 
   const prompt = `
@@ -44,6 +53,8 @@ Supported intents:
    Required fields: "intent": "submit"
 
 Extract the item code accurately. Users might say "피 백육십" (P 160) or "P-160". Normalize it to the closest likely item code format (e.g. "P-160").
+Note: The speech-to-text engine might mishear words. For example, "주문 리스트" (Order list) might be misheard as "휴먼 리스트" (Human list), and "전송" might be heard as "청송". Be lenient and infer the correct intent based on the context.
+${validItemsPrompt}
 
 User's Command: "${text}"
 `;

@@ -32,9 +32,11 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { parseIntent } from '../utils/SamdoriBrain'
 
 const emit = defineEmits(['intent-parsed'])
+const { locale } = useI18n()
 
 const isListening = ref(false)
 const isOpen = ref(false)
@@ -58,7 +60,8 @@ const initSpeech = () => {
   recognition = new SpeechRecognition()
   recognition.continuous = true
   recognition.interimResults = true
-  recognition.lang = 'ko-KR' // 기본 한국어, 스페인어 혼용 가능 여부는 브라우저 엔진에 따라 다름
+  // UI 언어 설정에 따라 음성 인식 언어 동적 설정 (스페인어 vs 한국어)
+  recognition.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR' 
   
   recognition.onstart = () => {
     isListening.value = true
@@ -113,7 +116,7 @@ const initSpeech = () => {
 
 const handleFinalText = (text) => {
   const lowerText = text.toLowerCase()
-  if (!isAwake && (lowerText.includes('삼돌') || lowerText.includes('samdori'))) {
+  if (!isAwake && (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|samdori)/i.test(lowerText))) {
     wakeUp()
   } else if (isAwake) {
     // Already handled by silence timer, but we can fast-track if needed
@@ -165,7 +168,7 @@ const processAwakeCommand = async (fullText) => {
 const speak = (text) => {
   if (!synthesis) return
   const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'ko-KR'
+  utterance.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
   utterance.rate = 1.1
   synthesis.speak(utterance)
 }
