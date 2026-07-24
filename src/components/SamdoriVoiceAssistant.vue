@@ -141,7 +141,7 @@ const initSpeech = () => {
       // 대기 모드일 때는 화면에 텍스트 표시하지 않고 조용히 호출어만 감지
       if (final || interim) {
         const lowerText = (final || interim).toLowerCase()
-        if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
+        if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토|자비스|jarvis)/i.test(lowerText)) {
           wakeUp()
         }
       }
