@@ -178,10 +178,23 @@ const handleFinalText = (text) => {
   
   if (isAwake) {
     // 취소 명령어 감지 (한국어/스페인어)
-    if (/(취소|아니다|다시|무시해|cancelar|cancela|olvídalo|olvidalo)/i.test(lowerText)) {
+    if (/(취소|아니다|무시해|cancelar|cancela|olvídalo|olvidalo)/i.test(lowerText)) {
       clearTimeout(silenceTimer)
       const cancelMsg = locale.value === 'es' ? 'Comando cancelado.' : '명령이 취소되었습니다.'
       speak(cancelMsg)
+      sleep()
+      return
+    }
+
+    // 다시 말해줘 (Repeat) 감지: API 과금을 방지하고 로컬에서 바로 다시 읽어줌
+    if (/(다시|뭐라고|못들었|한번 더|repetir|otra vez|repite)/i.test(lowerText)) {
+      clearTimeout(silenceTimer)
+      if (lastResponseText.value) {
+        speak(lastResponseText.value)
+      } else {
+        const noMsg = locale.value === 'es' ? 'No hay respuesta anterior.' : '이전에 대답한 내용이 없습니다.'
+        speak(noMsg)
+      }
       sleep()
       return
     }
