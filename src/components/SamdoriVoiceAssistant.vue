@@ -411,35 +411,65 @@ defineExpose({
   align-items: flex-end;
 }
 
-.samdori-button {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background-color: #3b82f6;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-  transition: all 0.3s ease;
-}
+  .samdori-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #3b82f6, #ec4899);
+    background-size: 200% 200%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    z-index: 10;
+  }
+  
+  .samdori-button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+  }
+  
+  .samdori-button.pulsing {
+    background: linear-gradient(135deg, #ef4444, #f59e0b, #ec4899);
+    animation: gradientShift 3s ease infinite, pulseGlow 1.5s infinite;
+  }
 
-.samdori-button:hover {
-  transform: scale(1.1);
-}
-
-.samdori-button.pulsing {
-  background-color: #ef4444;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
+  .samdori-button.pulsing::before,
+  .samdori-button.pulsing::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    background: inherit;
+    z-index: -1;
+    animation: ripple 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  }
+  
+  .samdori-button.pulsing::after {
+    animation-delay: 0.75s;
+  }
+  
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  @keyframes ripple {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.7); opacity: 0; }
+  }
+  
+  @keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
 
 .samdori-panel {
   width: 320px;
