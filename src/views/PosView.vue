@@ -787,7 +787,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const { isMobile } = useMobile()
 const isAdmin = computed(() => authStore.isAdmin)
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const {
   rebuildItemIndex,
