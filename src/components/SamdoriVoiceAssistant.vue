@@ -239,6 +239,21 @@ const sleep = () => {
   finalTranscript.value = ''
 }
 
+const silentWakeUp = () => {
+  isAwake = true
+  isOpen.value = true
+  statusText.value = '이어서 듣고 있습니다...'
+  finalTranscript.value = ''
+  transcript.value = ''
+  
+  clearTimeout(silenceTimer)
+  silenceTimer = setTimeout(() => {
+    if (isAwake && !transcript.value && !finalTranscript.value) {
+      sleep()
+    }
+  }, 10000)
+}
+
 const processAwakeCommand = async (fullText) => {
   clearTimeout(silenceTimer)
   statusText.value = 'AI 분석 중...'
@@ -310,6 +325,11 @@ const speak = (text) => {
   } else if (langVoices.length > 0) {
     // 남성 목소리를 명시적으로 못 찾으면 해당 언어의 기본 목소리 사용
     utterance.voice = langVoices[0]
+  }
+
+  utterance.onend = () => {
+    // 대답을 마친 후 바로 다시 마이크를 열어 연속 대화를 가능하게 함
+    silentWakeUp()
   }
 
   synthesis.speak(utterance)
