@@ -240,18 +240,21 @@ const sleep = () => {
 }
 
 const silentWakeUp = () => {
-  isAwake = true
-  isOpen.value = true
-  statusText.value = '이어서 듣고 있습니다...'
-  finalTranscript.value = ''
-  transcript.value = ''
-  
-  clearTimeout(silenceTimer)
-  silenceTimer = setTimeout(() => {
-    if (isAwake && !transcript.value && !finalTranscript.value) {
-      sleep()
-    }
-  }, 10000)
+  // TTS 메아리(자신이 한 말)가 마이크에 들어가는 것을 방지하기 위해 0.8초 후 마이크 개방
+  setTimeout(() => {
+    isAwake = true
+    isOpen.value = true
+    statusText.value = '이어서 듣고 있습니다...'
+    finalTranscript.value = ''
+    transcript.value = ''
+    
+    clearTimeout(silenceTimer)
+    silenceTimer = setTimeout(() => {
+      if (isAwake && !transcript.value && !finalTranscript.value) {
+        sleep()
+      }
+    }, 10000)
+  }, 800)
 }
 
 const processAwakeCommand = async (fullText) => {
