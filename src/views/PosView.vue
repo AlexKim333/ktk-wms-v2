@@ -121,6 +121,7 @@
       <!-- 지점 재고 이동 예약 -->
       <BranchTransferView 
         v-else-if="activeNav === 'branch-transfer'" 
+        ref="branchTransferRef"
         :raw-items="rawSingleItems"
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
@@ -2691,6 +2692,7 @@ const submitReservation = async () => {
   }
 }
 const samdori = ref(null)
+const branchTransferRef = ref(null)
 const validItemCodes = computed(() => rawSingleItems.value.map(item => item.name))
 
 const handleSamdoriIntent = (intentObj) => {
@@ -2699,6 +2701,22 @@ const handleSamdoriIntent = (intentObj) => {
   const { intent, item, qty } = intentObj
 
   if (intent === 'add_order') {
+    if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
+      const prod = rawSingleItems.value.find(i => i.name === item)
+      if (prod) {
+        const inputQty = qty ? Number(qty) : 1
+        for (let i = 0; i < inputQty; i++) {
+          branchTransferRef.value.addFromVoice(prod)
+        }
+        const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+      } else {
+        const msg = locale.value === 'es' ? `No se encontró ${item}.` : `해당 품목 ${item} 을(를) 찾을 수 없습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+      }
+      return;
+    }
+
     if (isGridLocked.value) {
       const msg = locale.value === 'es' ? 'Por favor, complete los campos de arriba primero.' : '먼저 화면 우측 상단의 필수 항목을 선택해 주세요.';
       if (samdori.value) samdori.value.speak(msg)
@@ -2771,7 +2789,13 @@ const handleSamdoriIntent = (intentObj) => {
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'check') {
-    const count = currentTab.value.cartItems.length
+    let count = 0
+    if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
+      count = branchTransferRef.value.getCartCount()
+    } else if (currentTab.value) {
+      count = currentTab.value.cartItems.length
+    }
+    
     if (count === 0) {
       const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
       if (samdori.value) samdori.value.speak(msg)
@@ -2780,6 +2804,13 @@ const handleSamdoriIntent = (intentObj) => {
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'submit') {
+    if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
+      const msg = locale.value === 'es' ? `Enviando pedido de sucursal...` : `지점 발주서를 전송합니다.`
+      if (samdori.value) samdori.value.speak(msg)
+      branchTransferRef.value.submitTransfer()
+      return;
+    }
+
     const msg = locale.value === 'es' ? `Enviando pedido...` : `주문을 전송합니다.`
     if (samdori.value) samdori.value.speak(msg)
     if (transactionMode.value === 'outbound' || transactionMode.value === 'transfer') {

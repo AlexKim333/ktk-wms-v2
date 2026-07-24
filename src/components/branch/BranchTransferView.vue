@@ -365,8 +365,14 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, watch, onMounted , nextTick} from 'vue'
-import { useI18n } from 'vue-i18n';
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '../../stores/auth.js'
+import QuickClerkAddModal from '../QuickClerkAddModal.vue'
+import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
+import { usePagedList } from '../../composables/usePagedList.js'
+import axios from 'axios'
+import frappeApi from '../../api/frappe.js'
 
 const { t } = useI18n();
 
@@ -375,12 +381,6 @@ import ReceiptPrint from '../ReceiptPrint.vue'
 const receiptPrintRef = ref(null)
 const receiptPrintData = ref({ summary: {} })
 const receiptPrintItems = ref([])
-import { useAuthStore } from '../../stores/auth.js'
-import QuickClerkAddModal from '../QuickClerkAddModal.vue'
-import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch.js'
-import { usePagedList } from '../../composables/usePagedList.js'
-import axios from 'axios'
-import frappeApi from '../../api/frappe.js'
 
 // 임시: 권한 부여 전까지 token API 사용 (지점장 권한 설정 후 frappeApi로 복구 예정)
 // baseURL은 Vite 프록시(`/api`)를 타도록 비움 — localhost:8000 직접 호출 금지
@@ -1171,6 +1171,12 @@ const submitTransfer = async () => {
     isSubmitting.value = false
   }
 }
+
+  defineExpose({
+    addFromVoice: addToCart,
+    submitTransfer,
+    getCartCount: () => currentTab.value ? currentTab.value.cartItems.length : 0
+  })
 </script>
 
 <style scoped>
