@@ -1175,7 +1175,8 @@ const submitTransfer = async () => {
   defineExpose({
     addFromVoice: addToCart,
     submitTransfer,
-    getCartCount: () => currentTab.value ? currentTab.value.cartItems.length : 0
+    getCartCount: () => currentTab.value ? currentTab.value.cartItems.length : 0,
+    getCartItems: () => currentTab.value ? currentTab.value.cartItems : []
   })
 </script>
 

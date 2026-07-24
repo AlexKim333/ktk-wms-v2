@@ -2789,18 +2789,37 @@ const handleSamdoriIntent = (intentObj) => {
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'check') {
-    let count = 0
+    let cartItems = []
     if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
-      count = branchTransferRef.value.getCartCount()
+      cartItems = branchTransferRef.value.getCartItems()
     } else if (currentTab.value) {
-      count = currentTab.value.cartItems.length
+      cartItems = currentTab.value.cartItems
     }
     
+    const count = cartItems.length
     if (count === 0) {
       const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
       if (samdori.value) samdori.value.speak(msg)
     } else {
-      const msg = locale.value === 'es' ? `Hay ${count} productos en el carrito.` : `현재 장바구니에 ${count}종류의 상품이 있습니다.`
+      let msg = locale.value === 'es' 
+        ? `Hay ${count} productos en el carrito. ` 
+        : `현재 장바구니에 ${count}종류의 상품이 있습니다. `
+      
+      const details = cartItems.map(item => {
+        const code = item.item_code || item.name || ''
+        const boxes = item.boxQty || item.input_box || 0
+        const eaches = item.eachQty || item.input_each || 0
+        if (locale.value === 'es') {
+          return `${code} ${boxes} cajas, ${eaches} sueltos`
+        } else {
+          let str = code
+          if (boxes > 0) str += ` ${boxes}박스`
+          if (eaches > 0) str += ` ${eaches}개`
+          return str
+        }
+      })
+      
+      msg += details.join(', ') + (locale.value === 'es' ? '.' : ' 입니다.')
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'submit') {
