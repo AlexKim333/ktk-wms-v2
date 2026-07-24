@@ -260,6 +260,21 @@ const silentWakeUp = () => {
   }, 800)
 }
 
+const manualWakeUp = () => {
+  isAwake = true
+  isOpen.value = true
+  statusText.value = '듣고 있습니다! 명령을 내려주세요.'
+  finalTranscript.value = ''
+  transcript.value = ''
+  
+  clearTimeout(silenceTimer)
+  silenceTimer = setTimeout(() => {
+    if (isAwake && !transcript.value && !finalTranscript.value) {
+      sleep()
+    }
+  }, 10000)
+}
+
 const processAwakeCommand = async (fullText) => {
   clearTimeout(silenceTimer)
   statusText.value = 'AI 분석 중...'
@@ -363,6 +378,8 @@ const toggleListen = () => {
     } catch (e) {
       console.log('Already started')
     }
+    // 마이크 버튼을 수동으로 누른 경우 즉시 깨워서 대기시간을 없앰
+    manualWakeUp()
   }
 }
 
