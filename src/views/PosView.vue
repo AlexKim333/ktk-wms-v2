@@ -1377,15 +1377,15 @@ const pollReservations = async () => {
     const [reqRes, reqDraftRes, seDraftRes, binRes] = await Promise.all([
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name']),
+          fields: JSON.stringify(['name', 'modified']),
           filters: JSON.stringify([['docstatus', '=', 1], ['status', 'in', ['Pending', 'Draft', 'Partially Ordered', 'Partially Issued', 'Partially Received', 'Partial']]]),
           limit_page_length: 0
         }
       }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Material Request', {
         params: {
-          fields: JSON.stringify(['name']),
-          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
+          fields: JSON.stringify(['name', 'modified']),
+          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '대기(지점장)']]),
           limit_page_length: 0
         }
       }).catch(() => ({ data: { data: [] } })),
@@ -1419,7 +1419,7 @@ const pollReservations = async () => {
     if (reqList.length > 0) {
       if (!window.mrDetailsCache) window.mrDetailsCache = {};
       const mrDetailsPromises = reqList.map(req => {
-        if (window.mrDetailsCache[req.name] && req._docstatus !== 0) {
+        if (window.mrDetailsCache[req.name] && window.mrDetailsCache[req.name].modified === req.modified) {
           return Promise.resolve({ data: { data: window.mrDetailsCache[req.name], _cached: true } })
         }
         return frappeApi.get(`/api/resource/Material Request/${req.name}`).catch(() => null)
@@ -2988,3 +2988,4 @@ const submitReservation = async () => {
 }
 .action-btn-triple-group { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; }
 </style>
+
