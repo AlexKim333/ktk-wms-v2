@@ -87,6 +87,11 @@ const initSpeech = () => {
   }
   
   recognition.onresult = (event) => {
+    // TTS가 말하고 있는 동안에는 마이크에 들어오는 소리(자기 목소리)를 무시합니다 (에코 방지)
+    if (synthesis && synthesis.speaking) {
+      return
+    }
+
     let interim = ''
     let final = ''
     
