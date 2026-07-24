@@ -250,10 +250,10 @@ const processAwakeCommand = async (fullText) => {
   speak(analyzingMsg)
   
   try {
-    const intent = await parseIntent(fullText, props.validItems)
+    const intent = await parseIntent(fullText, props.validItems, lastIntent.value)
     lastIntent.value = intent
     emit('intent-parsed', intent)
-    statusText.value = '명령 처리 완료'
+    statusText.value = '명령 분석 완료'
     sleep()
   } catch (error) {
     console.error(error)

@@ -18,7 +18,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * @param {string} text - User's voice transcribed text
  * @returns {Promise<Object>} - The parsed intent object
  */
-export async function parseIntent(text, validItems = []) {
+export async function parseIntent(text, validItems = [], lastIntent = null) {
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API Key is missing. Please check .env file.');
   }
@@ -28,9 +28,19 @@ export async function parseIntent(text, validItems = []) {
     validItemsPrompt = `
 Here is a list of VALID full item codes currently available in the warehouse:
 [${validItems.join(', ')}]
+
 CRITICAL RULE FOR ITEM CODES:
-When the user speaks an item (e.g., "B-160") and optionally a color (e.g., "검정", "네그로"), you MUST search this list for the closest matching FULL item code (e.g., "P-160-NEGRO-400") and output that EXACT FULL code.
+When the user speaks an item (e.g., "B-160") and optionally a color (e.g., "검정", "까만색"), you MUST search this list for the closest matching FULL item code (e.g., "P-160-NEGRO-400") and output that EXACT FULL code.
 Never output a partial code like "P-160" if a full code like "P-160-NEGRO-400" exists in the list and matches the user's color description.
+`
+  }
+
+  let contextPrompt = ''
+  if (lastIntent && lastIntent.item) {
+    contextPrompt = `
+CONVERSATION CONTEXT (MEMORY):
+The user recently interacted with the item: "${lastIntent.item}".
+If the user's command contains pronouns like "이거", "이것", "그거", "그것" (this/that) without explicitly naming a product, you MUST ASSUME they are referring to "${lastIntent.item}".
 `
   }
 
@@ -38,7 +48,7 @@ Never output a partial code like "P-160" if a full code like "P-160-NEGRO-400" e
 You are an AI Voice Assistant for a Warehouse Management System (WMS). Your name is 'Samdori' (in Korean) or 'Paquito' (in Spanish).
 Your job is to analyze the user's voice command and extract the intent and parameters as a strict JSON object.
 Do not output anything other than the JSON object.
-
+${contextPrompt}
 Supported intents:
 1. "search": Checking stock or inventory for an item. (e.g. "재고 확인 P-160", "재고조회 P-160", "P-160 몇개나 있어?", "Busca P-160", "Inventario P-160", "알라르꼰에 P-160 몇개야?")
    Required fields: "intent": "search", "item": "<item_code>"
