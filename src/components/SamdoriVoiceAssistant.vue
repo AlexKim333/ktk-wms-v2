@@ -23,7 +23,18 @@
         
         <div class="intent-box" v-if="lastIntent">
           <h4>💡 AI 분석 결과:</h4>
-          <pre>{{ JSON.stringify(lastIntent, null, 2) }}</pre>
+          <div v-if="lastIntent.intent === 'search'">
+            <span class="badge bg-blue">재고조사</span> <strong>{{ lastIntent.item }}</strong>
+          </div>
+          <div v-else-if="lastIntent.intent === 'add_order'">
+            <span class="badge bg-green">주문추가</span> <strong>{{ lastIntent.item }}</strong> ({{ lastIntent.qty }}개)
+          </div>
+          <div v-else-if="lastIntent.intent === 'check'">
+            <span class="badge bg-purple">주문확인</span> 현재까지 담은 리스트 확인
+          </div>
+          <div v-else-if="lastIntent.intent === 'submit'">
+            <span class="badge bg-orange">주문전송</span> 스캔 화면으로 이동
+          </div>
         </div>
       </div>
     </div>
@@ -87,21 +98,28 @@ const initSpeech = () => {
       }
     }
     
-    transcript.value = interim
-    
-    if (final) {
-      finalTranscript.value += (finalTranscript.value ? ' ' : '') + final
-      handleFinalText(final)
-    }
-    
-    // Silence detection for auto-processing
     if (isAwake) {
+      transcript.value = interim
+      if (final) {
+        finalTranscript.value += (finalTranscript.value ? ' ' : '') + final
+        handleFinalText(final)
+      }
+      
+      // Silence detection for auto-processing
       clearTimeout(silenceTimer)
       silenceTimer = setTimeout(() => {
         if (transcript.value || finalTranscript.value) {
           processAwakeCommand(finalTranscript.value + ' ' + transcript.value)
         }
       }, 2000)
+    } else {
+      // 대기 모드일 때는 화면에 텍스트 표시하지 않고 조용히 호출어만 감지
+      if (final || interim) {
+        const lowerText = (final || interim).toLowerCase()
+        if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
+          wakeUp()
+        }
+      }
     }
   }
   
@@ -144,11 +162,6 @@ const handleFinalText = (text) => {
       return
     }
     // 그 외는 silenceTimer에 의해 2초 후 자동 전송됨
-  } else {
-    // "삼돌"이 포함되면 삼돌, 삼돌이, 삼돌아 모두 매칭됨. 스페인어는 paquito 매칭. 한국어 모드에서 paquito를 '밖에 있다'로 잘못 알아듣는 경우 포함.
-    if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
-      wakeUp()
-    }
   }
 }
 
@@ -192,6 +205,7 @@ const processAwakeCommand = async (fullText) => {
     sleep()
   } catch (error) {
     console.error(error)
+    lastIntent.value = null // 에러 시 이전 성공 결과 숨김
     statusText.value = '분석 실패: ' + error.message
     const errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
     speak(errorMsg)
@@ -397,4 +411,18 @@ defineExpose({
   margin: 0;
   white-space: pre-wrap;
 }
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  margin-right: 6px;
+}
+.bg-blue { background-color: #3b82f6; }
+.bg-green { background-color: #10b981; }
+.bg-purple { background-color: #8b5cf6; }
+.bg-orange { background-color: #f97316; }
 </style>
