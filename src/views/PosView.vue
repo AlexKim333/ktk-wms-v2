@@ -2750,11 +2750,11 @@ const handleSamdoriIntent = (intentObj) => {
       let packQty = prods[0].custom_pack_qty || 1
       
       let searchWarehouse = currentTab.value.selectedSource
-      if (intent.warehouse) {
+      if (intentObj.warehouse) {
         // AI가 음성에서 창고명(예: "알라르꼰")을 추출했다면, 해당 창고를 찾아서 강제 지정
         const matchedBranch = branchList.value.find(b => 
-          b.name.toLowerCase().includes(intent.warehouse.toLowerCase()) || 
-          b.warehouse_name.toLowerCase().includes(intent.warehouse.toLowerCase())
+          b.name.toLowerCase().includes(intentObj.warehouse.toLowerCase()) || 
+          b.warehouse_name.toLowerCase().includes(intentObj.warehouse.toLowerCase())
         )
         if (matchedBranch) {
           searchWarehouse = matchedBranch.name
