@@ -1,7 +1,7 @@
 <template>
   <div class="samdori-container" :class="{ active: isListening }">
     <div class="samdori-button" @click="toggleListen" :class="{ pulsing: isListening }">
-      <i class="fas fa-microphone"></i>
+      <img src="/samdori-icon.jpg" class="samdori-avatar" alt="Samdori" />
     </div>
     
     <div class="samdori-panel" v-if="isOpen">
@@ -432,6 +432,15 @@ defineExpose({
   .samdori-button:hover {
     transform: translateY(-3px) scale(1.05);
     box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+  }
+  
+  .samdori-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    transform: scale(0.85); /* Creates a glowing ring effect from the background gradient */
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
   }
   
   .samdori-button.pulsing {
