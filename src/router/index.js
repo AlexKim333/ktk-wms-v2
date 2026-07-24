@@ -22,6 +22,7 @@ const router = createRouter({
     },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/product/:id', name: 'product-detail', component: ProductDetailView },
+    { path: '/samdori-test', name: 'samdori-test', component: () => import('../views/SamdoriTestView.vue') },
     { path: '/', redirect: '/login' }
   ]
 })
