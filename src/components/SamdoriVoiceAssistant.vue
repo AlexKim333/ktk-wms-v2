@@ -320,13 +320,15 @@ const processAwakeCommand = async (fullText) => {
   }
 }
 
+let currentUtterance = null
+
 const speak = (text) => {
   lastResponseText.value = text
   if (!synthesis) return
-  const utterance = new SpeechSynthesisUtterance(text)
+  currentUtterance = new SpeechSynthesisUtterance(text)
   const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
-  utterance.lang = targetLang
-  utterance.rate = 1.1
+  currentUtterance.lang = targetLang
+  currentUtterance.rate = 1.1
   
   // 남성 목소리 찾기 시도
   const voices = synthesis.getVoices()
@@ -342,13 +344,13 @@ const speak = (text) => {
   )
   
   if (maleVoice) {
-    utterance.voice = maleVoice
+    currentUtterance.voice = maleVoice
   } else if (langVoices.length > 0) {
     // 남성 목소리를 명시적으로 못 찾으면 해당 언어의 기본 목소리 사용
-    utterance.voice = langVoices[0]
+    currentUtterance.voice = langVoices[0]
   }
 
-  utterance.onend = () => {
+  currentUtterance.onend = () => {
     isTTSPlaying = false
     if (isListening.value && recognition) {
       try { recognition.start() } catch (e) {}
@@ -362,7 +364,7 @@ const speak = (text) => {
     try { recognition.stop() } catch (e) {}
   }
   
-  synthesis.speak(utterance)
+  synthesis.speak(currentUtterance)
 }
 
 const toggleListen = () => {
