@@ -2731,12 +2731,24 @@ const handleSamdoriIntent = (intentObj) => {
       let totalStock = 0
       let packQty = prods[0].custom_pack_qty || 1
       
-      prods.forEach(prod => {
-        // 지점장은 자신이 속한 지점의 재고만 확인 가능하도록 강제 제한
-        let searchWarehouse = currentTab.value.selectedSource
-        if (!authStore.isAdmin && (!searchWarehouse || searchWarehouse === '')) {
-          searchWarehouse = authStore.user?.branch_name || ''
+      let searchWarehouse = currentTab.value.selectedSource
+      if (intent.warehouse) {
+        // AI가 음성에서 창고명(예: "알라르꼰")을 추출했다면, 해당 창고를 찾아서 강제 지정
+        const matchedBranch = branchList.value.find(b => 
+          b.name.toLowerCase().includes(intent.warehouse.toLowerCase()) || 
+          b.warehouse_name.toLowerCase().includes(intent.warehouse.toLowerCase())
+        )
+        if (matchedBranch) {
+          searchWarehouse = matchedBranch.name
         }
+      }
+
+      // 지점장은 자신이 속한 지점의 재고만 확인 가능하도록 제한 (단, 위에서 다른 창고를 지정한 경우 제외)
+      if (!authStore.isAdmin && (!searchWarehouse || searchWarehouse === '')) {
+        searchWarehouse = authStore.user?.branch_name || ''
+      }
+
+      prods.forEach(prod => {
         totalStock += getAvailableStock(prod.name, searchWarehouse)
       })
       
@@ -2744,19 +2756,9 @@ const handleSamdoriIntent = (intentObj) => {
       if (packQty > 1) {
         const boxes = Math.floor(totalStock / packQty)
         const eaches = totalStock % packQty
-        if (boxes > 0 && eaches > 0) {
-          msg = locale.value === 'es'
-            ? `Hay ${boxes} cajas y ${eaches} sueltos para ${item}.`
-            : `해당 품목의 총 재고는 ${boxes}박스, 낱장 ${eaches}개 입니다.`
-        } else if (boxes > 0) {
-          msg = locale.value === 'es'
-            ? `Hay ${boxes} cajas para ${item}.`
-            : `해당 품목의 총 재고는 ${boxes}박스 입니다.`
-        } else {
-          msg = locale.value === 'es'
-            ? `Hay ${eaches} sueltos para ${item}.`
-            : `해당 품목의 총 재고는 낱장 ${eaches}개 입니다.`
-        }
+        msg = locale.value === 'es'
+          ? `El inventario de ${item} en ${searchWarehouse} es ${boxes} cajas y ${eaches} sueltos.`
+          : `해당 품목의 총 재고는 ${boxes}박스, 낱장 ${eaches}개 입니다.`
       } else {
         msg = locale.value === 'es' 
           ? `Hay ${totalStock} en inventario para ${item}.` 

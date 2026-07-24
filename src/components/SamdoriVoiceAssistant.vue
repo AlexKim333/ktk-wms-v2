@@ -32,6 +32,7 @@
           <h4>🤖 AI 분석 결과:</h4>
           <div v-if="lastIntent.intent === 'search'">
             <span class="badge bg-blue">재고조회</span> <strong>{{ lastIntent.item }}</strong>
+            <span v-if="lastIntent.warehouse" style="margin-left:5px; color:#94a3b8;">[{{ lastIntent.warehouse }}]</span>
           </div>
           <div v-else-if="lastIntent.intent === 'add_order'">
             <span class="badge bg-green">장바구니</span> <strong>{{ lastIntent.item }}</strong> ({{ lastIntent.qty }}개)
