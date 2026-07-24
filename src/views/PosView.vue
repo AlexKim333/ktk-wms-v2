@@ -2732,7 +2732,12 @@ const handleSamdoriIntent = (intentObj) => {
       let packQty = prods[0].custom_pack_qty || 1
       
       prods.forEach(prod => {
-        totalStock += getAvailableStock(prod.name, currentTab.value.selectedSource)
+        // 지점장은 자신이 속한 지점의 재고만 확인 가능하도록 강제 제한
+        let searchWarehouse = currentTab.value.selectedSource
+        if (!authStore.isAdmin && (!searchWarehouse || searchWarehouse === '')) {
+          searchWarehouse = authStore.user?.branch_name || ''
+        }
+        totalStock += getAvailableStock(prod.name, searchWarehouse)
       })
       
       let msg = ''
