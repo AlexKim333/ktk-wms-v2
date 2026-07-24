@@ -2729,13 +2729,35 @@ const handleSamdoriIntent = (intentObj) => {
 
     if (prods.length > 0) {
       let totalStock = 0
+      let packQty = prods[0].custom_pack_qty || 1
+      
       prods.forEach(prod => {
         totalStock += getAvailableStock(prod.name, currentTab.value.selectedSource)
       })
       
-      const msg = locale.value === 'es' 
-        ? `Hay ${totalStock} en inventario para ${item}.` 
-        : `해당 품목의 현재 총 재고는 ${totalStock}개 입니다.`
+      let msg = ''
+      if (packQty > 1) {
+        const boxes = Math.floor(totalStock / packQty)
+        const eaches = totalStock % packQty
+        if (boxes > 0 && eaches > 0) {
+          msg = locale.value === 'es'
+            ? `Hay ${boxes} cajas y ${eaches} sueltos para ${item}.`
+            : `해당 품목의 총 재고는 ${boxes}박스, 낱장 ${eaches}개 입니다.`
+        } else if (boxes > 0) {
+          msg = locale.value === 'es'
+            ? `Hay ${boxes} cajas para ${item}.`
+            : `해당 품목의 총 재고는 ${boxes}박스 입니다.`
+        } else {
+          msg = locale.value === 'es'
+            ? `Hay ${eaches} sueltos para ${item}.`
+            : `해당 품목의 총 재고는 낱장 ${eaches}개 입니다.`
+        }
+      } else {
+        msg = locale.value === 'es' 
+          ? `Hay ${totalStock} en inventario para ${item}.` 
+          : `해당 품목의 현재 총 재고는 ${totalStock}개 입니다.`
+      }
+      
       if (samdori.value) samdori.value.speak(msg)
     } else {
       const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 관련 제품이 없습니다.`
