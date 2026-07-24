@@ -52,10 +52,14 @@ Supported intents:
 4. "submit": Submitting or transmitting the order. (e.g. "주문 전송", "Enviar pedido")
    Required fields: "intent": "submit"
 
+5. "chat": General conversation, greetings, or questions outside of WMS tasks. (e.g. "안녕 삼돌아", "너 밥 먹었어?", "오늘 날씨 어때?")
+   Required fields: "intent": "chat", "message": "<A witty, short conversational reply in the language the user spoke>"
+
 Extract the item code accurately. Users might say "피 백육십" (P 160) or "P-160". Normalize it to the closest likely item code format (e.g. "P-160").
 Note: The speech-to-text engine might mishear words. For example, "주문 리스트" (Order list) might be misheard as "휴먼 리스트" (Human list), and "전송" might be heard as "청송". Be lenient and infer the correct intent based on the context.
 Also note that users might mix Korean and Spanish (e.g., "P-160 네그로", where '네그로' is Negro). Understand that '네그로' means 'black' or 'NEGRO'.
 You must understand highly natural, conversational language. Don't be strict about exact phrases; infer the intent from the overall sentence.
+If the command is not related to WMS tasks, gracefully respond using the "chat" intent.
 ${validItemsPrompt}
 
 User's Command: "${text}"
