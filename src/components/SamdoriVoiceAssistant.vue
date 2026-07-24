@@ -16,8 +16,9 @@
         </div>
         
         <div class="transcript-box">
-          <p v-if="!transcript && !finalTranscript && !manualInput" class="placeholder">"자비스~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
-          <p class="final-text" v-if="finalTranscript"><span class="badge bg-purple">질문</span> {{ finalTranscript }}</p>
+          <p v-if="!transcript && !finalTranscript && !manualInput && !lastQuestionText" class="placeholder">"자비스~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
+          <p class="final-text" v-if="lastQuestionText && !finalTranscript && !transcript"><span class="badge bg-purple">질문</span> {{ lastQuestionText }}</p>
+          <p class="final-text" v-if="finalTranscript"><span class="badge bg-purple">인식중</span> {{ finalTranscript }}</p>
           <p class="interim-text">{{ transcript }}</p>
           <input type="text" v-model="manualInput" @keyup.enter="submitManual" placeholder="음성 대신 타자로 명령 입력 (엔터)" class="manual-input" />
         </div>
@@ -75,6 +76,7 @@ const finalTranscript = ref('')
 const manualInput = ref('')
 const lastIntent = ref(null)
 const lastResponseText = ref('')
+const lastQuestionText = ref('')
 const debugError = ref('')
 
 let recognition = null
@@ -203,11 +205,12 @@ const wakeUp = () => {
   finalTranscript.value = ''
   transcript.value = ''
   lastResponseText.value = ''
+  lastQuestionText.value = ''
   
   const reply = locale.value === 'es' ? 'Dígame, señor.' : '네, 말씀하세요.'
   speak(reply)
   
-  // 10초간 명령이 없으면 다시 대기 모드로
+  // 10초간 입력이 없으면 자동으로 대기 모드로
   setTimeout(() => {
     if (isAwake && !transcript.value && !finalTranscript.value) {
       sleep()
@@ -217,7 +220,7 @@ const wakeUp = () => {
 
 const sleep = () => {
   isAwake = false
-  statusText.value = '마이크 켜짐 (호출어 대기중...)'
+  statusText.value = '대기중 (호출어 대기중...)'
   transcript.value = ''
   finalTranscript.value = ''
 }
@@ -227,6 +230,7 @@ const processAwakeCommand = async (fullText) => {
   statusText.value = 'AI 분석 중...'
   debugError.value = '' // 이전 에러 지우기
   lastResponseText.value = '' // 이전 답변 초기화
+  lastQuestionText.value = fullText
   
   const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
   speak(analyzingMsg)
