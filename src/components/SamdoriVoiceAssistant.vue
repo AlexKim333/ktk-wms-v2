@@ -135,7 +135,7 @@ const handleFinalText = (text) => {
     }
     
     // 즉시 실행(Fast-track) 명령어 감지
-    const executeRegex = /(실행|끝|전송|오버|처리해|완료|ya|listo|ejecutar|ejecuta)/i
+    const executeRegex = /(실행|끝|전송|오버|이상|처리해|완료|ya|listo|ejecutar|ejecuta)/i
     if (executeRegex.test(lowerText)) {
       clearTimeout(silenceTimer)
       // 전체 누적된 문장에서 실행 명령어만 제거 후 바로 전송

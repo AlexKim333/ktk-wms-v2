@@ -69,7 +69,8 @@ User's Command: "${text}"
       }
     });
 
-    const responseText = response.data.candidates[0].content.parts[0].text;
+    let responseText = response.data.candidates[0].content.parts[0].text;
+    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(responseText);
     return parsed;
   } catch (error) {
