@@ -116,7 +116,8 @@ const initSpeech = () => {
 
 const handleFinalText = (text) => {
   const lowerText = text.toLowerCase()
-  if (!isAwake && (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|samdori)/i.test(lowerText))) {
+  // "삼돌아" 와 발음이 비슷한 모든 오타 허용 (잠돌, 산돌, 상돌, 섬돌, 참돌, 탐돌, 산더라, 삼도라, 잠도라 등)
+  if (!isAwake && (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|samdori)/i.test(lowerText))) {
     wakeUp()
   } else if (isAwake) {
     // Already handled by silence timer, but we can fast-track if needed
