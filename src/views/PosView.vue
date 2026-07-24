@@ -1624,6 +1624,13 @@ const fetchFrappeItems = async () => {
     
   } catch (error) {
     console.error('Frappe 마스터 데이터 로드 실패:', error)
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      alert("보안 세션이 만료되었습니다. 다시 로그인해 주세요.")
+      authStore.logout().finally(() => {
+        authStore.user = null
+        router.push('/')
+      })
+    }
   }
 }
 
