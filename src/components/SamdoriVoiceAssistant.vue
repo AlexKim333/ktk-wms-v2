@@ -351,7 +351,9 @@ const speak = (text) => {
   }
 
   currentUtterance.onend = () => {
+    if (!isTTSPlaying) return // 이미 처리됨
     isTTSPlaying = false
+    clearTimeout(window.ttsFallbackTimer)
     if (isListening.value && recognition) {
       try { recognition.start() } catch (e) {}
     }
@@ -363,6 +365,16 @@ const speak = (text) => {
   if (recognition) {
     try { recognition.stop() } catch (e) {}
   }
+  
+  // 안드로이드 크롬 TTS onend 미발동 버그 방지용 폴백(안전장치)
+  if (window.ttsFallbackTimer) clearTimeout(window.ttsFallbackTimer)
+  const expectedDuration = Math.max(text.length * 150 + 1500, 3000)
+  window.ttsFallbackTimer = setTimeout(() => {
+    if (isTTSPlaying && currentUtterance && currentUtterance.onend) {
+      console.warn('TTS onend fallback triggered')
+      currentUtterance.onend()
+    }
+  }, expectedDuration)
   
   synthesis.speak(currentUtterance)
 }
