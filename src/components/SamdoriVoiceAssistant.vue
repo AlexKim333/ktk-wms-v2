@@ -16,9 +16,15 @@
         </div>
         
         <div class="transcript-box">
-          <p v-if="!transcript && !finalTranscript" class="placeholder">"삼돌아~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
+          <p v-if="!transcript && !finalTranscript && !manualInput" class="placeholder">"삼돌아~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
           <p class="final-text">{{ finalTranscript }}</p>
           <p class="interim-text">{{ transcript }}</p>
+          <input type="text" v-model="manualInput" @keyup.enter="submitManual" placeholder="음성 대신 타자로 명령 입력 (엔터)" class="manual-input" />
+        </div>
+        
+        <div class="error-box" v-if="debugError">
+          <span class="badge bg-red">디버그 에러</span>
+          <p>{{ debugError }}</p>
         </div>
         
         <div class="intent-box" v-if="lastIntent">
@@ -61,12 +67,26 @@ const isOpen = ref(false)
 const statusText = ref('대기 중')
 const transcript = ref('')
 const finalTranscript = ref('')
+const manualInput = ref('')
 const lastIntent = ref(null)
+const debugError = ref('')
 
 let recognition = null
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
+
+const submitManual = () => {
+  if (!manualInput.value.trim()) return
+  // 수동 입력 시 마이크를 끄고 직접 명령어 전달
+  if (recognition && isListening.value) {
+    recognition.stop()
+  }
+  isAwake = true // 수동 입력은 호출어 생략
+  finalTranscript.value = manualInput.value
+  processAwakeCommand(manualInput.value)
+  manualInput.value = ''
+}
 
 const initSpeech = () => {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -198,6 +218,7 @@ const sleep = () => {
 const processAwakeCommand = async (fullText) => {
   clearTimeout(silenceTimer)
   statusText.value = 'AI 분석 중...'
+  debugError.value = '' // 이전 에러 지우기
   
   const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
   speak(analyzingMsg)
@@ -212,6 +233,13 @@ const processAwakeCommand = async (fullText) => {
     console.error(error)
     lastIntent.value = null // 에러 시 이전 성공 결과 숨김
     statusText.value = '분석 실패: ' + error.message
+    
+    // 에러 원인 상세 출력 (디버그용)
+    if (error.response) {
+      debugError.value = `Server Error [${error.response.status}]: ${JSON.stringify(error.response.data)}`
+    } else {
+      debugError.value = `Client/Parser Error: ${error.name} - ${error.message}\n${error.stack}`
+    }
     
     let errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
     
@@ -440,4 +468,33 @@ defineExpose({
 .bg-green { background-color: #10b981; }
 .bg-purple { background-color: #8b5cf6; }
 .bg-orange { background-color: #f97316; }
+.bg-red { background-color: #ef4444; }
+
+.manual-input {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.manual-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.error-box {
+  background: #fee2e2;
+  border-left: 4px solid #ef4444;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #b91c1c;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
 </style>
