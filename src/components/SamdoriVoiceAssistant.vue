@@ -136,7 +136,7 @@ const handleFinalText = (text) => {
     // 취소가 아니면 silenceTimer 에 의해 자동 전송됨
   } else {
     // "삼돌"이 포함되면 삼돌, 삼돌이, 삼돌아 모두 매칭됨. 스페인어는 paquito 매칭. 한국어 모드에서 paquito를 '밖에 있다'로 잘못 알아듣는 경우 포함.
-    if (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
+    if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
       wakeUp()
     }
   }
