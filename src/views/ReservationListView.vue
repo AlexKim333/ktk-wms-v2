@@ -308,17 +308,23 @@ const fetchReservations = async () => {
     const allDocs = reservations.value
     if (allDocs.length > 0) {
       const detailPromises = allDocs.map(r => {
-        if (r.is_stock_entry || r.name.startsWith('MAT-STE') || r.name.startsWith('STE-')) {
-          return frappeApi.get(`/api/resource/Stock Entry/${r.name}`)
+        if (totalQtyMap.value[r.name] !== undefined && r.docstatus !== 0 && r.status !== \'Draft\') {
+          return Promise.resolve({ data: { data: { name: r.name, _cached: true } } })
+        }
+        if (r.is_stock_entry || r.name.startsWith(\'MAT-STE\') || r.name.startsWith(\'STE-\')) {
+          return frappeApi.get(/api/resource/Stock Entry/).catch(() => null)
         } else {
-          return frappeApi.get(`/api/resource/Material Request/${r.name}`)
+          return frappeApi.get(/api/resource/Material Request/).catch(() => null)
         }
       })
       const detailResArray = await Promise.all(detailPromises)
       
-      const qtyMap = {}
-      detailResArray.forEach(res => {
-        const doc = res.data.data
+      const qtyMap = { ...totalQtyMap.value }
+      detailResArray.forEach(resp => {
+        if (!resp || !resp.data || !resp.data.data) return
+        const doc = resp.data.data
+        if (doc._cached) return
+        
         if (doc && (doc.items || doc.items)) {
           const items = doc.items || []
           const total = items.reduce((sum, item) => sum + (item.qty || 0), 0)

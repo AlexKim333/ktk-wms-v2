@@ -331,18 +331,24 @@ const fetchReservations = async () => {
     
     // 예약 총 수량 계산
     if (reservations.value.length > 0) {
-      const detailPromises = reservations.value.map(r => 
-        r.is_stock_entry
-          ? frappeApi.get(`/api/resource/Stock Entry/${r.name}`)
-          : frappeApi.get(`/api/resource/Material Request/${r.name}`)
-      )
+      const detailPromises = reservations.value.map(r => {
+        if (totalQtyMap.value[r.name] !== undefined && r.docstatus !== 0 && r.status !== 'Draft') {
+          return Promise.resolve({ data: { data: { name: r.name, _cached: true } } })
+        }
+        return r.is_stock_entry
+          ? frappeApi.get(`/api/resource/Stock Entry/${r.name}`).catch(() => null)
+          : frappeApi.get(`/api/resource/Material Request/${r.name}`).catch(() => null)
+      })
       const detailResArray = await Promise.all(detailPromises)
       
-      const qtyMap = {}
+      const qtyMap = { ...totalQtyMap.value }
       const aggItemsMap = {}
       
       detailResArray.forEach(resp => {
+        if (!resp || !resp.data || !resp.data.data) return
         const doc = resp.data.data
+        if (doc._cached) return
+        
         if (doc && doc.items) {
           const total = doc.items.reduce((sum, item) => sum + (item.qty || 0), 0)
           qtyMap[doc.name] = total
