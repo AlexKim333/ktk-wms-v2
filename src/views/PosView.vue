@@ -2699,6 +2699,11 @@ const handleSamdoriIntent = (intentObj) => {
   const { intent, item, qty } = intentObj
 
   if (intent === 'add_order') {
+    if (isGridLocked.value) {
+      const msg = locale.value === 'es' ? 'Por favor, complete los campos de arriba primero.' : '먼저 화면 우측 상단의 필수 항목을 선택해 주세요.';
+      if (samdori.value) samdori.value.speak(msg)
+      return;
+    }
     const prod = rawSingleItems.value.find(i => i.name === item)
     if (prod) {
       addSingleToCartInternal(prod)
