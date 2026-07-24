@@ -2721,13 +2721,24 @@ const handleSamdoriIntent = (intentObj) => {
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'search') {
-    const prod = rawSingleItems.value.find(i => i.name === item)
-    if (prod) {
-      const stock = getAvailableStock(prod.name, currentTab.value.selectedSource)
-      const msg = locale.value === 'es' ? `Hay ${stock} en inventario.` : `현재 재고는 ${stock}개 입니다.`
+    let prods = rawSingleItems.value.filter(i => i.name === item)
+    if (prods.length === 0) {
+      // 정확한 일치가 없으면, 앞부분이 일치하는 변형 상품들(예: P-160-NEGRO-400, P-160-BEIGE-400)을 모두 찾음
+      prods = rawSingleItems.value.filter(i => i.name.startsWith(item + '-') || i.name.includes(item))
+    }
+
+    if (prods.length > 0) {
+      let totalStock = 0
+      prods.forEach(prod => {
+        totalStock += getAvailableStock(prod.name, currentTab.value.selectedSource)
+      })
+      
+      const msg = locale.value === 'es' 
+        ? `Hay ${totalStock} en inventario para ${item}.` 
+        : `해당 품목의 현재 총 재고는 ${totalStock}개 입니다.`
       if (samdori.value) samdori.value.speak(msg)
     } else {
-      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 제품이 없습니다.`
+      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 관련 제품이 없습니다.`
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'check') {

@@ -212,7 +212,17 @@ const processAwakeCommand = async (fullText) => {
     console.error(error)
     lastIntent.value = null // 에러 시 이전 성공 결과 숨김
     statusText.value = '분석 실패: ' + error.message
-    const errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
+    
+    let errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
+    
+    if (error.response && error.response.status === 503) {
+      errorMsg = locale.value === 'es' ? 'El servidor de Google AI está muy ocupado. Inténtalo de nuevo.' : '현재 구글 AI 서버에 사용자가 몰려 지연되고 있습니다. 다시 시도해 주세요.'
+    } else if (error.response && error.response.status === 404) {
+      errorMsg = locale.value === 'es' ? 'Modelo de IA no encontrado.' : 'AI 모델을 찾을 수 없습니다.'
+    } else if (error.name === 'SyntaxError') {
+      errorMsg = locale.value === 'es' ? 'Error al procesar la respuesta de la IA.' : 'AI가 올바르지 않은 형식으로 대답했습니다.'
+    }
+    
     speak(errorMsg)
     sleep()
   }

@@ -26,9 +26,11 @@ export async function parseIntent(text, validItems = []) {
   let validItemsPrompt = ''
   if (validItems.length > 0) {
     validItemsPrompt = `
-Here is a list of VALID item codes currently available in the warehouse:
+Here is a list of VALID full item codes currently available in the warehouse:
 [${validItems.join(', ')}]
-If the user's spoken item code (e.g., "B-160") sounds similar or was misrecognized by STT, ALWAYS autocorrect it to the exact matching valid item code (e.g., "P-160") from this list.
+CRITICAL RULE FOR ITEM CODES:
+When the user speaks an item (e.g., "B-160") and optionally a color (e.g., "검정", "네그로"), you MUST search this list for the closest matching FULL item code (e.g., "P-160-NEGRO-400") and output that EXACT FULL code.
+Never output a partial code like "P-160" if a full code like "P-160-NEGRO-400" exists in the list and matches the user's color description.
 `
   }
 
