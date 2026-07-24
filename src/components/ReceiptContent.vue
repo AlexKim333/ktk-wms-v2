@@ -91,10 +91,10 @@
     <table class="main-table">
       <thead>
         <tr>
-          <th>아이템코드</th>
-          <th>박스주문</th>
-          <th>낱개주문</th>
-          <th>총주문낱개수량</th>
+          <th>PRODUCTO</th>
+          <th>CANT BULTO</th>
+          <th>CANT PZS</th>
+          <th>TOTAL PZS</th>
         </tr>
       </thead>
       <tbody>
