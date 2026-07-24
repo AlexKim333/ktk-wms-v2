@@ -84,6 +84,7 @@ let recognition = null
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
+let isTTSPlaying = false
 
 const submitManual = () => {
   if (!manualInput.value.trim()) return
@@ -166,9 +167,11 @@ const initSpeech = () => {
   }
   
   recognition.onend = () => {
-    if (isListening.value) {
-      // 자동 재시작 (마이크 꺼짐 방지)
-      setTimeout(() => recognition.start(), 500)
+    if (isListening.value && !isTTSPlaying) {
+      // 계속 듣기 (에러 방지용)
+      setTimeout(() => {
+        try { recognition.start() } catch (e) {}
+      }, 500)
     }
   }
 }
@@ -331,10 +334,19 @@ const speak = (text) => {
   }
 
   utterance.onend = () => {
+    isTTSPlaying = false
+    if (isListening.value && recognition) {
+      try { recognition.start() } catch (e) {}
+    }
     // 대답을 마친 후 바로 다시 마이크를 열어 연속 대화를 가능하게 함
     silentWakeUp()
   }
 
+  isTTSPlaying = true
+  if (recognition) {
+    try { recognition.stop() } catch (e) {}
+  }
+  
   synthesis.speak(utterance)
 }
 
