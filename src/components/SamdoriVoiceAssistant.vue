@@ -116,8 +116,8 @@ const initSpeech = () => {
 
 const handleFinalText = (text) => {
   const lowerText = text.toLowerCase()
-  // "삼돌아" 와 발음이 비슷한 모든 오타 허용 (잠돌, 산돌, 상돌, 섬돌, 참돌, 탐돌, 산더라, 삼도라, 잠도라 등)
-  if (!isAwake && (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|samdori)/i.test(lowerText))) {
+  // "삼돌"이 포함되면 삼돌, 삼돌이, 삼돌아 모두 매칭됨. 스페인어는 paquito 매칭.
+  if (!isAwake && (/(삼돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|samdori|paquito)/i.test(lowerText))) {
     wakeUp()
   } else if (isAwake) {
     // Already handled by silence timer, but we can fast-track if needed
@@ -130,7 +130,9 @@ const wakeUp = () => {
   statusText.value = '듣고 있습니다! 명령을 내려주세요.'
   finalTranscript.value = ''
   transcript.value = ''
-  speak("네, 말씀하세요.")
+  
+  const reply = locale.value === 'es' ? 'Dígame, señor.' : '네, 말씀하세요.'
+  speak(reply)
   
   // 10초간 명령이 없으면 다시 대기 모드로
   setTimeout(() => {
@@ -150,7 +152,9 @@ const sleep = () => {
 const processAwakeCommand = async (fullText) => {
   clearTimeout(silenceTimer)
   statusText.value = 'AI 분석 중...'
-  speak("분석 중입니다.")
+  
+  const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
+  speak(analyzingMsg)
   
   try {
     const intent = await parseIntent(fullText)
@@ -161,7 +165,8 @@ const processAwakeCommand = async (fullText) => {
   } catch (error) {
     console.error(error)
     statusText.value = '분석 실패: ' + error.message
-    speak("죄송합니다. 무슨 말인지 이해하지 못했습니다.")
+    const errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
+    speak(errorMsg)
     sleep()
   }
 }
@@ -169,8 +174,30 @@ const processAwakeCommand = async (fullText) => {
 const speak = (text) => {
   if (!synthesis) return
   const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
+  const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
+  utterance.lang = targetLang
   utterance.rate = 1.1
+  
+  // 남성 목소리 찾기 시도
+  const voices = synthesis.getVoices()
+  const langVoices = voices.filter(v => v.lang.startsWith(locale.value === 'es' ? 'es' : 'ko'))
+  
+  // 이름에 남자(Male, 남성, Hombre, Pablo 등)가 들어간 목소리 우선 선택
+  const maleVoice = langVoices.find(v => 
+    v.name.toLowerCase().includes('male') || 
+    v.name.toLowerCase().includes('남성') || 
+    v.name.toLowerCase().includes('hombre') ||
+    v.name.toLowerCase().includes('pablo') ||
+    v.name.toLowerCase().includes('diego')
+  )
+  
+  if (maleVoice) {
+    utterance.voice = maleVoice
+  } else if (langVoices.length > 0) {
+    // 남성 목소리를 명시적으로 못 찾으면 해당 언어의 기본 목소리 사용
+    utterance.voice = langVoices[0]
+  }
+
   synthesis.speak(utterance)
 }
 
