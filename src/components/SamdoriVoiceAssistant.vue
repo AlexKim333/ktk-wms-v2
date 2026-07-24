@@ -492,6 +492,18 @@ defineExpose({
   text-align: center;
 }
 
+@media (max-width: 768px) {
+  .samdori-container {
+    bottom: 85px;
+    right: 20px;
+  }
+  .samdori-button {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+}
+
 .transcript-box {
   background: #f1f5f9;
   padding: 10px;
