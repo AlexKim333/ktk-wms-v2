@@ -90,7 +90,7 @@ const initSpeech = () => {
     transcript.value = interim
     
     if (final) {
-      finalTranscript.value = final
+      finalTranscript.value += (finalTranscript.value ? ' ' : '') + final
       handleFinalText(final)
     }
     
@@ -101,7 +101,7 @@ const initSpeech = () => {
         if (transcript.value || finalTranscript.value) {
           processAwakeCommand(finalTranscript.value + ' ' + transcript.value)
         }
-      }, 2000) // 2 seconds of silence triggers processing
+      }, 2000)
     }
   }
   
@@ -133,7 +133,17 @@ const handleFinalText = (text) => {
       sleep()
       return
     }
-    // 취소가 아니면 silenceTimer 에 의해 자동 전송됨
+    
+    // 즉시 실행(Fast-track) 명령어 감지
+    const executeRegex = /(실행|끝|전송|오버|처리해|완료|ya|listo|ejecutar|ejecuta)/i
+    if (executeRegex.test(lowerText)) {
+      clearTimeout(silenceTimer)
+      // 전체 누적된 문장에서 실행 명령어만 제거 후 바로 전송
+      const finalCmd = finalTranscript.value.replace(new RegExp(executeRegex.source, 'gi'), '').trim()
+      processAwakeCommand(finalCmd)
+      return
+    }
+    // 그 외는 silenceTimer에 의해 2초 후 자동 전송됨
   } else {
     // "삼돌"이 포함되면 삼돌, 삼돌이, 삼돌아 모두 매칭됨. 스페인어는 paquito 매칭. 한국어 모드에서 paquito를 '밖에 있다'로 잘못 알아듣는 경우 포함.
     if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토)/i.test(lowerText)) {
