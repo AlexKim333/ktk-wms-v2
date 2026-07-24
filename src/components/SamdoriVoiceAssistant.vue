@@ -16,8 +16,8 @@
         </div>
         
         <div class="transcript-box">
-          <p v-if="!transcript && !finalTranscript && !manualInput" class="placeholder">"삼돌아~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
-          <p class="final-text">{{ finalTranscript }}</p>
+          <p v-if="!transcript && !finalTranscript && !manualInput" class="placeholder">"자비스~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
+          <p class="final-text" v-if="finalTranscript"><span class="badge bg-purple">질문</span> {{ finalTranscript }}</p>
           <p class="interim-text">{{ transcript }}</p>
           <input type="text" v-model="manualInput" @keyup.enter="submitManual" placeholder="음성 대신 타자로 명령 입력 (엔터)" class="manual-input" />
         </div>
@@ -28,19 +28,24 @@
         </div>
         
         <div class="intent-box" v-if="lastIntent">
-          <h4>💡 AI 분석 결과:</h4>
+          <h4>🤖 AI 분석 결과:</h4>
           <div v-if="lastIntent.intent === 'search'">
-            <span class="badge bg-blue">재고조사</span> <strong>{{ lastIntent.item }}</strong>
+            <span class="badge bg-blue">재고조회</span> <strong>{{ lastIntent.item }}</strong>
           </div>
           <div v-else-if="lastIntent.intent === 'add_order'">
-            <span class="badge bg-green">주문추가</span> <strong>{{ lastIntent.item }}</strong> ({{ lastIntent.qty }}개)
+            <span class="badge bg-green">장바구니</span> <strong>{{ lastIntent.item }}</strong> ({{ lastIntent.qty }}개)
           </div>
           <div v-else-if="lastIntent.intent === 'check'">
-            <span class="badge bg-purple">주문확인</span> 현재까지 담은 리스트 확인
+            <span class="badge bg-purple">내역확인</span> 장바구니 내역 확인
           </div>
           <div v-else-if="lastIntent.intent === 'submit'">
-            <span class="badge bg-orange">주문전송</span> 스캔 화면으로 이동
+            <span class="badge bg-orange">전송완료</span> 전표 데이터 전송
           </div>
+        </div>
+        
+        <div class="response-box" v-if="lastResponseText">
+          <h4>💬 자비스의 대답:</h4>
+          <p>{{ lastResponseText }}</p>
         </div>
       </div>
     </div>
@@ -69,6 +74,7 @@ const transcript = ref('')
 const finalTranscript = ref('')
 const manualInput = ref('')
 const lastIntent = ref(null)
+const lastResponseText = ref('')
 const debugError = ref('')
 
 let recognition = null
@@ -196,6 +202,7 @@ const wakeUp = () => {
   statusText.value = '듣고 있습니다! 명령을 내려주세요.'
   finalTranscript.value = ''
   transcript.value = ''
+  lastResponseText.value = ''
   
   const reply = locale.value === 'es' ? 'Dígame, señor.' : '네, 말씀하세요.'
   speak(reply)
@@ -219,6 +226,7 @@ const processAwakeCommand = async (fullText) => {
   clearTimeout(silenceTimer)
   statusText.value = 'AI 분석 중...'
   debugError.value = '' // 이전 에러 지우기
+  lastResponseText.value = '' // 이전 답변 초기화
   
   const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
   speak(analyzingMsg)
@@ -259,6 +267,7 @@ const processAwakeCommand = async (fullText) => {
 }
 
 const speak = (text) => {
+  lastResponseText.value = text
   if (!synthesis) return
   const utterance = new SpeechSynthesisUtterance(text)
   const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
@@ -455,6 +464,29 @@ defineExpose({
 .intent-box pre {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.response-box {
+  margin-top: 12px;
+  background: #f0fdf4;
+  color: #15803d;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #22c55e;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.response-box h4 {
+  margin: 0 0 5px 0;
+  color: #166534;
+  font-size: 12px;
+}
+
+.response-box p {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .badge {
