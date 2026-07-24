@@ -2747,10 +2747,6 @@ const handleSamdoriIntent = (intentObj) => {
     } else {
       submitReservation()
     }
-  } else if (intent === 'chat') {
-    if (samdori.value && intentObj.message) {
-      samdori.value.speak(intentObj.message)
-    }
   }
 }
 </script>
