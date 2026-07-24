@@ -35,6 +35,13 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { parseIntent } from '../utils/SamdoriBrain'
 
+const props = defineProps({
+  validItems: {
+    type: Array,
+    default: () => []
+  }
+})
+
 const emit = defineEmits(['intent-parsed'])
 const { locale } = useI18n()
 
@@ -157,7 +164,7 @@ const processAwakeCommand = async (fullText) => {
   speak(analyzingMsg)
   
   try {
-    const intent = await parseIntent(fullText)
+    const intent = await parseIntent(fullText, props.validItems)
     lastIntent.value = intent
     emit('intent-parsed', intent)
     statusText.value = '명령 처리 완료'

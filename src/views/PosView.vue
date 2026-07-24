@@ -747,9 +747,11 @@
     </div>
   </div>
   <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
+  <SamdoriVoiceAssistant ref="samdori" :valid-items="validItemCodes" @intent-parsed="handleSamdoriIntent" />
 </template>
 
 <script setup>
+import SamdoriVoiceAssistant from '../components/SamdoriVoiceAssistant.vue'
 import { useMobile } from '../composables/useMobile.js'
 import MobilePosLayout from './mobile/MobilePosLayout.vue'
 import { useI18n } from 'vue-i18n'
@@ -2686,6 +2688,60 @@ const submitReservation = async () => {
       }
     }
     alert(t('pos.msg_err_res') + `\n\n[상세 사유]\n${errorMsg}`);
+  }
+}
+const samdori = ref(null)
+const validItemCodes = computed(() => rawSingleItems.value.map(item => item.name))
+
+const handleSamdoriIntent = (intentObj) => {
+  if (!currentTab.value) return;
+
+  const { intent, item, qty } = intentObj
+
+  if (intent === 'add_order') {
+    const prod = rawSingleItems.value.find(i => i.name === item)
+    if (prod) {
+      addSingleToCartInternal(prod)
+      const inputQty = qty ? Number(qty) : 1
+      if (inputQty > 1) {
+         const existing = currentTab.value.cartItems.find(i => i.name === prod.name)
+         if (existing) {
+           existing.input_box += (inputQty - 1)
+         }
+      }
+      const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    } else {
+      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 제품이 없습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    }
+  } else if (intent === 'search') {
+    const prod = rawSingleItems.value.find(i => i.name === item)
+    if (prod) {
+      const stock = getAvailableStock(prod.name, currentTab.value.selectedSource)
+      const msg = locale.value === 'es' ? `Hay ${stock} en inventario.` : `현재 재고는 ${stock}개 입니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    } else {
+      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 제품이 없습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    }
+  } else if (intent === 'check') {
+    const count = currentTab.value.cartItems.length
+    if (count === 0) {
+      const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    } else {
+      const msg = locale.value === 'es' ? `Hay ${count} productos en el carrito.` : `현재 장바구니에 ${count}종류의 상품이 있습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+    }
+  } else if (intent === 'submit') {
+    const msg = locale.value === 'es' ? `Enviando pedido...` : `주문을 전송합니다.`
+    if (samdori.value) samdori.value.speak(msg)
+    if (transactionMode.value === 'outbound' || transactionMode.value === 'transfer') {
+      submitToFrappe()
+    } else {
+      submitReservation()
+    }
   }
 }
 </script>
