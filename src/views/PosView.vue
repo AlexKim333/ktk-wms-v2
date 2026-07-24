@@ -1404,8 +1404,8 @@ const pollReservations = async () => {
       }).catch(() => ({ data: { data: [] } }))
     ]);
 
-    const reqList1 = reqRes.data?.data || [];
-    const reqList2 = reqDraftRes.data?.data || [];
+    const reqList1 = (reqRes.data?.data || []).map(r => ({...r, _docstatus: 1}));
+    const reqList2 = (reqDraftRes.data?.data || []).map(r => ({...r, _docstatus: 0}));
     const seList = seDraftRes.data?.data || [];
     const reqList = [...reqList1, ...reqList2];
     
@@ -1417,9 +1417,13 @@ const pollReservations = async () => {
     }
 
     if (reqList.length > 0) {
-      const mrDetailsPromises = reqList.map(req =>
-        frappeApi.get(`/api/resource/Material Request/${req.name}`).catch(() => null)
-      );
+      if (!window.mrDetailsCache) window.mrDetailsCache = {};
+      const mrDetailsPromises = reqList.map(req => {
+        if (window.mrDetailsCache[req.name] && req._docstatus !== 0) {
+          return Promise.resolve({ data: { data: window.mrDetailsCache[req.name], _cached: true } })
+        }
+        return frappeApi.get(`/api/resource/Material Request/${req.name}`).catch(() => null)
+      });
       const mrDetailsRes = (await Promise.all(mrDetailsPromises)).filter(Boolean);
       
       const reservedMap = {};
@@ -1428,6 +1432,7 @@ const pollReservations = async () => {
 
       mrDetailsRes.forEach(res => {
          const doc = res.data.data;
+         if (!res.data._cached) window.mrDetailsCache[doc.name] = doc;
          if (doc.material_request_type === 'Material Issue') outboundResCount++;
          else if (doc.material_request_type === 'Material Transfer') {
              transferResCount++;
