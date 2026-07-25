@@ -2,35 +2,174 @@ import axios from 'axios';
 import FlexSearch from 'flexsearch';
 
 let flexIndex = null;
-let lastValidItemsLength = -1;
+let flexIndexKey = '';
+
+function koDigit(token) {
+  const t = String(token || '').trim()
+  const map = {
+    영: 0, 공: 0, 일: 1, 한: 1, 하나: 1, 이: 2, 두: 2, 둘: 2,
+    삼: 3, 세: 3, 셋: 3, 사: 4, 네: 4, 넷: 4, 오: 5, 다섯: 5,
+    육: 6, 여섯: 6, 칠: 7, 일곱: 7, 팔: 8, 여덟: 8, 구: 9, 아홉: 9
+  }
+  if (t === '') return 0
+  if (/^\d+$/.test(t)) return Number(t)
+  return map[t] ?? null
+}
+
+/** "백육십", "백 육십", "일백육십" → 160 */
+function parseKoreanNumberChunk(text) {
+  let t = String(text || '').replace(/\s+/g, '')
+  if (!t) return ''
+  if (/\d/.test(t)) {
+    const m = t.match(/\d+/g)
+    return m ? m.join('') : ''
+  }
+  let n = 0
+  if (t.includes('백')) {
+    const [a, b] = t.split('백')
+    const hundreds = a === '' ? 1 : koDigit(a)
+    if (hundreds == null) return ''
+    n += hundreds * 100
+    t = b || ''
+  }
+  if (t.includes('십')) {
+    const [a, b] = t.split('십')
+    const tens = a === '' ? 1 : koDigit(a)
+    if (tens == null) return ''
+    n += tens * 10
+    t = b || ''
+  }
+  if (t) {
+    const ones = koDigit(t)
+    if (ones == null) return n ? String(n) : ''
+    n += ones
+  }
+  return n ? String(n) : ''
+}
+
+const COLOR_ALIASES = {
+  네그로: 'NEGRO', negro: 'NEGRO', 검정: 'NEGRO', 검정색: 'NEGRO', 블랙: 'NEGRO', black: 'NEGRO',
+  베이지: 'BEIGE', beige: 'BEIGE',
+  블랑코: 'BLANCO', blanco: 'BLANCO', 화이트: 'BLANCO', 하얀: 'BLANCO', 흰색: 'BLANCO', white: 'BLANCO',
+  로호: 'ROJO', rojo: 'ROJO', 빨강: 'ROJO', 빨간색: 'ROJO', red: 'ROJO',
+  아술: 'AZUL', azul: 'AZUL', 파랑: 'AZUL', 파란색: 'AZUL', blue: 'AZUL'
+}
+
+function resolveColorToken(color, rawSpoken) {
+  const fromField = String(color || '').trim()
+  if (fromField) {
+    const hit = COLOR_ALIASES[fromField.toLowerCase()] || fromField.toUpperCase()
+    return hit
+  }
+  const raw = String(rawSpoken || '')
+  for (const [k, v] of Object.entries(COLOR_ALIASES)) {
+    if (raw.toLowerCase().includes(k.toLowerCase())) return v
+  }
+  return ''
+}
+
+/**
+ * Gemini가 준 발음 문자열 → 로컬 검색 키
+ * 예: "피 백육십 네그로" → { prefix: "P-160", color: "NEGRO" }
+ */
+function normalizeSpokenQuery(rawSpoken, color) {
+  let s = String(rawSpoken || '').trim()
+  const resolvedColor = resolveColorToken(color, s)
+
+  // 이미 정식 코드면 그대로
+  if (/^[A-Za-z]+-\d+/.test(s)) {
+    const m = s.toUpperCase().match(/^([A-Z]+-\d+)/)
+    return { prefix: m ? m[1] : s.toUpperCase(), color: resolvedColor, flexQuery: s.toUpperCase() }
+  }
+
+  // 접두 문자
+  let letter = 'P'
+  if (/^(비|비이|b\b)/i.test(s) || /^b/i.test(s.replace(/\s/g, ''))) letter = 'B'
+  if (/^(피|프이|pee|p\b)/i.test(s) || /^p/i.test(s.replace(/\s/g, ''))) letter = 'P'
+  const latin = s.match(/[A-Za-z]/)
+  if (latin) letter = latin[0].toUpperCase()
+
+  // 숫자: 아라비아 또는 한글 수사
+  let num = ''
+  const arab = s.match(/\d+/)
+  if (arab) {
+    num = arab[0]
+  } else {
+    const hangulChunk = s
+      .replace(/[A-Za-z]/g, ' ')
+      .replace(/피|비|네그로|베이지|블랑코|로호|아술|검정|하얀|빨강|파랑|블랙|화이트|색/gi, ' ')
+      .trim()
+    num = parseKoreanNumberChunk(hangulChunk)
+  }
+
+  const prefix = num ? `${letter}-${num}` : ''
+  const flexQuery = [prefix || s, resolvedColor].filter(Boolean).join(' ')
+  return { prefix, color: resolvedColor, flexQuery }
+}
 
 function initFlexSearch(validItems) {
-  if (!validItems || validItems.length === 0) return;
-  if (flexIndex && lastValidItemsLength === validItems.length) return;
+  if (!validItems || validItems.length === 0) return
+  const key = `${validItems.length}:${validItems[0]}:${validItems[validItems.length - 1]}`
+  if (flexIndex && flexIndexKey === key) return
   flexIndex = new FlexSearch.Document({
     document: {
       id: 'id',
       index: ['code']
     },
     tokenize: 'forward'
-  });
+  })
   validItems.forEach((item, idx) => {
-    flexIndex.add({ id: idx, code: item });
-  });
-  lastValidItemsLength = validItems.length;
+    flexIndex.add({ id: idx, code: String(item) })
+  })
+  flexIndexKey = key
 }
 
 function matchItemCode(rawSpoken, color, validItems) {
-  if (!rawSpoken) return null;
-  initFlexSearch(validItems);
-  if (!flexIndex) return rawSpoken;
-  const query = `${rawSpoken} ${color || ''}`.trim();
-  const results = flexIndex.search(query, 1);
-  if (results.length > 0 && results[0].result.length > 0) {
-    const idx = results[0].result[0];
-    return validItems[idx];
+  if (!rawSpoken) return null
+  if (!validItems || validItems.length === 0) return null
+
+  const raw = String(rawSpoken).trim()
+  // 메모리/정식코드 정확 일치
+  const exact =
+    validItems.find((i) => i === raw) ||
+    validItems.find((i) => String(i).toUpperCase() === raw.toUpperCase())
+  if (exact) return exact
+
+  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color)
+
+  // 1) 접두 매칭 (P-160 → P-160-*)
+  if (prefix) {
+    const upper = prefix.toUpperCase()
+    let hits = validItems.filter(
+      (i) => {
+        const u = String(i).toUpperCase()
+        return u === upper || u.startsWith(`${upper}-`)
+      }
+    )
+    if (col) {
+      const colored = hits.filter((i) => String(i).toUpperCase().includes(col))
+      if (colored.length) hits = colored
+    }
+    if (hits.length === 1) return hits[0]
+    if (hits.length > 1) {
+      return hits.find((i) => /NEGRO/i.test(i)) || hits[0]
+    }
   }
-  return rawSpoken;
+
+  // 2) FlexSearch 보조 (영문/숫자 쿼리일 때 유효)
+  initFlexSearch(validItems)
+  if (!flexIndex) return null
+  const results = flexIndex.search(flexQuery || raw, 5)
+  const ids = results?.[0]?.result || []
+  if (!ids.length) return null
+  let hits = ids.map((id) => validItems[id]).filter(Boolean)
+  if (col) {
+    const colored = hits.filter((i) => String(i).toUpperCase().includes(col))
+    if (colored.length) hits = colored
+  }
+  if (hits.length === 1) return hits[0]
+  if (hits.length > 1) return hits.find((i) => /NEGRO/i.test(i)) || hits[0]
+  return null
 }
 
 // SamdoriBrain.js
@@ -167,13 +306,12 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    // FlexSearch local matching
+    // 로컬 매칭: 한글 발음 → P-160-NEGRO… (실패 시 한글을 item에 넣지 않음)
     if (parsed.raw_spoken_item) {
-      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems);
-      if (matched) {
-        parsed.item = matched;
-      } else {
-        parsed.item = parsed.raw_spoken_item;
+      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
+      parsed.item = matched || undefined
+      if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
+        parsed.item = String(parsed.raw_spoken_item).trim()
       }
     }
     
@@ -313,13 +451,12 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    // FlexSearch local matching
+    // 로컬 매칭: 한글 발음 → P-160-NEGRO… (실패 시 한글을 item에 넣지 않음)
     if (parsed.raw_spoken_item) {
-      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems);
-      if (matched) {
-        parsed.item = matched;
-      } else {
-        parsed.item = parsed.raw_spoken_item;
+      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
+      parsed.item = matched || undefined
+      if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
+        parsed.item = String(parsed.raw_spoken_item).trim()
       }
     }
     
