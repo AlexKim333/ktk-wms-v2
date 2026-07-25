@@ -600,6 +600,30 @@ const submitGridSelection = () => {
 }
 // ------------------------
 
+
+const addFromVoice = (item, qty = 1) => {
+  if (!currentTab.value) return;
+  if (isClerk.value && currentTab.value.docName) return;
+
+  const packQty = item.custom_pack_qty || item.pack_qty || 1;
+  const existing = currentTab.value.cartItems.find(c => c.item_code === item.name);
+  if (existing) {
+    existing.boxQty += qty;
+    updateTotalQty(existing);
+  } else {
+    currentTab.value.cartItems.push({
+      item_code: item.name,
+      item_name: item.item_name || item.name,
+      custom_color: item.custom_color || '',
+      pack_qty: packQty,
+      uom: item.stock_uom || 'Nos',
+      boxQty: qty,
+      eachQty: 0,
+      totalQty: qty * packQty
+    });
+  }
+}
+
 // Init Search Index
 watch(() => props.rawItems, (newVal) => {
   if (newVal && newVal.length > 0) {
@@ -1249,6 +1273,7 @@ const submitTransfer = async () => {
     isSubmitting.value = false
   }
 }
+defineExpose({ addFromVoice })
 </script>
 
 <style scoped>

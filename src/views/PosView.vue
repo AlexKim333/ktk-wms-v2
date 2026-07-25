@@ -2,6 +2,7 @@
   <div class="pos-view-container">
     <MobilePosLayout 
     v-if="isMobile" 
+    ref="mobileLayoutRef"
     :raw-items="rawSingleItems"
     :bin-data="binDataMap"
     :pending-reserved="pendingReservedMap"
@@ -2706,9 +2707,28 @@ const submitReservation = async () => {
 }
 const samdori = ref(null)
 const branchTransferRef = ref(null)
+const mobileLayoutRef = ref(null)
 const validItemCodes = computed(() => rawSingleItems.value.map(item => item.name))
 
 const handleSamdoriIntent = (intentObj) => {
+  // Mobile handling
+  if (isMobile.value && mobileLayoutRef.value) {
+    const { intent, item, qty } = intentObj
+    if (intent === 'add_order') {
+      const prod = rawSingleItems.value.find(i => i.name === item)
+      if (prod) {
+        const inputQty = qty ? Number(qty) : 1
+        mobileLayoutRef.value.addFromVoice(prod, inputQty)
+        const msg = locale.value === 'es' ? `${item} aAñadido al carrito.` : `${item} 추가되었습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+      } else {
+        const msg = locale.value === 'es' ? `No se encontró ${item}.` : `${item} 품목을 찾을 수 없습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+      }
+    }
+    return;
+  }
+
   if (!currentTab.value) return;
 
   const { intent, item, qty } = intentObj

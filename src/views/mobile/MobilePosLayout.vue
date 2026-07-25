@@ -19,6 +19,7 @@
       />
       <MobileBranchPosView 
         v-else-if="activeNav === 'branch-pos' || activeNav === 'pos'" 
+        ref="mobilePosViewRef"
         :raw-items="rawItems"
         :bin-data="binData"
         :pending-reserved="pendingReserved"
@@ -27,6 +28,7 @@
       />
       <MobileBranchTransferView 
         v-else-if="activeNav === 'branch-transfer'" 
+        ref="mobileTransferViewRef"
         :raw-items="rawItems"
         :bin-data="binData"
         :pending-reserved="pendingReserved"
@@ -92,6 +94,23 @@ const authStore = useAuthStore()
 
 // 모바일에서는 기본적으로 지점 출고 화면(또는 이동)을 표시
 const activeNav = ref('branch-pos')
+
+const mobilePosViewRef = ref(null)
+const mobileTransferViewRef = ref(null)
+
+defineExpose({
+  addFromVoice: (prod, qty) => {
+    if (activeNav.value === 'branch-pos' || activeNav.value === 'pos') {
+      if (mobilePosViewRef.value?.addFromVoice) {
+        mobilePosViewRef.value.addFromVoice(prod, qty)
+      }
+    } else if (activeNav.value === 'branch-transfer') {
+      if (mobileTransferViewRef.value?.addFromVoice) {
+        mobileTransferViewRef.value.addFromVoice(prod, qty)
+      }
+    }
+  }
+})
 
 const handleLogout = () => {
   authStore.logout()
