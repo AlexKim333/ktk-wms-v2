@@ -35,7 +35,7 @@
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import axios from 'axios'
+import frappeApi from '../api/frappe.js'
 import { useAuthStore } from '../stores/auth.js'
 
 const props = defineProps({
@@ -81,15 +81,7 @@ const submitForm = async () => {
   const currentBranch = authStore.user?.branch_name
 
   try {
-    // 1. Create User using Admin Token
-    const adminApi = axios.create({
-      
-      headers: {
-        'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
+    // 세션 사용자 권한으로 User 생성 (관리자/권한 있는 계정만 가능)
     const payload = {
       email: email,
       first_name: form.value.name,
@@ -105,7 +97,7 @@ const submitForm = async () => {
       ]
     }
 
-    const res = await adminApi.post('/api/resource/User', payload)
+    const res = await frappeApi.post('/api/resource/User', payload)
 
     alert(`점원 [${form.value.name}]이 성공적으로 등록되었습니다!\n로그인 ID: ${email}\n임시 비밀번호: Ktk@${cleanPhone}\n(보안상 로그인 후 비밀번호를 변경해주세요.)`)
     emit('success', { email, full_name: form.value.name })

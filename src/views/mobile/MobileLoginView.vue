@@ -140,7 +140,8 @@ const handleLogin = async () => {
       }
         // 세션 쿠키 기준으로 역할/지점 해석 (API 토큰 사용 금지)
         authStore.user = await resolveLoginProfile(frappeApi, username.value)
-      router.push('/pos')
+        authStore.sessionChecked = true
+        router.push('/pos')
     }
   } catch (error) {
     console.error('Login Error:', error)
@@ -162,49 +163,18 @@ const handleLogin = async () => {
   }
 }
 
-// 이메일 OTP 발송 요청 (향후 Frappe API 연동)
+// 이메일 OTP — 백엔드 연동 전까지 비활성 (가짜 세션으로 401 유발 방지)
 const sendOtp = async () => {
-  if (!email.value) return alert('이메일을 입력해 주세요.')
-  isLoading.value = true
-  try {
-    // TODO: 백엔드 이메일 인증 발송 API 호출
-    // await frappeApi.post('/api/method/send_login_otp', { email: email.value })
-    
-    // 시뮬레이션 성공 처리
-    setTimeout(() => {
-      otpSent.value = true
-      isLoading.value = false
-      alert('인증 번호가 발송되었습니다. (테스트 환경이므로 아무 번호나 입력하세요)')
-    }, 1000)
-  } catch (error) {
-    console.error('OTP Send Error:', error)
-    alert('인증 번호 발송에 실패했습니다.')
-    isLoading.value = false
-  }
+  alert('이메일 인증 로그인은 아직 사용할 수 없습니다. 아이디/비밀번호로 로그인해 주세요.')
+  loginMode.value = 'password'
 }
 
-// 이메일 OTP 로그인 처리
 const handleEmailLogin = async () => {
-  if (!otpCode.value) return alert('인증 번호를 입력해 주세요.')
-  isLoading.value = true
-  try {
-    // TODO: 백엔드 이메일 인증 로그인 API 호출
-    // const response = await frappeApi.post('/api/method/login_with_otp', { email: email.value, otp: otpCode.value })
-
-    // 시뮬레이션 성공 처리
-    setTimeout(() => {
-      authStore.user = { 
-        member_name: email.value, 
-        access_level: 'Admin',
-        branch_name: 'Centro'
-      }
-      router.push('/pos')
-    }, 1000)
-  } catch (error) {
-    console.error('Email Login Error:', error)
-    alert('인증에 실패했습니다.')
-    isLoading.value = false
-  }
+  alert('이메일 인증 로그인은 아직 사용할 수 없습니다. 아이디/비밀번호로 로그인해 주세요.')
+  loginMode.value = 'password'
+  otpSent.value = false
+  otpCode.value = ''
+  isLoading.value = false
 }
 </script>
 

@@ -980,10 +980,10 @@ const branchList = computed(() => {
   let list = warehouseList.value.filter(wh => wh.parent_warehouse === 'SCURUSAL - K')
   
   if (!authStore.isAdmin) {
-    const uBranch = authStore.userBranch?.toUpperCase() || ''
+    const uBranch = (authStore.userBranch || authStore.user?.branch_name || '').toUpperCase()
     list = list.filter(wh => {
       const wName = wh.name.toUpperCase()
-      return wName.includes('ALARCON') || wName === uBranch
+      return wName.includes('ALARCON') || (uBranch && (wName === uBranch || wName.includes(uBranch)))
     })
   }
   return list

@@ -196,20 +196,11 @@ import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import ReceiptPrint from '../../ReceiptPrint.vue'
 import MobileNumpadModal from './MobileNumpadModal.vue'
-import axios from 'axios'
 import frappeApi from '../../../api/frappe.js'
 import { useAuthStore } from '../../../stores/auth.js'
 
-// 임시: 권한 부여 전까지 token API 사용 (지점장 권한 설정 후 frappeApi로 복구 예정)
-const adminApi = axios.create({
-  baseURL: '',
-  withCredentials: true,
-  headers: {
-    'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-})
+// 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
+const adminApi = frappeApi
 
 const authStore = useAuthStore();
 const { t } = useI18n();
