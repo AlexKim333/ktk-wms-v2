@@ -2708,16 +2708,62 @@ const submitReservation = async () => {
 const samdori = ref(null)
 const branchTransferRef = ref(null)
 const mobileLayoutRef = ref(null)
+/** 관리자 재고조회: 창고 미지정/미인식 시 품목을 기억하고 창고명만 재질문 */
+const pendingVoiceStockItem = ref(null)
+const MAIN_WAREHOUSE = '[MAIN] ALARCON - K'
 const validItemCodes = computed(() => rawSingleItems.value.map(item => item.name))
+
+const voiceWarehouseLabel = (warehouseName) => {
+  if (!warehouseName) return locale.value === 'es' ? 'almacén' : '창고'
+  if (/ALARCON/i.test(warehouseName)) return locale.value === 'es' ? 'Alarcón' : '알라르꼰'
+  return warehouseName
+}
+
+const resolveVoiceWarehouse = (hint) => {
+  if (!hint) return null
+  const q = String(hint).toLowerCase().trim()
+  if (!q) return null
+  // 흔한 별칭
+  if (/알라르꼰|알라르콘|alarcon|alarcón|본사|메인|main/.test(q)) {
+    const main = warehouseList.value.find((w) => /ALARCON/i.test(w.name)) || { name: MAIN_WAREHOUSE }
+    return main.name
+  }
+  return (
+    warehouseList.value.find(
+      (b) =>
+        b.name?.toLowerCase() === q ||
+        b.warehouse_name?.toLowerCase() === q ||
+        b.name?.toLowerCase().includes(q) ||
+        b.warehouse_name?.toLowerCase().includes(q)
+    )?.name || null
+  )
+}
 
 const findProductForVoice = (itemCode) => {
   if (!itemCode) return null
   const key = String(itemCode).trim()
-  return (
+  const upper = key.toUpperCase()
+  const exact =
     rawSingleItems.value.find((i) => i.name === key) ||
-    rawSingleItems.value.find((i) => i.name?.toUpperCase() === key.toUpperCase()) ||
-    null
+    rawSingleItems.value.find((i) => i.name?.toUpperCase() === upper)
+  if (exact) return exact
+
+  // Gemini가 P-160처럼 짧게 주면 변형 코드 중 유일/대표 1건 사용
+  const prefixHits = rawSingleItems.value.filter(
+    (i) => i.name?.toUpperCase() === upper || i.name?.toUpperCase().startsWith(`${upper}-`)
   )
+  if (prefixHits.length === 1) return prefixHits[0]
+  if (prefixHits.length > 1) {
+    const negro = prefixHits.find((i) => /NEGRO/i.test(i.name))
+    return negro || prefixHits[0]
+  }
+
+  // 품명(item_name) 부분 일치 — 유일할 때만
+  const nameHits = rawSingleItems.value.filter((i) =>
+    (i.item_name || '').toLowerCase().includes(key.toLowerCase())
+  )
+  if (nameHits.length === 1) return nameHits[0]
+  return null
 }
 
 const resolveMobileLayout = async () => {
@@ -2732,6 +2778,11 @@ const resolveMobileLayout = async () => {
 
 const handleSamdoriIntent = async (intentObj) => {
   const { intent, item, qty } = intentObj || {}
+
+  // 재고조회 외 명령이면 관리자 창고 대기 상태 해제
+  if (intent && intent !== 'search') {
+    pendingVoiceStockItem.value = null
+  }
 
   const layout = await resolveMobileLayout()
   const useMobileCart = !!(isMobile.value || layout?.addFromVoice)
@@ -2905,56 +2956,119 @@ const handleSamdoriIntent = async (intentObj) => {
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'search') {
-    let prods = rawSingleItems.value.filter(i => i.name === item)
-    if (prods.length === 0) {
-      // 정확한 일치가 없으면, 앞부분이 일치하는 변형 상품들(예: P-160-NEGRO-400, P-160-BEIGE-400)을 모두 찾음
-      prods = rawSingleItems.value.filter(i => i.name.startsWith(item + '-') || i.name.includes(item))
+    // 관리자 창고 재질문 후: item이 비면 pending 품목 사용
+    const stockItem = item || pendingVoiceStockItem.value
+    let prods = stockItem
+      ? rawSingleItems.value.filter((i) => i.name === stockItem)
+      : []
+    if (stockItem && prods.length === 0) {
+      prods = rawSingleItems.value.filter(
+        (i) => i.name.startsWith(stockItem + '-') || i.name.includes(stockItem)
+      )
     }
 
     if (prods.length > 0) {
-      let totalStock = 0
-      let packQty = prods[0].custom_pack_qty || 1
-      
-      let searchWarehouse = currentTab.value.selectedSource
-      if (intentObj.warehouse) {
-        // AI가 음성에서 창고명(예: "알라르꼰")을 추출했다면, 해당 창고를 찾아서 강제 지정 (본사/지점 모두 포함)
-        const matchedWarehouse = warehouseList.value.find(b => 
-          b.name.toLowerCase().includes(intentObj.warehouse.toLowerCase()) || 
-          b.warehouse_name.toLowerCase().includes(intentObj.warehouse.toLowerCase())
+      const packQty = prods[0].custom_pack_qty || 1
+      const boxesAt = (warehouse) => {
+        if (!warehouse) return 0
+        let total = 0
+        prods.forEach((prod) => {
+          total += getAvailableStock(prod.name, warehouse)
+        })
+        return Math.floor(total / (packQty || 1))
+      }
+      const speakStock = (text) => {
+        if (samdori.value) samdori.value.speak(text)
+      }
+      const askWarehouseAgain = () => {
+        pendingVoiceStockItem.value = stockItem
+        speakStock(
+          locale.value === 'es'
+            ? `¿Qué almacén consulta para ${stockItem}? Digame el nombre, por ejemplo Alarcón o Carmen.`
+            : `${stockItem} 재고를 어느 창고에서 확인할까요? 알라르꼰, 까르멘처럼 창고 이름을 다시 말씀해 주세요.`
         )
-        if (matchedWarehouse) {
-          searchWarehouse = matchedWarehouse.name
+      }
+
+      const branchWh = authStore.user?.branch_name || ''
+      const resolvedWh = resolveVoiceWarehouse(intentObj.warehouse)
+
+      // ----- 관리자: 8개 창고 나열 안 함. 미지정/미인식이면 창고만 재질문 -----
+      if (authStore.isAdmin) {
+        if (!intentObj.warehouse || !resolvedWh) {
+          askWarehouseAgain()
+          return
+        }
+        pendingVoiceStockItem.value = null
+        const boxes = boxesAt(resolvedWh)
+        speakStock(
+          locale.value === 'es'
+            ? `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes} cajas.`
+            : `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes}박스 입니다.`
+        )
+        return
+      }
+
+      // ----- 지점장/점원: 본인 지점 + 알라르꼰만 (타 지점 요청은 부드럽게 폴백) -----
+      pendingVoiceStockItem.value = null
+      const allowed = new Set([MAIN_WAREHOUSE, branchWh].filter(Boolean))
+
+      if (intentObj.warehouse) {
+        if (resolvedWh && allowed.has(resolvedWh)) {
+          const boxes = boxesAt(resolvedWh)
+          speakStock(
+            locale.value === 'es'
+              ? `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes} cajas.`
+              : `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes}박스 입니다.`
+          )
+          return
+        }
+        // 타 지점/미인식 → 권한 안내 후 지점+본사 요약
+        if (intentObj.warehouse && resolvedWh && !allowed.has(resolvedWh)) {
+          const branchBoxes = boxesAt(branchWh)
+          const mainBoxes = boxesAt(MAIN_WAREHOUSE)
+          speakStock(
+            locale.value === 'es'
+              ? `Solo puede consultar su sucursal y Alarcón. ${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
+              : `지점 계정은 본인 지점과 알라르꼰만 조회할 수 있습니다. ${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+          )
+          return
+        }
+        if (intentObj.warehouse && !resolvedWh) {
+          // 지점장은 재질문보다 기본 요약이 더 매끄러움
+          const branchBoxes = boxesAt(branchWh)
+          const mainBoxes = boxesAt(MAIN_WAREHOUSE)
+          speakStock(
+            locale.value === 'es'
+              ? `No entendí el almacén. ${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
+              : `창고명을 이해하지 못해 기본으로 안내합니다. ${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+          )
+          return
         }
       }
 
-      // 지점장은 자신이 속한 지점의 재고만 확인 가능하도록 제한 (단, 위에서 다른 창고를 지정한 경우 제외)
-      if (!authStore.isAdmin && (!searchWarehouse || searchWarehouse === '')) {
-        searchWarehouse = authStore.user?.branch_name || ''
-      }
-
-      prods.forEach(prod => {
-        totalStock += getAvailableStock(prod.name, searchWarehouse)
-      })
-      
-      let msg = ''
-      if (packQty > 1) {
-        const boxes = Math.floor(totalStock / packQty)
-        const eaches = totalStock % packQty
-        msg = locale.value === 'es'
-          ? `El inventario de ${item} en ${searchWarehouse} es ${boxes} cajas y ${eaches} sueltos.`
-          : `해당 품목의 총 재고는 ${boxes}박스, 낱장 ${eaches}개 입니다.`
+      // 창고 미지정: 지점 + 알라르꼰 박스만
+      const mainBoxes = boxesAt(MAIN_WAREHOUSE)
+      if (branchWh && branchWh !== MAIN_WAREHOUSE) {
+        const branchBoxes = boxesAt(branchWh)
+        speakStock(
+          locale.value === 'es'
+            ? `${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
+            : `${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+        )
       } else {
-        msg = locale.value === 'es' 
-          ? `Hay ${totalStock} en inventario para ${item}.` 
-          : `해당 품목의 현재 총 재고는 ${totalStock}개 입니다.`
+        speakStock(
+          locale.value === 'es'
+            ? `${stockItem}: Alarcón ${mainBoxes} cajas.`
+            : `${stockItem}: 알라르꼰 ${mainBoxes}박스 입니다.`
+        )
       }
-      
-      if (samdori.value) samdori.value.speak(msg)
     } else {
-      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 관련 제품이 없습니다.`
+      pendingVoiceStockItem.value = null
+      const msg = locale.value === 'es' ? `No se encontró ${stockItem || item}.` : `창고에 ${stockItem || item} 관련 제품이 없습니다.`
       if (samdori.value) samdori.value.speak(msg)
     }
   } else if (intent === 'check') {
+    pendingVoiceStockItem.value = null
     let cartItems = []
     if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
       cartItems = branchTransferRef.value.getCartItems()

@@ -1,6 +1,13 @@
 <template>
-  <div class="samdori-container" :class="{ active: isListening }">
-    <div class="samdori-button" @click="toggleListen" :class="{ pulsing: isListening }">
+  <div class="samdori-container" :class="{ active: isPttHolding || isListening }">
+    <div
+      class="samdori-button"
+      :class="{ pulsing: isPttHolding || isListening }"
+      @pointerdown="onPttDown"
+      @pointerup="onPttUp"
+      @pointercancel="onPttUp"
+      @contextmenu.prevent
+    >
       <img src="/samdori-icon.jpg" class="samdori-avatar" alt="Samdori" />
     </div>
     
@@ -16,7 +23,7 @@
         </div>
         
         <div class="transcript-box">
-          <p v-if="!transcript && !finalTranscript && !manualInput && !lastQuestionText" class="placeholder">"자비스~" 라고 부른 뒤 명령을 말씀해 보세요.</p>
+          <p v-if="!transcript && !finalTranscript && !manualInput && !lastQuestionText" class="placeholder">버튼을 누른 채 말씀하시고, 손을 떼면 바로 분석합니다.</p>
           <p class="final-text" v-if="lastQuestionText && !finalTranscript && !transcript"><span class="badge bg-purple">질문</span> {{ lastQuestionText }}</p>
           <p class="final-text" v-if="finalTranscript"><span class="badge bg-purple">인식중</span> {{ finalTranscript }}</p>
           <p class="interim-text">{{ transcript }}</p>
@@ -55,9 +62,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { parseIntent } from '../utils/SamdoriBrain'
+
+/**
+ * 입력 모드
+ * - 'ptt'  : 버튼을 누르는 동안만 녹음, 손을 떼면 즉시 분석 (현재 기본)
+ * - 'wake' : 호출어 연속 듣기 (검증된 레거시 — 기본 비활성, 복구용으로만 유지)
+ * PosView 장바구니/전송 로직은 이 파일 밖이므로 건드리지 않음.
+ */
+const INPUT_MODE = 'ptt'
 
 const props = defineProps({
   validItems: {
@@ -70,8 +85,9 @@ const emit = defineEmits(['intent-parsed'])
 const { locale } = useI18n()
 
 const isListening = ref(false)
+const isPttHolding = ref(false)
 const isOpen = ref(false)
-const statusText = ref('대기 중')
+const statusText = ref(INPUT_MODE === 'ptt' ? '버튼을 누른 채 말씀하세요' : '대기 중')
 const transcript = ref('')
 const finalTranscript = ref('')
 const manualInput = ref('')
@@ -85,19 +101,139 @@ let recognition = null
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
+let commandWindowTimer = null
 let isTTSPlaying = false
 let retryTimer = null
+let pttPointerId = null
+/** "다시 말해줘"용 — 분석 안내 TTS/버튼 뗌으로는 지우지 않음 */
+let cachedReply = ''
+
+/** 레거시(wake) 전용 타이머 상수 — PTT에서는 사용하지 않음 */
+const COMMAND_WINDOW_MS = 6000
+const SILENCE_COMMIT_MS = 1800
+
+const clearCommandWindow = () => {
+  if (commandWindowTimer) {
+    clearTimeout(commandWindowTimer)
+    commandWindowTimer = null
+  }
+}
+
+const startCommandWindow = (ms = COMMAND_WINDOW_MS) => {
+  if (INPUT_MODE === 'ptt') return
+  clearCommandWindow()
+  commandWindowTimer = setTimeout(() => {
+    commandWindowTimer = null
+    if (isAwake && !transcript.value && !finalTranscript.value) {
+      sleep('timeout')
+    }
+  }, ms)
+}
+
+/** 로컬 처리(캐시 재생/취소). true면 API(parseIntent) 호출 안 함 */
+const tryLocalCommand = (rawText) => {
+  const text = (rawText || '').trim()
+  if (!text) return false
+  const lower = text.toLowerCase()
+
+  if (/(취소|아니다|무시해|cancelar|cancela|olvídalo|olvidalo)/i.test(lower)) {
+    const cancelMsg = locale.value === 'es' ? 'Comando cancelado.' : '명령이 취소되었습니다.'
+    speak(cancelMsg, { continueListening: false })
+    sleep('timeout')
+    return true
+  }
+
+  // "다시 말해줘" — cachedReply만 재생, Gemini 호출 없음 (버튼 뗌/분석중 멘트로 캐시 안 지움)
+  if (/(다시|뭐라고|못들었|한번 더|repetir|otra vez|repite)/i.test(lower)) {
+    if (cachedReply) {
+      statusText.value = '이전 답변 재생 (캐시)'
+      speak(cachedReply, { continueListening: false, saveCache: false })
+    } else {
+      const noMsg = locale.value === 'es' ? 'No hay respuesta anterior.' : '이전에 대답한 내용이 없습니다.'
+      speak(noMsg, { continueListening: false, saveCache: false })
+      sleep('timeout')
+    }
+    return true
+  }
+
+  return false
+}
 
 const submitManual = () => {
   if (!manualInput.value.trim()) return
-  // 수동 입력 시 마이크를 끄고 직접 명령어 전달
-  if (recognition && isListening.value) {
-    recognition.stop()
+  if (recognition && (isListening.value || isPttHolding.value)) {
+    isPttHolding.value = false
+    try { recognition.stop() } catch (e) {}
   }
-  isAwake = true // 수동 입력은 호출어 생략
-  finalTranscript.value = manualInput.value
-  processAwakeCommand(manualInput.value)
+  isListening.value = false
+  const cmd = manualInput.value
   manualInput.value = ''
+  finalTranscript.value = cmd
+  if (tryLocalCommand(cmd)) return
+  processAwakeCommand(cmd)
+}
+
+const onPttDown = (e) => {
+  if (INPUT_MODE !== 'ptt') return
+  e.preventDefault()
+  if (typeof e.button === 'number' && e.button !== 0) return
+
+  try {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    pttPointerId = e.pointerId
+  } catch (err) {}
+
+  if (isTTSPlaying && synthesis) {
+    try { synthesis.cancel() } catch (err) {}
+    isTTSPlaying = false
+  }
+
+  isOpen.value = true
+  isPttHolding.value = true
+  isAwake = true
+  finalTranscript.value = ''
+  transcript.value = ''
+  statusText.value = '녹음 중... 손을 떼면 분석합니다'
+
+  if (!recognition) initSpeech()
+  if (!recognition) return
+
+  isListening.value = true
+  try {
+    recognition.start()
+  } catch (err) {
+    // 이미 시작된 경우 무시
+  }
+}
+
+const onPttUp = (e) => {
+  if (INPUT_MODE !== 'ptt') return
+  if (!isPttHolding.value) return
+  if (pttPointerId != null && e.pointerId !== pttPointerId) return
+
+  e.preventDefault()
+  isPttHolding.value = false
+  pttPointerId = null
+
+  try {
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+  } catch (err) {}
+
+  const cmd = `${finalTranscript.value || ''} ${transcript.value || ''}`.trim()
+  isListening.value = false
+  if (recognition) {
+    try { recognition.stop() } catch (err) {}
+  }
+
+  if (!cmd) {
+    statusText.value = '버튼을 누른 채 말씀해 주세요'
+    isAwake = false
+    return
+  }
+
+  // 다시/취소는 캐시·로컬만 — API 사이드 이펙트 없음
+  if (tryLocalCommand(cmd)) return
+  processAwakeCommand(cmd)
 }
 
 const initSpeech = () => {
@@ -106,27 +242,29 @@ const initSpeech = () => {
     statusText.value = '브라우저가 음성 인식을 지원하지 않습니다.'
     return
   }
-  
+
   recognition = new SpeechRecognition()
   recognition.continuous = true
   recognition.interimResults = true
-  // UI 언어 설정에 따라 음성 인식 언어 동적 설정 (스페인어 vs 한국어)
-  recognition.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR' 
-  
+  recognition.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
+
   recognition.onstart = () => {
     isListening.value = true
-    statusText.value = '마이크 켜짐 (호출어 대기중...)'
-  }
-  
-  recognition.onresult = (event) => {
-    // TTS가 말하고 있는 동안에는 마이크에 들어오는 소리(자기 목소리)를 무시합니다 (에코 방지)
-    if (synthesis && synthesis.speaking) {
-      return
+    if (INPUT_MODE === 'ptt') {
+      statusText.value = isPttHolding.value
+        ? '녹음 중... 손을 떼면 분석합니다'
+        : '버튼을 누른 채 말씀하세요'
+    } else {
+      statusText.value = '마이크 켜짐 (호출어 대기중...)'
     }
+  }
+
+  recognition.onresult = (event) => {
+    if (synthesis && synthesis.speaking) return
 
     let interim = ''
     let final = ''
-    
+
     for (let i = event.resultIndex; i < event.results.length; ++i) {
       if (event.results[i].isFinal) {
         final += event.results[i][0].transcript
@@ -134,45 +272,82 @@ const initSpeech = () => {
         interim += event.results[i][0].transcript
       }
     }
-    
+
+    // PTT: 누르는 동안만 텍스트 누적. 자동 확정/호출어/침묵 타이머 없음.
+    if (INPUT_MODE === 'ptt') {
+      if (!isPttHolding.value) return
+      transcript.value = interim
+      if (final) {
+        finalTranscript.value += (finalTranscript.value ? ' ' : '') + final
+      }
+      return
+    }
+
+    // ----- 아래는 wake 레거시 (INPUT_MODE === 'wake' 일 때만) -----
     if (isAwake) {
+      if (interim || final) clearCommandWindow()
+
       transcript.value = interim
       if (final) {
         finalTranscript.value += (finalTranscript.value ? ' ' : '') + final
         handleFinalText(final)
       }
-      
-      // Silence detection for auto-processing
+
       clearTimeout(silenceTimer)
       silenceTimer = setTimeout(() => {
-        if (transcript.value || finalTranscript.value) {
-          processAwakeCommand(finalTranscript.value + ' ' + transcript.value)
+        const cmd = `${finalTranscript.value || ''} ${transcript.value || ''}`.trim()
+        if (cmd) {
+          processAwakeCommand(cmd)
+        } else if (isAwake) {
+          startCommandWindow(2000)
         }
-      }, 2000)
-    } else {
-      // 대기 모드: 확정(final) 결과에서만 호출어 감지 — interim/소음으로 오인식 방지
-      if (final) {
-        const lowerText = final.toLowerCase().trim()
-        // 한글에는 \b가 약해서, 확정 문장 + 핵심 호출어만 허용
-        const wakeRegex = /(삼돌이|삼돌야|삼돌|잠돌이|잠돌|산돌이|산돌|samdori|paquito|파키토|자비스|jarvis)/i
-        if (wakeRegex.test(lowerText)) {
+      }, SILENCE_COMMIT_MS)
+    } else if (final) {
+      const lowerText = final.toLowerCase().trim()
+      const wakeRegex = /(삼돌이|삼돌야|삼돌|잠돌이|잠돌|산돌이|산돌|samdori|paquito|파키토|자비스|jarvis)/i
+      const wakeMatch = lowerText.match(wakeRegex)
+      if (wakeMatch) {
+        const afterWake = lowerText
+          .slice(wakeMatch.index + wakeMatch[0].length)
+          .replace(/^[\s,.\-~]+/, '')
+          .trim()
+        if (afterWake.length >= 2) {
+          isAwake = true
+          isOpen.value = true
+          processAwakeCommand(afterWake)
+        } else {
           wakeUp()
         }
       }
     }
   }
-  
+
   recognition.onerror = (event) => {
     console.error('Speech recognition error', event.error)
     if (event.error === 'not-allowed') {
       statusText.value = '마이크 권한이 거부되었습니다.'
       isListening.value = false
+      isPttHolding.value = false
+    } else if (event.error === 'aborted' || event.error === 'no-speech') {
+      // PTT 손 뗌/짧은 무음 — 치명 아님
     }
   }
-  
+
   recognition.onend = () => {
+    // PTT: 누르고 있는 동안에만 재시작 (Chrome이 중간에 끊는 경우)
+    if (INPUT_MODE === 'ptt') {
+      if (isPttHolding.value && !isTTSPlaying) {
+        setTimeout(() => {
+          if (!isPttHolding.value || !recognition) return
+          try { recognition.start() } catch (e) {}
+        }, 200)
+      } else {
+        isListening.value = false
+      }
+      return
+    }
+
     if (isListening.value && !isTTSPlaying) {
-      // 계속 듣기 (에러 방지용)
       setTimeout(() => {
         try { recognition.start() } catch (e) {}
       }, 500)
@@ -180,11 +355,12 @@ const initSpeech = () => {
   }
 }
 
+/** wake 레거시 전용 — PTT에서는 호출되지 않음 */
 const handleFinalText = (text) => {
+  if (INPUT_MODE === 'ptt') return
   const lowerText = text.toLowerCase()
-  
+
   if (isAwake) {
-    // 취소 명령어 감지 (한국어/스페인어)
     if (/(취소|아니다|무시해|cancelar|cancela|olvídalo|olvidalo)/i.test(lowerText)) {
       clearTimeout(silenceTimer)
       const cancelMsg = locale.value === 'es' ? 'Comando cancelado.' : '명령이 취소되었습니다.'
@@ -193,33 +369,29 @@ const handleFinalText = (text) => {
       return
     }
 
-    // 다시 말해줘 (Repeat) 감지: API 과금을 방지하고 로컬에서 바로 다시 읽어줌
-    if (/(다시|뭐라고|못들었|한번 더|repetir|otra vez|repite)/i.test(lowerText)) {
+    if (tryLocalCommand(lowerText)) {
       clearTimeout(silenceTimer)
-      if (lastResponseText.value) {
-        speak(lastResponseText.value, { continueListening: true })
-      } else {
-        const noMsg = locale.value === 'es' ? 'No hay respuesta anterior.' : '이전에 대답한 내용이 없습니다.'
-        speak(noMsg, { continueListening: false })
-        sleep('timeout')
+      return
+    }
+
+    const executeRegex = /(실행|끝|오버|이상|처리해|완료|입력완료|엔터|enter|ya|listo|ejecutar|ejecuta)/i
+    if (executeRegex.test(lowerText)) {
+      clearTimeout(silenceTimer)
+      clearCommandWindow()
+      const finalCmd = finalTranscript.value.replace(new RegExp(executeRegex.source, 'gi'), '').trim()
+      if (finalCmd) {
+        processAwakeCommand(finalCmd)
       }
       return
     }
-    
-    // 즉시 실행(Fast-track) 명령어 감지
-    const executeRegex = /(실행|끝|전송|오버|이상|처리해|완료|ya|listo|ejecutar|ejecuta)/i
-    if (executeRegex.test(lowerText)) {
-      clearTimeout(silenceTimer)
-      // 전체 누적된 문장에서 실행 명령어만 제거 후 바로 전송
-      const finalCmd = finalTranscript.value.replace(new RegExp(executeRegex.source, 'gi'), '').trim()
-      processAwakeCommand(finalCmd)
-      return
-    }
-    // 그 외는 silenceTimer에 의해 2초 후 자동 전송됨
   }
 }
 
 const wakeUp = () => {
+  if (INPUT_MODE === 'ptt') return
+  clearCommandWindow()
+  clearTimeout(silenceTimer)
+  silenceTimer = null
   isAwake = true
   isOpen.value = true
   statusText.value = '듣고 있습니다! 명령을 내려주세요.'
@@ -227,32 +399,28 @@ const wakeUp = () => {
   transcript.value = ''
   lastResponseText.value = ''
   lastQuestionText.value = ''
-  
+
   const reply = locale.value === 'es' ? 'Dígame, señor.' : '네, 말씀하세요.'
-  speak(reply)
-  
-  // 3초간 입력이 없으면 자동으로 대기 모드로
-  setTimeout(() => {
-    if (isAwake && !transcript.value && !finalTranscript.value) {
-      sleep('timeout')
-    }
-  }, 3000)
+  speak(reply, { continueListening: true })
 }
 
 const sleep = (reason = '') => {
   clearTimeout(silenceTimer)
   silenceTimer = null
+  clearCommandWindow()
   isAwake = false
+  isPttHolding.value = false
   transcript.value = ''
   finalTranscript.value = ''
-  // timeout 안내는 말하지 않음 — speak 후 silentWakeUp 루프("대기 모드로 돌아갑니다" 반복) 방지
-  statusText.value = '대기중 (호출어 대기중...)'
+  statusText.value = INPUT_MODE === 'ptt'
+    ? '버튼을 누른 채 말씀하세요'
+    : '대기중 (호출어 대기중...)'
 }
 
 const silentWakeUp = () => {
-  // TTS 메아리(자신이 한 말)가 마이크에 들어가는 것을 방지하기 위해 0.8초 후 마이크 개방
+  // PTT에서는 TTS 후 자동 마이크 개방 금지 (사이드 이펙트 차단)
+  if (INPUT_MODE === 'ptt') return
   setTimeout(() => {
-    // 이미 대기 모드로 강제 전환됐으면 연속 듣기 시작하지 않음
     if (!isListening.value) return
 
     isAwake = true
@@ -262,50 +430,75 @@ const silentWakeUp = () => {
     transcript.value = ''
 
     clearTimeout(silenceTimer)
-    silenceTimer = setTimeout(() => {
-      if (isAwake && !transcript.value && !finalTranscript.value) {
-        sleep('timeout')
-      }
-    }, 3000)
-  }, 800)
+    silenceTimer = null
+    startCommandWindow(COMMAND_WINDOW_MS)
+  }, 600)
 }
 
 const manualWakeUp = () => {
+  if (INPUT_MODE === 'ptt') return
+  clearCommandWindow()
+  clearTimeout(silenceTimer)
+  silenceTimer = null
   isAwake = true
   isOpen.value = true
   statusText.value = '듣고 있습니다! 명령을 내려주세요.'
   finalTranscript.value = ''
   transcript.value = ''
-  
-  clearTimeout(silenceTimer)
-  silenceTimer = setTimeout(() => {
-    if (isAwake && !transcript.value && !finalTranscript.value) {
-      sleep('timeout')
-    }
-  }, 3000)
+  startCommandWindow(COMMAND_WINDOW_MS)
 }
 
 const processAwakeCommand = async (fullText) => {
+  const cmd = (fullText || '').trim()
+  if (!cmd) return
+
   clearTimeout(silenceTimer)
+  silenceTimer = null
+  clearCommandWindow()
   statusText.value = 'AI 분석 중...'
   debugError.value = '' // 이전 에러 지우기
-  lastResponseText.value = '' // 이전 답변 초기화
-  lastQuestionText.value = fullText
-  
+  // cachedReply는 유지 — 버튼 뗌/새 분석 시작으로 "다시 말해줘" 캐시를 날리지 않음
+  lastQuestionText.value = cmd
+  finalTranscript.value = cmd
+  transcript.value = ''
+
   const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
-  // 분석 안내 TTS 후에는 연속 듣기 금지 (중간 silentWakeUp 방지)
-  speak(analyzingMsg, { continueListening: false })
-  
+  // 분석 안내는 캐시에 저장하지 않음
+  speak(analyzingMsg, { continueListening: false, saveCache: false })
+
   try {
-    const intent = await parseIntent(fullText, props.validItems, lastIntent.value)
-    
+    const intent = await parseIntent(cmd, props.validItems, lastIntent.value)
+
+    // 관리자 창고 재질문 답변: Gemini가 none으로 줘도, 직전이 search면 창고명으로 재시도
+    if (
+      intent.intent === 'none' &&
+      lastIntent.value?.intent === 'search' &&
+      lastIntent.value?.item &&
+      cmd.length <= 40
+    ) {
+      intent.intent = 'search'
+      intent.item = lastIntent.value.item
+      intent.warehouse = cmd
+    }
+
     // meaningless noise filter
     if (intent.intent === 'none') {
       statusText.value = '명령이 명확하지 않아 무시됨'
       sleep('timeout')
       return
     }
-    
+
+    // 품명검색 → 담기 2단계: Gemini가 item을 빼먹거나 대명사만 주면 직전 품목 재사용
+    if ((intent.intent === 'add_order' || intent.intent === 'search') && lastIntent.value?.item) {
+      const rawItem = String(intent.item || '').trim()
+      const weakItem = !rawItem || /^(이거|이것|그거|그것|얘|this|that|eso|este|esta)$/i.test(rawItem)
+      if (weakItem) intent.item = lastIntent.value.item
+    }
+    if (intent.intent === 'add_order') {
+      const n = Number(intent.qty)
+      intent.qty = Number.isFinite(n) && n > 0 ? n : 1
+    }
+
     lastIntent.value = intent
     emit('intent-parsed', intent)
     statusText.value = '명령 분석 완료'
@@ -313,7 +506,7 @@ const processAwakeCommand = async (fullText) => {
     sleep()
   } catch (error) {
     console.error(error)
-    lastIntent.value = null // 에러 시 이전 성공 결과 숨김
+    // 분석 실패해도 직전 품목 메모리는 유지 (검색→담기 흐름 보호)
     statusText.value = '분석 실패: ' + error.message
     
     // 에러 원인 상세 출력 (디버그용)
@@ -389,8 +582,14 @@ const startRetryTimer = () => {
 let currentUtterance = null
 
 const speak = (text, options = {}) => {
-  const { continueListening = true } = options
+  // PTT: 부모(PosView)가 continueListening을 넘겨도 자동 마이크 개방하지 않음
+  const continueListening = INPUT_MODE === 'wake' && (options.continueListening !== false)
+  const saveCache = options.saveCache !== false
   lastResponseText.value = text
+  // 실제 답변만 "다시 말해줘" 캐시에 저장 (분석중/재생 멘트 제외)
+  if (saveCache && text) {
+    cachedReply = text
+  }
   if (!synthesis) {
     if (continueListening) silentWakeUp()
     return
@@ -399,46 +598,49 @@ const speak = (text, options = {}) => {
   const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
   currentUtterance.lang = targetLang
   currentUtterance.rate = 1.1
-  
-  // 남성 목소리 찾기 시도
+
   const voices = synthesis.getVoices()
   const langVoices = voices.filter(v => v.lang.startsWith(locale.value === 'es' ? 'es' : 'ko'))
-  
-  // 이름에 남자(Male, 남성, Hombre, Pablo 등)가 들어간 목소리 우선 선택
-  const maleVoice = langVoices.find(v => 
-    v.name.toLowerCase().includes('male') || 
-    v.name.toLowerCase().includes('남성') || 
+
+  const maleVoice = langVoices.find(v =>
+    v.name.toLowerCase().includes('male') ||
+    v.name.toLowerCase().includes('남성') ||
     v.name.toLowerCase().includes('hombre') ||
     v.name.toLowerCase().includes('pablo') ||
     v.name.toLowerCase().includes('diego')
   )
-  
+
   if (maleVoice) {
     currentUtterance.voice = maleVoice
   } else if (langVoices.length > 0) {
-    // 남성 목소리를 명시적으로 못 찾으면 해당 언어의 기본 목소리 사용
     currentUtterance.voice = langVoices[0]
   }
 
   currentUtterance.onend = () => {
-    if (!isTTSPlaying) return // 이미 처리됨
+    if (!isTTSPlaying) return
     isTTSPlaying = false
     clearTimeout(window.ttsFallbackTimer)
+
+    // PTT: TTS 후 마이크를 다시 켜지 않음 — 버튼으로만 입력
+    if (INPUT_MODE === 'ptt') {
+      isListening.value = false
+      return
+    }
+
     if (isListening.value && recognition) {
       try { recognition.start() } catch (e) {}
     }
-    // 명령 결과 TTS만 연속 듣기. 안내/에러/대기 전환 TTS는 호출어 대기로 유지
     if (continueListening) {
       silentWakeUp()
     }
   }
 
   isTTSPlaying = true
+  isPttHolding.value = false
   if (recognition) {
     try { recognition.stop() } catch (e) {}
   }
-  
-  // 안드로이드 크롬 TTS onend 미발동 버그 방지용 폴백(안전장치)
+
   if (window.ttsFallbackTimer) clearTimeout(window.ttsFallbackTimer)
   const expectedDuration = Math.max(text.length * 150 + 1500, 3000)
   window.ttsFallbackTimer = setTimeout(() => {
@@ -447,11 +649,13 @@ const speak = (text, options = {}) => {
       currentUtterance.onend()
     }
   }, expectedDuration)
-  
+
   synthesis.speak(currentUtterance)
 }
 
+/** wake 레거시 토글 — PTT에서는 버튼이 pointer 이벤트를 사용 */
 const toggleListen = () => {
+  if (INPUT_MODE === 'ptt') return
   if (isListening.value) {
     isListening.value = false
     recognition.stop()
@@ -464,7 +668,6 @@ const toggleListen = () => {
     } catch (e) {
       console.log('Already started')
     }
-    // 마이크 버튼을 수동으로 누른 경우 즉시 깨워서 대기시간을 없앰
     manualWakeUp()
   }
 }
@@ -513,6 +716,9 @@ defineExpose({
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative;
     z-index: 10;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
   
   .samdori-button:hover {
