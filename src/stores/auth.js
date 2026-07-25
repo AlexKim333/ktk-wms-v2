@@ -2,6 +2,15 @@ import { defineStore } from 'pinia'
 import frappeApi from '../api/frappe.js'
 import { resolveLoginProfile } from '../composables/resolveLoginProfile.js'
 
+function roleList(user) {
+  return Array.isArray(user?.roles) ? user.roles : []
+}
+
+function hasRole(user, name) {
+  const target = name.toLowerCase()
+  return roleList(user).some((r) => String(r).toLowerCase() === target)
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -10,12 +19,32 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isLoggedIn: (state) => !!state.user,
     userBranch: (state) => state.user?.branch_name || '',
+    // Admin이 Branch Manager 역할을 겸해도 관리자로 판정
     isAdmin: (state) =>
-      state.user?.roles?.includes('System Manager') || state.user?.access_level === 'Admin',
-    isBranchManager: (state) =>
-      state.user?.roles?.includes('Branch Manager') || state.user?.access_level === 'Manager',
-    isBranchClerk: (state) =>
-      state.user?.roles?.includes('Branch Clerk') || state.user?.access_level === 'Representative'
+      state.user?.access_level === 'Admin' ||
+      hasRole(state.user, 'System Manager') ||
+      hasRole(state.user, 'Administrator'),
+    isBranchManager: (state) => {
+      if (
+        state.user?.access_level === 'Admin' ||
+        hasRole(state.user, 'System Manager') ||
+        hasRole(state.user, 'Administrator')
+      ) {
+        return false
+      }
+      return state.user?.access_level === 'Manager' || hasRole(state.user, 'Branch Manager')
+    },
+    isBranchClerk: (state) => {
+      if (
+        state.user?.access_level === 'Admin' ||
+        state.user?.access_level === 'Manager' ||
+        hasRole(state.user, 'System Manager') ||
+        hasRole(state.user, 'Branch Manager')
+      ) {
+        return false
+      }
+      return state.user?.access_level === 'Representative' || hasRole(state.user, 'Branch Clerk')
+    }
   },
   actions: {
     /** Cookie sid가 있으면 Pinia user를 복구. 새로고침 후 /pos 유지용 */
