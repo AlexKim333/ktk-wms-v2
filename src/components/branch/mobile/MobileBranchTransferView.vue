@@ -602,27 +602,53 @@ const submitGridSelection = () => {
 
 
 const addFromVoice = (item, qty = 1) => {
-  if (!currentTab.value) return;
-  if (isClerk.value && currentTab.value.docName) return;
+  if (!tabs.value.length) {
+    return { ok: false, message: '장바구니 탭이 없습니다.' }
+  }
 
-  const packQty = item.custom_pack_qty || item.pack_qty || 1;
-  const existing = currentTab.value.cartItems.find(c => c.item_code === item.name);
+  if (isClerk.value && currentTab.value?.docName) {
+    let writableIdx = tabs.value.findIndex((t) => !t.docName)
+    if (writableIdx < 0) {
+      addNewTab()
+      writableIdx = tabs.value.length - 1
+    }
+    currentTabIndex.value = writableIdx
+  }
+
+  const tab = tabs.value[currentTabIndex.value]
+  if (!tab) {
+    return { ok: false, message: '장바구니 탭이 없습니다.' }
+  }
+  if (isClerk.value && tab.docName) {
+    return { ok: false, message: '제출된 초안은 수정할 수 없습니다. 새 탭에서 다시 시도해 주세요.' }
+  }
+
+  const packQty = item.custom_pack_qty || item.pack_qty || 1
+  const code = item.name || item.item_code
+  if (!code) {
+    return { ok: false, message: '품목 코드가 없습니다.' }
+  }
+
+  const cart = Array.isArray(tab.cartItems) ? [...tab.cartItems] : []
+  const existing = cart.find((c) => c.item_code === code)
   if (existing) {
-    existing.boxQty += qty;
-    updateTotalQty(existing);
+    existing.boxQty = (Number(existing.boxQty) || 0) + qty
+    existing.totalQty = existing.boxQty * packQty + (Number(existing.eachQty) || 0)
   } else {
-    currentTab.value.cartItems.push({
-      item_code: item.name,
-      item_name: item.item_name || item.name,
+    cart.push({
+      item_code: code,
+      item_name: item.item_name || code,
       custom_color: item.custom_color || '',
       pack_qty: packQty,
       uom: item.stock_uom || 'Nos',
       boxQty: qty,
       eachQty: 0,
       totalQty: qty * packQty
-    });
+    })
   }
+  tab.cartItems = cart
   mobileMode.value = 'cart'
+  return { ok: true, count: cart.length }
 }
 
 // Init Search Index
@@ -1274,7 +1300,15 @@ const submitTransfer = async () => {
     isSubmitting.value = false
   }
 }
-defineExpose({ addFromVoice })
+const getCartItems = () => {
+  return currentTab.value?.cartItems ? [...currentTab.value.cartItems] : []
+}
+
+defineExpose({
+  addFromVoice,
+  getCartItems,
+  submitTransfer
+})
 </script>
 
 <style scoped>

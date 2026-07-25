@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import MobileBranchInventoryView from '../../components/branch/mobile/MobileBranchInventoryView.vue'
@@ -98,17 +98,51 @@ const activeNav = ref('branch-pos')
 const mobilePosViewRef = ref(null)
 const mobileTransferViewRef = ref(null)
 
+const ensureCartView = async () => {
+  if (
+    activeNav.value !== 'branch-pos' &&
+    activeNav.value !== 'pos' &&
+    activeNav.value !== 'branch-transfer'
+  ) {
+    activeNav.value = 'branch-pos'
+    await nextTick()
+  }
+}
+
+const getActiveCartView = async () => {
+  await ensureCartView()
+  if (activeNav.value === 'branch-transfer') {
+    if (!mobileTransferViewRef.value) await nextTick()
+    return mobileTransferViewRef.value
+  }
+  if (activeNav.value !== 'branch-pos' && activeNav.value !== 'pos') {
+    activeNav.value = 'branch-pos'
+    await nextTick()
+  }
+  if (!mobilePosViewRef.value) await nextTick()
+  return mobilePosViewRef.value
+}
+
 defineExpose({
-  addFromVoice: (prod, qty) => {
-    if (activeNav.value === 'branch-pos' || activeNav.value === 'pos') {
-      if (mobilePosViewRef.value?.addFromVoice) {
-        mobilePosViewRef.value.addFromVoice(prod, qty)
-      }
-    } else if (activeNav.value === 'branch-transfer') {
-      if (mobileTransferViewRef.value?.addFromVoice) {
-        mobileTransferViewRef.value.addFromVoice(prod, qty)
-      }
+  addFromVoice: async (prod, qty) => {
+    const view = await getActiveCartView()
+    if (!view?.addFromVoice) {
+      return { ok: false, message: '모바일 장바구니에 연결하지 못했습니다.' }
     }
+    return view.addFromVoice(prod, qty)
+  },
+  getCartItems: async () => {
+    const view = await getActiveCartView()
+    if (!view?.getCartItems) return []
+    return view.getCartItems()
+  },
+  submitTransfer: async () => {
+    const view = await getActiveCartView()
+    if (!view?.submitTransfer) {
+      return { ok: false, message: '전송 화면에 연결하지 못했습니다.' }
+    }
+    await view.submitTransfer()
+    return { ok: true }
   }
 })
 

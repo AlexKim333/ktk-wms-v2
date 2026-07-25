@@ -54,12 +54,18 @@ Supported intents:
    Required fields: "intent": "search", "item": "<item_code>"
    Optional fields: "warehouse": "<warehouse_name>" (Extract the target warehouse if mentioned, e.g. "알라르꼰" -> "ALARCON", "까르멘" -> "CARMEN", etc.)
    
-2. "add_order": Adding an item to the transfer cart. (e.g. "P-160 검정 색 두 박스 장바구니에 담아", "Agrega dos cajas de P-160 negro")
+2. "add_order": ONE unified action = add item into the shopping cart (장바구니 담기).
+   Treat ALL of these as the SAME intent "add_order" (do NOT invent a separate "add" intent):
+   - "장바구니에 담아/넣어/추가해", "카트에 넣어", "주문에 추가", "담아줘", "넣어줘", "추가해줘"
+   - Spanish: "agrega", "añade", "pon en el carrito", "agregar al carrito"
+   Examples: "P-160 검정 두 박스 장바구니에 담아", "P-160-NEGRO-400 1개 추가해줘", "Agrega dos cajas de P-160 negro"
    Required fields: "intent": "add_order", "item": "<item_code>", "qty": <number>
    Optional fields: "color": "<color>"
    Note: Translate color to UPPERCASE SPANISH if possible (e.g. "검정색" -> "NEGRO", "하얀색" -> "BLANCO", "빨간색" -> "ROJO").
+   If qty is missing, default qty to 1.
    
-3. "check": Checking the current order list/cart. (e.g. "주문 리스트 확인해줘", "Revisa la lista")
+3. "check": Checking what is ALREADY in the cart (장바구니 조회). NOT adding.
+   Examples: "장바구니 확인해줘", "장바구니 조회", "뭐 담겨 있어?", "주문 리스트 확인해줘", "Revisa el carrito", "Revisa la lista"
    Required fields: "intent": "check"
    
 4. "submit": Submitting or transmitting the order. (e.g. "주문 전송", "Enviar pedido")

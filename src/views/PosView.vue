@@ -2710,32 +2710,119 @@ const branchTransferRef = ref(null)
 const mobileLayoutRef = ref(null)
 const validItemCodes = computed(() => rawSingleItems.value.map(item => item.name))
 
-const handleSamdoriIntent = (intentObj) => {
-  // Mobile handling
-  if (isMobile.value && mobileLayoutRef.value) {
-    const { intent, item, qty } = intentObj
+const findProductForVoice = (itemCode) => {
+  if (!itemCode) return null
+  const key = String(itemCode).trim()
+  return (
+    rawSingleItems.value.find((i) => i.name === key) ||
+    rawSingleItems.value.find((i) => i.name?.toUpperCase() === key.toUpperCase()) ||
+    null
+  )
+}
+
+const handleSamdoriIntent = async (intentObj) => {
+  const { intent, item, qty } = intentObj || {}
+
+  // 모바일: 데스크톱 장바구니로 절대 폴백하지 않음
+  if (isMobile.value) {
+    await nextTick()
+    let layout = mobileLayoutRef.value
+    if (!layout) {
+      await nextTick()
+      layout = mobileLayoutRef.value
+    }
+
     if (intent === 'add_order') {
-      const prod = rawSingleItems.value.find(i => i.name === item)
-      if (prod) {
-        const inputQty = qty ? Number(qty) : 1
-        mobileLayoutRef.value.addFromVoice(prod, inputQty)
-        const msg = locale.value === 'es' ? `${item} aAñadido al carrito.` : `${item} 추가되었습니다.`
-        if (samdori.value) samdori.value.speak(msg)
-      } else {
+      const prod = findProductForVoice(item)
+      if (!prod) {
         const msg = locale.value === 'es' ? `No se encontró ${item}.` : `${item} 품목을 찾을 수 없습니다.`
         if (samdori.value) samdori.value.speak(msg)
+        return
       }
+      if (!layout?.addFromVoice) {
+        const msg =
+          locale.value === 'es'
+            ? 'No se pudo conectar con el carrito móvil.'
+            : '모바일 장바구니에 연결하지 못했습니다. 즉시출고 화면인지 확인해 주세요.'
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+
+      const inputQty = qty ? Number(qty) : 1
+      const result = await layout.addFromVoice(prod, inputQty)
+      if (result && result.ok === false) {
+        if (samdori.value) samdori.value.speak(result.message || '장바구니에 담지 못했습니다.')
+        return
+      }
+      const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
+      if (samdori.value) samdori.value.speak(msg)
+      return
     }
-    return;
+
+    if (intent === 'check') {
+      if (!layout?.getCartItems) {
+        const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+      const cartItems = (await layout.getCartItems()) || []
+      const count = cartItems.length
+      if (count === 0) {
+        const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+      let msg = locale.value === 'es'
+        ? `Hay ${count} productos en el carrito. `
+        : `현재 장바구니에 ${count}종류의 상품이 있습니다. `
+      const details = cartItems.map((cartItem) => {
+        const code = cartItem.item_code || cartItem.name || ''
+        const boxes = cartItem.boxQty || 0
+        const eaches = cartItem.eachQty || 0
+        if (locale.value === 'es') return `${code} ${boxes} cajas, ${eaches} sueltos`
+        let str = code
+        if (boxes > 0) str += ` ${boxes}박스`
+        if (eaches > 0) str += ` ${eaches}개`
+        return str
+      })
+      msg += details.join(', ') + (locale.value === 'es' ? '.' : ' 입니다.')
+      if (samdori.value) samdori.value.speak(msg)
+      return
+    }
+
+    if (intent === 'submit') {
+      if (!layout?.submitTransfer) {
+        const msg =
+          locale.value === 'es'
+            ? 'No se pudo enviar el pedido móvil.'
+            : '모바일 전송에 연결하지 못했습니다.'
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+      const cartItems = layout.getCartItems ? ((await layout.getCartItems()) || []) : []
+      if (!cartItems.length) {
+        const msg = locale.value === 'es' ? `El carrito está vacío.` : `장바구니가 비어 있어 전송할 수 없습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+      const msg = locale.value === 'es' ? `Enviando pedido de sucursal...` : `지점 발주서를 전송합니다.`
+      if (samdori.value) samdori.value.speak(msg)
+      await layout.submitTransfer()
+      return
+    }
+
+    if (intent === 'search') {
+      // 재고 조회는 모바일에서도 동일 로직 사용 (아래 공통 분기로)
+    } else {
+      return
+    }
   }
 
-  if (!currentTab.value) return;
-
-  const { intent, item, qty } = intentObj
+  if (!currentTab.value) return
 
   if (intent === 'add_order') {
     if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
-      const prod = rawSingleItems.value.find(i => i.name === item)
+      const prod = findProductForVoice(item)
       if (prod) {
         const inputQty = qty ? Number(qty) : 1
         for (let i = 0; i < inputQty; i++) {
@@ -2747,10 +2834,10 @@ const handleSamdoriIntent = (intentObj) => {
         const msg = locale.value === 'es' ? `No se encontró ${item}.` : `해당 품목 ${item} 을(를) 찾을 수 없습니다.`
         if (samdori.value) samdori.value.speak(msg)
       }
-      return;
+      return
     }
 
-    const prod = rawSingleItems.value.find(i => i.name === item)
+    const prod = findProductForVoice(item)
     if (prod) {
       addSingleToCartInternal(prod)
       const inputQty = qty ? Number(qty) : 1
