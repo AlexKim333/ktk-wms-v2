@@ -1,5 +1,6 @@
 <template>
-  <MobilePosLayout 
+  <div class="pos-view-container">
+    <MobilePosLayout 
     v-if="isMobile" 
     :raw-items="rawSingleItems"
     :bin-data="binDataMap"
@@ -1523,27 +1524,27 @@ const fetchFrappeItems = async () => {
           fields: JSON.stringify(['item_code', 'actual_qty', 'warehouse']),
           limit_page_length: 0 // 전체 재고 로드
         }
-      }),
+      }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Customer', {
         params: {
           fields: JSON.stringify(['name', 'customer_name']),
           filters: JSON.stringify([['disabled', '=', 0]]),
           limit_page_length: 0
         }
-      }),
+      }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Sales Person', {
         params: {
           fields: JSON.stringify(['name', 'sales_person_name', 'enabled', 'custom_branch']),
           filters: JSON.stringify([['enabled', '=', 1]]),
           limit_page_length: 0
         }
-      }),
+      }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Supplier', {
         params: {
           fields: JSON.stringify(['name', 'supplier_name']),
           limit_page_length: 0
         }
-      })
+      }).catch(() => ({ data: { data: [] } }))
     ]);
 
     warehouseList.value = whRes.data.data
