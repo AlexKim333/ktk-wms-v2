@@ -79,12 +79,14 @@ const lastIntent = ref(null)
 const lastResponseText = ref('')
 const lastQuestionText = ref('')
 const debugError = ref('')
+const queuedCommand = ref(null)
 
 let recognition = null
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
 let isTTSPlaying = false
+let retryTimer = null
 
 const submitManual = () => {
   if (!manualInput.value.trim()) return
@@ -306,7 +308,11 @@ const processAwakeCommand = async (fullText) => {
     let errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
     
     if (error.response && error.response.status === 503) {
-      errorMsg = locale.value === 'es' ? 'El servidor de Google AI está muy ocupado. Inténtalo de nuevo.' : '현재 구글 AI 서버에 사용자가 몰려 지연되고 있습니다. 다시 시도해 주세요.'
+      errorMsg = locale.value === 'es' ? 'El servidor de Google AI está retrasado. Puesto en cola para reintento automático.' : '현재 구글 AI 서버에 사용자가 몰려 지연되고 있습니다. 접속 대기열에 등록되었으며, 복구 시 자동 처리됩니다.'
+      
+      // 큐에 등록하고 자동 재시도 시작
+      queuedCommand.value = fullText
+      startRetryTimer()
     } else if (error.response && error.response.status === 429) {
       errorMsg = locale.value === 'es' ? 'Se ha superado el límite de uso de IA. Por favor, inténtelo de nuevo más tarde.' : 'AI 호출 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.'
     } else if (error.response && error.response.status === 404) {
@@ -318,6 +324,48 @@ const processAwakeCommand = async (fullText) => {
     speak(errorMsg)
     sleep()
   }
+}
+
+const startRetryTimer = () => {
+  if (retryTimer) clearInterval(retryTimer)
+  
+  retryTimer = setInterval(async () => {
+    if (!queuedCommand.value) {
+      clearInterval(retryTimer)
+      retryTimer = null
+      return
+    }
+    
+    try {
+      statusText.value = 'AI 서버 재접속 시도 중...'
+      const intent = await parseIntent(queuedCommand.value, props.validItems, lastIntent.value)
+      
+      // 성공하면 큐 비우고 처리
+      lastIntent.value = intent
+      emit('intent-parsed', intent)
+      statusText.value = '대기 명령 분석 완료'
+      
+      const successMsg = locale.value === 'es' ? 'El servidor se ha recuperado. Comando ejecutado.' : '서버가 복구되었습니다. 대기 중이던 명령 처리를 완료했습니다.'
+      speak(successMsg)
+      
+      queuedCommand.value = null
+      clearInterval(retryTimer)
+      retryTimer = null
+      
+    } catch (error) {
+      if (error.response && error.response.status === 503) {
+        statusText.value = '서버 503 - 다음 재시도 대기 중...'
+      } else {
+        // 503이 아닌 다른 실패면 큐에서 삭제
+        queuedCommand.value = null
+        clearInterval(retryTimer)
+        retryTimer = null
+        
+        let errorMsg = locale.value === 'es' ? 'Error al reintentar el comando en cola.' : '대기 명령 처리 중 오류가 발생하여 취소되었습니다.'
+        speak(errorMsg)
+      }
+    }
+  }, 15000) // 15초마다 재시도
 }
 
 let currentUtterance = null
