@@ -79,8 +79,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
-import axios from 'axios'
 import { resolveLoginProfile } from '../composables/resolveLoginProfile.js'
+import frappeApi from '../api/frappe.js'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const router = useRouter()
@@ -97,14 +97,6 @@ const loginMode = ref('password') // 'password' or 'email'
 const email = ref('')
 const otpCode = ref('')
 const otpSent = ref(false)
-
-const frappeApi = axios.create({
-  headers: {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json'
-  },
-  withCredentials: true 
-})
 
 onMounted(() => {
   const savedUsr = localStorage.getItem('lady_polo_usr')

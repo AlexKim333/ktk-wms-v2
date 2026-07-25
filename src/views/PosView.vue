@@ -17,7 +17,7 @@
       <div class="nav-logo">🏆 WMS PRO</div>
       <div v-if="authStore.user" class="nav-user-info">
         <span class="nav-user-name">{{ authStore.user.member_name || authStore.user.full_name }}</span>
-        <span class="nav-user-meta">{{ authStore.user.branch_name ?? '본부' }} · {{ authStore.user.access_level || '관리자' }}</span>
+        <span class="nav-user-meta">{{ authStore.user.branch_name ?? '본부' }} · {{ isAdmin ? 'Admin' : (authStore.user.access_level || '-') }}</span>
       </div>
       <div class="nav-lang-switcher" style="padding: 0 12px; margin-bottom: 12px;">
         <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
@@ -28,8 +28,8 @@
           🛒 VENTA (판매)
         </a> -->
 
-        <!-- 지점 전용 메뉴 -->
-        <div class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
+        <!-- 지점 전용 메뉴: 관리자가 지점장 UI로 오인되지 않도록 지점 계정에만 상단 노출 -->
+        <div v-if="!isAdmin" class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
           <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.branch_group') }}</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
@@ -942,6 +942,17 @@ const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
 // 지점 사용자는 VENTA(판매) 대신 '재고 이동 작성 (입력)' 화면을 기본값으로 사용
 const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-transfer')
+
+// 역할 복구 타이밍에 activeNav가 지점으로 고정되는 것 방지
+watch(
+  isAdmin,
+  (admin) => {
+    if (admin && String(activeNav.value || '').startsWith('branch')) {
+      activeNav.value = 'outbound'
+    }
+  },
+  { immediate: true }
+)
 const transactionMode = ref('outbound')
 const isProductMenuOpen = ref(false)
 const isInboundMenuOpen = ref(false)
