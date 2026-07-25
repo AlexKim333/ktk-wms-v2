@@ -120,14 +120,36 @@ let retryTimer = null
 let pttPointerId = null
 /** "다시 말해줘"용 — 분석 안내 TTS/버튼 뗌으로는 지우지 않음 */
 let cachedReply = ''
-/** iOS: 제스처 없이 speak() 하면 무음으로 차단됨 → PTT 누름 때 1회 언락 */
+/** iOS: 제스처 없이 speak() 하면 무음으로 차단됨 */
 let iosSpeechUnlocked = false
+let iosAudioCtx = null
+let iosSpeakTimer = null
 
 const stopMicTracks = (stream) => {
   try {
     ;(stream || activeMicStream)?.getTracks?.().forEach((t) => t.stop())
   } catch (e) {}
   if (!stream || stream === activeMicStream) activeMicStream = null
+}
+
+/** iOS 녹음 세션이 TTS를 죽이지 않도록 WebAudio도 함께 언락 */
+const unlockAudioContextForIOS = () => {
+  if (!isIOS) return
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    if (!iosAudioCtx) iosAudioCtx = new AC()
+    if (iosAudioCtx.state === 'suspended') {
+      iosAudioCtx.resume().catch(() => {})
+    }
+    const buf = iosAudioCtx.createBuffer(1, 1, 22050)
+    const src = iosAudioCtx.createBufferSource()
+    src.buffer = buf
+    src.connect(iosAudioCtx.destination)
+    src.start(0)
+  } catch (e) {
+    console.warn('iOS AudioContext unlock failed', e)
+  }
 }
 
 /** 레거시(wake) 전용 타이머 상수 — PTT에서는 사용하지 않음 */
@@ -182,20 +204,28 @@ const tryLocalCommand = (rawText) => {
 }
 
 /**
- * iOS Safari 보안: speechSynthesis는 "사용자 제스처" 안에서 한 번 speak 해야
- * 이후(API 응답 후) 프로그램적 TTS가 허용됨. 안 하면 분석 결과가 무음.
+ * iOS Safari: speechSynthesis는 사용자 제스처 안 speak로 언락 필요.
+ * 주의: getUserMedia 녹음이 오디오 세션을 가로채면 언락이 무효화되므로
+ * pointerdown + pointerup(녹음 종료 직후) 모두에서 호출한다.
  */
-const unlockSpeechForIOS = () => {
-  if (!synthesis) return
+const unlockSpeechForIOS = (force = false) => {
+  if (!isIOS || !synthesis) return
+  unlockAudioContextForIOS()
   try {
     synthesis.getVoices()
   } catch (e) {}
-  if (!isIOS || iosSpeechUnlocked) return
+  if (iosSpeechUnlocked && !force) return
   try {
-    const warm = new SpeechSynthesisUtterance(' ')
-    warm.volume = 0
-    warm.rate = 10
+    // volume 0은 일부 iOS에서 언락으로 인정 안 됨 → 아주 작게
+    const warm = new SpeechSynthesisUtterance('.')
+    warm.volume = 0.01
+    warm.rate = 2
     warm.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
+    const voices = synthesis.getVoices() || []
+    const match = voices.find((v) =>
+      v.lang?.toLowerCase().startsWith(locale.value === 'es' ? 'es' : 'ko')
+    )
+    if (match) warm.voice = match
     synthesis.speak(warm)
     iosSpeechUnlocked = true
   } catch (e) {
@@ -228,12 +258,12 @@ const onPttDown = async (e) => {
     pttPointerId = e.pointerId
   } catch (err) {}
 
-  // 이전 TTS 정리 후, 제스처 안에서 무음 speak로 iOS TTS 언락
+  // 이전 TTS 큐 정리 후 제스처 안에서 언락 (녹음 전)
   if (synthesis) {
     try { synthesis.cancel() } catch (err) {}
   }
   isTTSPlaying = false
-  unlockSpeechForIOS()
+  unlockSpeechForIOS(true)
 
   isOpen.value = true
   isPttHolding.value = true
@@ -350,6 +380,9 @@ const onPttUp = (e) => {
       stopMicTracks()
       statusText.value = '녹음 종료에 실패했습니다.'
     }
+    // 녹음 종료 직후(여전히 pointerup 제스처) TTS 재언락 — 마이크 세션이 언락을 무력화함
+    stopMicTracks()
+    unlockSpeechForIOS(true)
     return
   }
 
@@ -596,8 +629,11 @@ const processAudioCommand = async (base64Audio, mimeType) => {
   transcript.value = ''
   finalTranscript.value = '오디오 전송 완료 (분석 중)'
 
-  const analyzingMsg = locale.value === 'es' ? 'Analizando audio...' : '오디오 분석 중입니다.'
-  speak(analyzingMsg, { continueListening: false, saveCache: false })
+  // iOS: 분석중 TTS는 결과 TTS를 더 잘 막음 → 스킵 (화면 상태로만 표시)
+  if (!isIOS) {
+    const analyzingMsg = locale.value === 'es' ? 'Analizando audio...' : '오디오 분석 중입니다.'
+    speak(analyzingMsg, { continueListening: false, saveCache: false })
+  }
 
   try {
     const safeMime = mimeType && String(mimeType).includes('/') ? mimeType : 'audio/mp4'
@@ -764,89 +800,103 @@ const speak = (text, options = {}) => {
     return
   }
 
-  // iOS: 이전 무음 언락/큐가 stuck 되면 resume + 큐 정리 후 재생
-  try {
-    if (synthesis.paused) synthesis.resume()
-    if (isIOS) synthesis.cancel()
-  } catch (e) {}
+  const runSpeak = () => {
+    try {
+      if (synthesis.paused) synthesis.resume()
+      synthesis.cancel()
+    } catch (e) {}
 
-  currentUtterance = new SpeechSynthesisUtterance(text)
-  const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
-  currentUtterance.lang = targetLang
-  currentUtterance.rate = 1.1
-  currentUtterance.volume = 1
+    currentUtterance = new SpeechSynthesisUtterance(text)
+    const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
+    currentUtterance.lang = targetLang
+    currentUtterance.rate = 1.0
+    currentUtterance.volume = 1
 
-  const voices = synthesis.getVoices()
-  const langVoices = voices.filter(v => v.lang.startsWith(locale.value === 'es' ? 'es' : 'ko'))
+    const voices = synthesis.getVoices() || []
+    const langVoices = voices.filter((v) =>
+      v.lang?.toLowerCase().startsWith(locale.value === 'es' ? 'es' : 'ko')
+    )
 
-  const maleVoice = langVoices.find(v =>
-    v.name.toLowerCase().includes('male') ||
-    v.name.toLowerCase().includes('남성') ||
-    v.name.toLowerCase().includes('hombre') ||
-    v.name.toLowerCase().includes('pablo') ||
-    v.name.toLowerCase().includes('diego')
-  )
+    const maleVoice = langVoices.find((v) =>
+      v.name.toLowerCase().includes('male') ||
+      v.name.toLowerCase().includes('남성') ||
+      v.name.toLowerCase().includes('hombre') ||
+      v.name.toLowerCase().includes('pablo') ||
+      v.name.toLowerCase().includes('diego') ||
+      v.name.toLowerCase().includes('yuna') ||
+      v.name.toLowerCase().includes('sora')
+    )
 
-  if (maleVoice) {
-    currentUtterance.voice = maleVoice
-  } else if (langVoices.length > 0) {
-    currentUtterance.voice = langVoices[0]
-  }
-
-  currentUtterance.onend = () => {
-    if (!isTTSPlaying) return
-    isTTSPlaying = false
-    clearTimeout(window.ttsFallbackTimer)
-
-    // PTT: TTS 후 마이크를 다시 켜지 않음 — 버튼으로만 입력
-    if (INPUT_MODE === 'ptt') {
-      isListening.value = false
-      return
+    if (maleVoice) {
+      currentUtterance.voice = maleVoice
+    } else if (langVoices.length > 0) {
+      currentUtterance.voice = langVoices[0]
     }
 
-    if (isListening.value && recognition) {
-      try { recognition.start() } catch (e) {}
+    currentUtterance.onend = () => {
+      if (!isTTSPlaying) return
+      isTTSPlaying = false
+      clearTimeout(window.ttsFallbackTimer)
+
+      if (INPUT_MODE === 'ptt') {
+        isListening.value = false
+        return
+      }
+
+      if (isListening.value && recognition) {
+        try { recognition.start() } catch (e) {}
+      }
+      if (continueListening) {
+        silentWakeUp()
+      }
     }
-    if (continueListening) {
-      silentWakeUp()
+
+    currentUtterance.onerror = (ev) => {
+      console.warn('TTS error', ev?.error)
+      isTTSPlaying = false
+      clearTimeout(window.ttsFallbackTimer)
+    }
+
+    isTTSPlaying = true
+    isPttHolding.value = false
+    if (recognition) {
+      try { recognition.stop() } catch (e) {}
+    }
+
+    if (window.ttsFallbackTimer) clearTimeout(window.ttsFallbackTimer)
+    const expectedDuration = Math.max(String(text || '').length * 160 + 2000, 3500)
+    window.ttsFallbackTimer = setTimeout(() => {
+      if (isTTSPlaying && currentUtterance && currentUtterance.onend) {
+        console.warn('TTS onend fallback triggered')
+        currentUtterance.onend()
+      }
+    }, expectedDuration)
+
+    try {
+      synthesis.speak(currentUtterance)
+      if (isIOS) {
+        setTimeout(() => {
+          try {
+            if (synthesis.paused) synthesis.resume()
+          } catch (e) {}
+        }, 120)
+      }
+    } catch (e) {
+      console.warn('synthesis.speak failed', e)
+      isTTSPlaying = false
     }
   }
 
-  currentUtterance.onerror = (ev) => {
-    console.warn('TTS error', ev?.error)
-    isTTSPlaying = false
-    clearTimeout(window.ttsFallbackTimer)
+  // iOS: 마이크 녹음 세션이 완전히 풀린 뒤 TTS (바로 speak하면 무음인 경우 많음)
+  if (isIOS) {
+    stopMicTracks()
+    unlockAudioContextForIOS()
+    if (iosSpeakTimer) clearTimeout(iosSpeakTimer)
+    iosSpeakTimer = setTimeout(runSpeak, 450)
+    return
   }
 
-  isTTSPlaying = true
-  isPttHolding.value = false
-  if (recognition) {
-    try { recognition.stop() } catch (e) {}
-  }
-
-  if (window.ttsFallbackTimer) clearTimeout(window.ttsFallbackTimer)
-  const expectedDuration = Math.max(String(text || '').length * 150 + 1500, 3000)
-  window.ttsFallbackTimer = setTimeout(() => {
-    if (isTTSPlaying && currentUtterance && currentUtterance.onend) {
-      console.warn('TTS onend fallback triggered')
-      currentUtterance.onend()
-    }
-  }, expectedDuration)
-
-  try {
-    synthesis.speak(currentUtterance)
-    // iOS 간헐적 pause 상태 복구
-    if (isIOS) {
-      setTimeout(() => {
-        try {
-          if (synthesis.paused) synthesis.resume()
-        } catch (e) {}
-      }, 80)
-    }
-  } catch (e) {
-    console.warn('synthesis.speak failed', e)
-    isTTSPlaying = false
-  }
+  runSpeak()
 }
 
 /** wake 레거시 토글 — PTT에서는 버튼이 pointer 이벤트를 사용 */
