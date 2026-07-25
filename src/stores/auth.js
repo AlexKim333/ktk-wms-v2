@@ -14,7 +14,8 @@ function hasRole(user, name) {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
-    sessionChecked: false
+    sessionChecked: false,
+    loggingOut: false
   }),
   getters: {
     isLoggedIn: (state) => !!state.user,
@@ -67,14 +68,23 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    /**
+     * 화면 깜빡임 없이 로그아웃:
+     * 1) loggingOut=true 로 /login 이동 허용
+     * 2) 서버 세션 종료
+     * 3) user 제거
+     */
     async logout() {
+      this.loggingOut = true
+      this.sessionChecked = true
       try {
         await frappeApi.post('/api/method/logout')
       } catch (error) {
         console.error('로그아웃 에러:', error)
+      } finally {
+        this.user = null
+        this.loggingOut = false
       }
-      this.user = null
-      this.sessionChecked = true
     }
   }
 })

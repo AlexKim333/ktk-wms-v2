@@ -46,7 +46,8 @@ router.beforeEach(async (to) => {
   }
 
   // 이미 로그인된 상태에서 로그인 화면으로 가면 POS로
-  if ((to.path === '/login' || to.path === '/') && authStore.user) {
+  // loggingOut 중에는 /login 이동을 허용 (로그아웃 깜빡임/되돌림 방지)
+  if ((to.path === '/login' || to.path === '/') && authStore.user && !authStore.loggingOut) {
     return '/pos'
   }
 })

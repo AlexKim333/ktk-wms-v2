@@ -112,9 +112,10 @@ defineExpose({
   }
 })
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
+const handleLogout = async () => {
+  authStore.loggingOut = true
+  await router.replace('/login')
+  await authStore.logout()
 }
 </script>
 
