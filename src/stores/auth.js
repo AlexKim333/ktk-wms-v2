@@ -14,12 +14,11 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async logout() {
       try {
-        // 프라페 서버에 로그아웃 신고
-        await axios.post('/api/method/logout')
+        await axios.post('/api/method/logout', null, { withCredentials: true })
       } catch (error) {
         console.error('로그아웃 에러:', error)
       }
-      this.user = null // 출입증 파기
+      this.user = null
     }
   }
 })

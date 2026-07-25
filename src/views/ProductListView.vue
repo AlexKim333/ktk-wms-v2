@@ -242,10 +242,13 @@ const loadProducts = async () => {
     
   } catch (err) {
     console.error('Error loading products:', err)
-    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
-      alert('세션이 만료되었거나 권한이 없습니다. 다시 로그인해 주세요.')
+    const status = err.response?.status
+    if (status === 401) {
+      alert('세션이 만료되었습니다. 다시 로그인해 주세요.')
       authStore.logout()
       router.push('/login')
+    } else if (status === 403) {
+      alert('상품 데이터 조회 권한이 없습니다. 계정 역할을 확인하세요.')
     } else {
       alert(`Failed to load product data: ${err.message || err}`)
     }

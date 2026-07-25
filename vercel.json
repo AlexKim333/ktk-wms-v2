@@ -1,11 +1,10 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": null,
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://ktkpos.frappe.cloud/api/:path*"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
