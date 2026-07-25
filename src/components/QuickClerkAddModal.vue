@@ -83,7 +83,7 @@ const submitForm = async () => {
   try {
     // 1. Create User using Admin Token
     const adminApi = axios.create({
-      baseURL: import.meta.env.VITE_ERPNEXT_URL,
+      
       headers: {
         'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
         'Content-Type': 'application/json'

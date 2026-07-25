@@ -146,7 +146,7 @@ const handleLogin = async () => {
             // 프라페는 일반 유저가 자신의 Role을 조회하는 것을 차단하므로,
             // .env에 저장된 Admin 토큰을 사용하여 강제로 Role을 읽어옵니다.
             const adminApi = axios.create({
-              baseURL: import.meta.env.VITE_ERPNEXT_URL,
+              
               headers: {
                 'Authorization': `token ${import.meta.env.VITE_API_KEY}:${import.meta.env.VITE_API_SECRET}`,
                 'Content-Type': 'application/json'
