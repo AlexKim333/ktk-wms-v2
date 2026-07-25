@@ -150,10 +150,12 @@ const initSpeech = () => {
         }
       }, 2000)
     } else {
-      // 대기 모드일 때는 화면에 텍스트 표시하지 않고 조용히 호출어만 감지
-      if (final || interim) {
-        const lowerText = (final || interim).toLowerCase()
-        if (/(삼돌|3돌|잠돌|산돌|상돌|섬돌|참돌|탐돌|산더라|삼도라|잠도라|한돌|samdori|paquito|밖에 있다|바퀴토|파키토|자비스|jarvis)/i.test(lowerText)) {
+      // 대기 모드: 확정(final) 결과에서만 호출어 감지 — interim/소음으로 오인식 방지
+      if (final) {
+        const lowerText = final.toLowerCase().trim()
+        // 한글에는 \b가 약해서, 확정 문장 + 핵심 호출어만 허용
+        const wakeRegex = /(삼돌이|삼돌야|삼돌|잠돌이|잠돌|산돌이|산돌|samdori|paquito|파키토|자비스|jarvis)/i
+        if (wakeRegex.test(lowerText)) {
           wakeUp()
         }
       }
@@ -186,8 +188,8 @@ const handleFinalText = (text) => {
     if (/(취소|아니다|무시해|cancelar|cancela|olvídalo|olvidalo)/i.test(lowerText)) {
       clearTimeout(silenceTimer)
       const cancelMsg = locale.value === 'es' ? 'Comando cancelado.' : '명령이 취소되었습니다.'
-      speak(cancelMsg)
-      sleep()
+      speak(cancelMsg, { continueListening: false })
+      sleep('timeout')
       return
     }
 
@@ -195,12 +197,12 @@ const handleFinalText = (text) => {
     if (/(다시|뭐라고|못들었|한번 더|repetir|otra vez|repite)/i.test(lowerText)) {
       clearTimeout(silenceTimer)
       if (lastResponseText.value) {
-        speak(lastResponseText.value)
+        speak(lastResponseText.value, { continueListening: true })
       } else {
         const noMsg = locale.value === 'es' ? 'No hay respuesta anterior.' : '이전에 대답한 내용이 없습니다.'
-        speak(noMsg)
+        speak(noMsg, { continueListening: false })
+        sleep('timeout')
       }
-      sleep()
       return
     }
     
@@ -238,25 +240,27 @@ const wakeUp = () => {
 }
 
 const sleep = (reason = '') => {
-  if (isAwake && reason === 'timeout') {
-    const sleepMsg = locale.value === 'es' ? 'Volviendo al modo de espera.' : '대기 모드로 돌아갑니다.'
-    speak(sleepMsg)
-  }
+  clearTimeout(silenceTimer)
+  silenceTimer = null
   isAwake = false
-  statusText.value = '대기중 (호출어 대기중...)'
   transcript.value = ''
   finalTranscript.value = ''
+  // timeout 안내는 말하지 않음 — speak 후 silentWakeUp 루프("대기 모드로 돌아갑니다" 반복) 방지
+  statusText.value = '대기중 (호출어 대기중...)'
 }
 
 const silentWakeUp = () => {
   // TTS 메아리(자신이 한 말)가 마이크에 들어가는 것을 방지하기 위해 0.8초 후 마이크 개방
   setTimeout(() => {
+    // 이미 대기 모드로 강제 전환됐으면 연속 듣기 시작하지 않음
+    if (!isListening.value) return
+
     isAwake = true
     isOpen.value = true
     statusText.value = '이어서 듣고 있습니다...'
     finalTranscript.value = ''
     transcript.value = ''
-    
+
     clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
       if (isAwake && !transcript.value && !finalTranscript.value) {
@@ -289,7 +293,8 @@ const processAwakeCommand = async (fullText) => {
   lastQuestionText.value = fullText
   
   const analyzingMsg = locale.value === 'es' ? 'Analizando...' : '분석 중입니다.'
-  speak(analyzingMsg)
+  // 분석 안내 TTS 후에는 연속 듣기 금지 (중간 silentWakeUp 방지)
+  speak(analyzingMsg, { continueListening: false })
   
   try {
     const intent = await parseIntent(fullText, props.validItems, lastIntent.value)
@@ -304,6 +309,7 @@ const processAwakeCommand = async (fullText) => {
     lastIntent.value = intent
     emit('intent-parsed', intent)
     statusText.value = '명령 분석 완료'
+    // 부모 speak(결과)가 continueListening으로 이어서 듣게 함 — 여기서는 깨우지 않음
     sleep()
   } catch (error) {
     console.error(error)
@@ -333,8 +339,8 @@ const processAwakeCommand = async (fullText) => {
       errorMsg = locale.value === 'es' ? 'Error al procesar la respuesta de la IA.' : 'AI가 올바르지 않은 형식으로 대답했습니다.'
     }
     
-    speak(errorMsg)
-    sleep()
+    speak(errorMsg, { continueListening: false })
+    sleep('timeout')
   }
 }
 
@@ -382,9 +388,13 @@ const startRetryTimer = () => {
 
 let currentUtterance = null
 
-const speak = (text) => {
+const speak = (text, options = {}) => {
+  const { continueListening = true } = options
   lastResponseText.value = text
-  if (!synthesis) return
+  if (!synthesis) {
+    if (continueListening) silentWakeUp()
+    return
+  }
   currentUtterance = new SpeechSynthesisUtterance(text)
   const targetLang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
   currentUtterance.lang = targetLang
@@ -417,8 +427,10 @@ const speak = (text) => {
     if (isListening.value && recognition) {
       try { recognition.start() } catch (e) {}
     }
-    // 대답을 마친 후 바로 다시 마이크를 열어 연속 대화를 가능하게 함
-    silentWakeUp()
+    // 명령 결과 TTS만 연속 듣기. 안내/에러/대기 전환 TTS는 호출어 대기로 유지
+    if (continueListening) {
+      silentWakeUp()
+    }
   }
 
   isTTSPlaying = true

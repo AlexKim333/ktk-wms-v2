@@ -98,51 +98,54 @@ const activeNav = ref('branch-pos')
 const mobilePosViewRef = ref(null)
 const mobileTransferViewRef = ref(null)
 
-const ensureCartView = async () => {
-  if (
-    activeNav.value !== 'branch-pos' &&
-    activeNav.value !== 'pos' &&
-    activeNav.value !== 'branch-transfer'
-  ) {
-    activeNav.value = 'branch-pos'
-    await nextTick()
-  }
-}
-
-const getActiveCartView = async () => {
-  await ensureCartView()
-  if (activeNav.value === 'branch-transfer') {
-    if (!mobileTransferViewRef.value) await nextTick()
-    return mobileTransferViewRef.value
-  }
+/** 음성/삼돌이 장바구니는 항상 즉시출고(branch-pos). 이동 탭에 담으면 UI와 어긋남 */
+const waitForPosView = async () => {
   if (activeNav.value !== 'branch-pos' && activeNav.value !== 'pos') {
     activeNav.value = 'branch-pos'
+  }
+  for (let i = 0; i < 8; i++) {
+    if (mobilePosViewRef.value?.addFromVoice) return mobilePosViewRef.value
     await nextTick()
   }
-  if (!mobilePosViewRef.value) await nextTick()
   return mobilePosViewRef.value
 }
 
 defineExpose({
   addFromVoice: async (prod, qty) => {
-    const view = await getActiveCartView()
+    const view = await waitForPosView()
     if (!view?.addFromVoice) {
       return { ok: false, message: '모바일 장바구니에 연결하지 못했습니다.' }
     }
     return view.addFromVoice(prod, qty)
   },
   getCartItems: async () => {
-    const view = await getActiveCartView()
+    // 조회/전송도 즉시출고 장바구니 기준 (음성과 동일)
+    const view = await waitForPosView()
     if (!view?.getCartItems) return []
+    view.focusCart?.()
     return view.getCartItems()
   },
+  focusCart: async () => {
+    const view = await waitForPosView()
+    view?.focusCart?.()
+  },
   submitTransfer: async () => {
-    const view = await getActiveCartView()
+    const view = await waitForPosView()
     if (!view?.submitTransfer) {
       return { ok: false, message: '전송 화면에 연결하지 못했습니다.' }
     }
-    await view.submitTransfer()
-    return { ok: true }
+    try {
+      const result = await view.submitTransfer()
+      // 하위가 void를 돌려도 실패로 오인하지 않도록 정규화
+      if (result && typeof result === 'object' && 'ok' in result) return result
+      return { ok: true }
+    } catch (e) {
+      console.error('Mobile submitTransfer failed:', e)
+      return {
+        ok: false,
+        message: e?.message || 'Frappe 전송 중 오류가 발생했습니다.'
+      }
+    }
   }
 })
 

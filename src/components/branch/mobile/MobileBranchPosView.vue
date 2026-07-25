@@ -679,7 +679,12 @@ const {
 
 watch(searchQuery, () => resetListPage())
 
+const focusCart = () => {
+  mobileMode.value = 'cart'
+}
+
 const getCartItems = () => {
+  focusCart()
   return currentTab.value?.cartItems ? [...currentTab.value.cartItems] : []
 }
 
@@ -1081,23 +1086,35 @@ const updateDraft = async (isFinalApproval) => {
 // ----------------------------------------------------
 
 const submitTransfer = async () => {
-  if (!currentTab.value || currentTab.value.cartItems.length === 0) return
+  focusCart()
+
+  if (!currentTab.value || currentTab.value.cartItems.length === 0) {
+    return { ok: false, message: '장바구니가 비어 있어 전송할 수 없습니다.' }
+  }
+
+  // 음성 전송 시 요청자 미선택이면 로그인 사용자로 자동 채움
   if (!currentTab.value.selectedRequester) {
-    alert('Please select a clerk.')
-    return
+    currentTab.value.selectedRequester =
+      authStore.user?.full_name || authStore.user?.member_name || authStore.user?.email || ''
+  }
+  if (!currentTab.value.selectedRequester) {
+    const msg = '요청자(점원)를 선택해 주세요.'
+    alert(msg)
+    return { ok: false, message: msg }
+  }
+
+  if (isSubmitting.value) {
+    return { ok: false, message: '이미 전송 중입니다. 잠시만 기다려 주세요.' }
   }
 
   isSubmitting.value = true
   try {
-    const isClerk = userRole.value === 'Representative'
-    const isManager = userRole.value === 'Manager'
-    const isAdmin = ['Admin', 'Monitor'].includes(userRole.value)
-    
     const scheduleDate = new Date()
     scheduleDate.setDate(scheduleDate.getDate() + 1)
     const dateStr = scheduleDate.toISOString().split('T')[0]
 
     let docName = ''
+    let docType = ''
 
     if (orderType.value === 'immediate') {
       const payload = {
@@ -1120,6 +1137,7 @@ const submitTransfer = async () => {
       }
       const res = await adminApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
+      docType = 'Stock Entry'
       
       let totalBultoCount = 0
       let totalPzsCount = 0
@@ -1171,7 +1189,7 @@ const submitTransfer = async () => {
         owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 강제 지정
         custom_branch: authStore.user?.branch_name,
         custom_orderer: currentTab.value.selectedRequester,
-        custom_approval_stage: isClerk ? 'Clerk Request' : 'Manager Approval',
+        custom_approval_stage: isClerk.value ? 'Clerk Request' : 'Manager Approval',
         items: currentTab.value.cartItems.map(item => ({
           item_code: item.item_code,
           qty: item.totalQty,
@@ -1183,11 +1201,13 @@ const submitTransfer = async () => {
       }
       const res = await adminApi.post('/api/resource/Material Request', payload)
       docName = res.data.data.name
-      alert($t('branch.transfer.msg_submit_success'))
+      docType = 'Material Request'
+      alert(t('branch.transfer.msg_submit_success'))
     }
     
-    if(!isClerk) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
+    if (!isClerk.value) currentTab.value.cartItems = [] // Manager's draft clears, clerk's draft stays read-only
     emit('refresh-items')
+    return { ok: true, docName, docType, orderType: orderType.value }
   } catch (error) {
     console.error('Submit error:', error)
     let errorMsg = t('branch.transfer.msg_err_transfer')
@@ -1202,6 +1222,7 @@ const submitTransfer = async () => {
       }
     }
     alert(errorMsg)
+    return { ok: false, message: errorMsg }
   } finally {
     isSubmitting.value = false
   }
@@ -1210,6 +1231,7 @@ const submitTransfer = async () => {
 defineExpose({
   addFromVoice,
   getCartItems,
+  focusCart,
   submitTransfer
 })
 </script>

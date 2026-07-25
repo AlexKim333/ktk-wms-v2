@@ -2720,18 +2720,24 @@ const findProductForVoice = (itemCode) => {
   )
 }
 
+const resolveMobileLayout = async () => {
+  // 폭 판별보다 실제 마운트된 모바일 레이아웃을 우선 (웹 모바일/PWA 오판 방지)
+  for (let i = 0; i < 5; i++) {
+    const layout = mobileLayoutRef.value
+    if (layout?.addFromVoice) return layout
+    await nextTick()
+  }
+  return mobileLayoutRef.value
+}
+
 const handleSamdoriIntent = async (intentObj) => {
   const { intent, item, qty } = intentObj || {}
 
-  // 모바일: 데스크톱 장바구니로 절대 폴백하지 않음
-  if (isMobile.value) {
-    await nextTick()
-    let layout = mobileLayoutRef.value
-    if (!layout) {
-      await nextTick()
-      layout = mobileLayoutRef.value
-    }
+  const layout = await resolveMobileLayout()
+  const useMobileCart = !!(isMobile.value || layout?.addFromVoice)
 
+  // 모바일 UI/레이아웃이 있으면 데스크톱 장바구니로 절대 폴백하지 않음
+  if (useMobileCart) {
     if (intent === 'add_order') {
       const prod = findProductForVoice(item)
       if (!prod) {
@@ -2743,7 +2749,7 @@ const handleSamdoriIntent = async (intentObj) => {
         const msg =
           locale.value === 'es'
             ? 'No se pudo conectar con el carrito móvil.'
-            : '모바일 장바구니에 연결하지 못했습니다. 즉시출고 화면인지 확인해 주세요.'
+            : '모바일 장바구니에 연결하지 못했습니다. 즉시출고 탭인지 확인해 주세요.'
         if (samdori.value) samdori.value.speak(msg)
         return
       }
@@ -2754,6 +2760,19 @@ const handleSamdoriIntent = async (intentObj) => {
         if (samdori.value) samdori.value.speak(result.message || '장바구니에 담지 못했습니다.')
         return
       }
+
+      // 실제로 카트에 들어갔는지 재확인 후 성공 멘트
+      const cartAfter = layout.getCartItems ? ((await layout.getCartItems()) || []) : []
+      const added = cartAfter.some((c) => c.item_code === prod.name || c.item_code === item)
+      if (!added) {
+        const msg =
+          locale.value === 'es'
+            ? 'No se pudo agregar al carrito. Intente de nuevo.'
+            : '장바구니 반영에 실패했습니다. 즉시출고 화면에서 다시 시도해 주세요.'
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+
       const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
       if (samdori.value) samdori.value.speak(msg)
       return
@@ -2761,10 +2780,14 @@ const handleSamdoriIntent = async (intentObj) => {
 
     if (intent === 'check') {
       if (!layout?.getCartItems) {
-        const msg = locale.value === 'es' ? `El carrito está vacío.` : `현재 장바구니가 비어있습니다.`
+        const msg =
+          locale.value === 'es'
+            ? 'No se pudo conectar con el carrito móvil.'
+            : '모바일 장바구니에 연결하지 못했습니다. 즉시출고 탭인지 확인해 주세요.'
         if (samdori.value) samdori.value.speak(msg)
         return
       }
+      if (layout.focusCart) await layout.focusCart()
       const cartItems = (await layout.getCartItems()) || []
       const count = cartItems.length
       if (count === 0) {
@@ -2777,8 +2800,8 @@ const handleSamdoriIntent = async (intentObj) => {
         : `현재 장바구니에 ${count}종류의 상품이 있습니다. `
       const details = cartItems.map((cartItem) => {
         const code = cartItem.item_code || cartItem.name || ''
-        const boxes = cartItem.boxQty || 0
-        const eaches = cartItem.eachQty || 0
+        const boxes = cartItem.boxQty || cartItem.input_box || 0
+        const eaches = cartItem.eachQty || cartItem.input_each || 0
         if (locale.value === 'es') return `${code} ${boxes} cajas, ${eaches} sueltos`
         let str = code
         if (boxes > 0) str += ` ${boxes}박스`
@@ -2805,9 +2828,37 @@ const handleSamdoriIntent = async (intentObj) => {
         if (samdori.value) samdori.value.speak(msg)
         return
       }
-      const msg = locale.value === 'es' ? `Enviando pedido de sucursal...` : `지점 발주서를 전송합니다.`
-      if (samdori.value) samdori.value.speak(msg)
-      await layout.submitTransfer()
+
+      const startMsg =
+        locale.value === 'es'
+          ? `Enviando ${cartItems.length} productos a Frappe...`
+          : `장바구니 ${cartItems.length}종을 Frappe로 전송합니다.`
+      if (samdori.value) samdori.value.speak(startMsg)
+
+      let result
+      try {
+        result = await layout.submitTransfer()
+      } catch (e) {
+        console.error(e)
+        const msg =
+          locale.value === 'es'
+            ? 'Error al enviar el pedido.'
+            : 'Frappe 전송 중 오류가 발생했습니다.'
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
+
+      if (result && result.ok === false) {
+        if (samdori.value) {
+          samdori.value.speak(result.message || (locale.value === 'es' ? 'No se pudo enviar.' : '전송에 실패했습니다.'))
+        }
+        return
+      }
+
+      const doneMsg = locale.value === 'es'
+        ? (result?.docName ? `Pedido enviado. Documento ${result.docName}.` : 'Pedido enviado correctamente.')
+        : (result?.docName ? `전송 완료. 문서번호 ${result.docName} 입니다.` : 'Frappe 전송이 완료되었습니다.')
+      if (samdori.value) samdori.value.speak(doneMsg)
       return
     }
 

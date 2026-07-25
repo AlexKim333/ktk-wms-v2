@@ -78,10 +78,16 @@ Supported intents:
    If qty is missing, default qty to 1.
    
 3. "check": Checking what is ALREADY in the cart (장바구니 조회). NOT adding.
-   Examples: "장바구니 확인해줘", "장바구니 조회", "뭐 담겨 있어?", "주문 리스트 확인해줘", "Revisa el carrito", "Revisa la lista"
+   Treat ALL of these as "check":
+   - "장바구니 확인해줘", "장바구니 조회", "카트 확인해", "뭐 담겨 있어?", "뭐 들어있어?", "주문 리스트 확인해줘", "리스트 보여줘"
+   - Spanish: "Revisa el carrito", "Revisa la lista", "Qué hay en el carrito?"
    Required fields: "intent": "check"
    
-4. "submit": Submitting or transmitting the order. (e.g. "주문 전송", "Enviar pedido")
+4. "submit": Submitting / transmitting the cart order to Frappe (ERP).
+   Treat ALL of these as the SAME intent "submit" (do NOT invent "send" / "transfer"):
+   - "주문 전송", "전송해줘", "전송", "올려줘", "발주 올려", "프라페 전송", "Frappe 전송", "ERP 전송", "제출해줘", "보내줘"
+   - STT mishears: "청송", "전송해", "프라빼 전송", "푸라페 전송" → still "submit"
+   - Spanish: "Enviar pedido", "Envía el pedido", "Manda el pedido", "Confirma el pedido"
    Required fields: "intent": "submit"
 
 5. "none": If the user's command is just meaningless background noise, incomplete chatter, or lacks any clear WMS action (e.g. check, add, submit, search), DO NOT force an intent. Simply output {"intent": "none"}
