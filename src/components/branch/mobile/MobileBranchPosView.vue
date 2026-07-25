@@ -624,6 +624,7 @@ const addFromVoice = (item, qty = 1) => {
       totalQty: qty * packQty
     });
   }
+  mobileMode.value = 'cart'
 }
 
 // Init Search Index

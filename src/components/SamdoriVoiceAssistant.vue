@@ -229,15 +229,19 @@ const wakeUp = () => {
   const reply = locale.value === 'es' ? 'Dígame, señor.' : '네, 말씀하세요.'
   speak(reply)
   
-  // 10초간 입력이 없으면 자동으로 대기 모드로
+  // 3초간 입력이 없으면 자동으로 대기 모드로
   setTimeout(() => {
     if (isAwake && !transcript.value && !finalTranscript.value) {
-      sleep()
+      sleep('timeout')
     }
-  }, 10000)
+  }, 3000)
 }
 
-const sleep = () => {
+const sleep = (reason = '') => {
+  if (isAwake && reason === 'timeout') {
+    const sleepMsg = locale.value === 'es' ? 'Volviendo al modo de espera.' : '대기 모드로 돌아갑니다.'
+    speak(sleepMsg)
+  }
   isAwake = false
   statusText.value = '대기중 (호출어 대기중...)'
   transcript.value = ''
@@ -256,9 +260,9 @@ const silentWakeUp = () => {
     clearTimeout(silenceTimer)
     silenceTimer = setTimeout(() => {
       if (isAwake && !transcript.value && !finalTranscript.value) {
-        sleep()
+        sleep('timeout')
       }
-    }, 10000)
+    }, 3000)
   }, 800)
 }
 
@@ -272,9 +276,9 @@ const manualWakeUp = () => {
   clearTimeout(silenceTimer)
   silenceTimer = setTimeout(() => {
     if (isAwake && !transcript.value && !finalTranscript.value) {
-      sleep()
+      sleep('timeout')
     }
-  }, 10000)
+  }, 3000)
 }
 
 const processAwakeCommand = async (fullText) => {
@@ -289,6 +293,14 @@ const processAwakeCommand = async (fullText) => {
   
   try {
     const intent = await parseIntent(fullText, props.validItems, lastIntent.value)
+    
+    // meaningless noise filter
+    if (intent.intent === 'none') {
+      statusText.value = '명령이 명확하지 않아 무시됨'
+      sleep('timeout')
+      return
+    }
+    
     lastIntent.value = intent
     emit('intent-parsed', intent)
     statusText.value = '명령 분석 완료'
