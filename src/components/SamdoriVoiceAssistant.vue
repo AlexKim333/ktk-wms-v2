@@ -36,6 +36,9 @@
         </div>
         
         <div class="intent-box" v-if="lastIntent">
+          <div v-if="lastIntent._tokenUsage" style="margin-bottom: 10px; font-size: 11px; color: #64748b; background: #f8fafc; padding: 4px 8px; border-radius: 4px; display: inline-block;">
+            <strong>Tokens:</strong> 입력 {{ lastIntent._tokenUsage.promptTokenCount }} | 출력 {{ lastIntent._tokenUsage.candidatesTokenCount }} | 총 {{ lastIntent._tokenUsage.totalTokenCount }}
+          </div>
           <h4>🤖 AI 분석 결과:</h4>
           <div v-if="lastIntent.intent === 'search'">
             <span class="badge bg-blue">재고조회</span> <strong>{{ lastIntent.item }}</strong>
@@ -64,7 +67,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { parseIntent } from '../utils/SamdoriBrain'
+import { parseIntent, parseIntentFromAudio } from '../utils/SamdoriBrain'
+
+const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 /**
  * 입력 모드
@@ -98,6 +103,8 @@ const debugError = ref('')
 const queuedCommand = ref(null)
 
 let recognition = null
+let mediaRecorder = null
+let audioChunks = []
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
@@ -173,7 +180,7 @@ const submitManual = () => {
   processAwakeCommand(cmd)
 }
 
-const onPttDown = (e) => {
+const onPttDown = async (e) => {
   if (INPUT_MODE !== 'ptt') return
   e.preventDefault()
   if (typeof e.button === 'number' && e.button !== 0) return
@@ -194,6 +201,34 @@ const onPttDown = (e) => {
   finalTranscript.value = ''
   transcript.value = ''
   statusText.value = '녹음 중... 손을 떼면 분석합니다'
+
+  if (isIOS) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaRecorder = new MediaRecorder(stream)
+      audioChunks = []
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunks.push(event.data)
+      }
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' })
+        const reader = new FileReader()
+        reader.readAsDataURL(audioBlob)
+        reader.onloadend = () => {
+          const base64data = reader.result.split(',')[1]
+          processAudioCommand(base64data, audioBlob.type)
+        }
+        // Release camera/mic
+        stream.getTracks().forEach(track => track.stop())
+      }
+      mediaRecorder.start()
+    } catch (err) {
+      statusText.value = '마이크 권한이 거부되었습니다.'
+      isListening.value = false
+      isPttHolding.value = false
+    }
+    return
+  }
 
   if (!recognition) initSpeech()
   if (!recognition) return
@@ -219,8 +254,16 @@ const onPttUp = (e) => {
     e.currentTarget.releasePointerCapture?.(e.pointerId)
   } catch (err) {}
 
-  const cmd = `${finalTranscript.value || ''} ${transcript.value || ''}`.trim()
   isListening.value = false
+
+  if (isIOS) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop()
+    }
+    return
+  }
+
+  const cmd = `${finalTranscript.value || ''} ${transcript.value || ''}`.trim()
   if (recognition) {
     try { recognition.stop() } catch (err) {}
   }
@@ -448,7 +491,89 @@ const manualWakeUp = () => {
   startCommandWindow(COMMAND_WINDOW_MS)
 }
 
+
+const processAudioCommand = async (base64Audio, mimeType) => {
+  clearTimeout(silenceTimer)
+  silenceTimer = null
+  clearCommandWindow()
+  statusText.value = 'AI 오디오 분석 중...'
+  debugError.value = ''
+  transcript.value = ''
+  finalTranscript.value = '오디오 전송 완료 (분석 중)'
+
+  const analyzingMsg = locale.value === 'es' ? 'Analizando audio...' : '오디오 분석 중입니다.'
+  speak(analyzingMsg, { continueListening: false, saveCache: false })
+
+  try {
+    const intent = await parseIntentFromAudio(base64Audio, mimeType, props.validItems, lastIntent.value)
+    handleParsedIntent(intent, '오디오 명령')
+  } catch (error) {
+    handleIntentError(error, null)
+  }
+}
+
+const handleParsedIntent = (intent, cmdRawText) => {
+  if (
+    intent.intent === 'none' &&
+    lastIntent.value?.intent === 'search' &&
+    lastIntent.value?.item &&
+    cmdRawText && cmdRawText.length <= 40
+  ) {
+    intent.intent = 'search'
+    intent.item = lastIntent.value.item
+    intent.warehouse = cmdRawText
+  }
+
+  if (intent.intent === 'none') {
+    statusText.value = '명령이 명확하지 않아 무시됨'
+    sleep('timeout')
+    return
+  }
+
+  if ((intent.intent === 'add_order' || intent.intent === 'search') && lastIntent.value?.item) {
+    const rawItem = String(intent.item || '').trim()
+    const weakItem = !rawItem || /^(이거|이것|그거|그것|얘|this|that|eso|este|esta)$/i.test(rawItem)
+    if (weakItem) intent.item = lastIntent.value.item
+  }
+  if (intent.intent === 'add_order') {
+    const n = Number(intent.qty)
+    intent.qty = Number.isFinite(n) && n > 0 ? n : 1
+  }
+
+  lastIntent.value = intent
+  emit('intent-parsed', intent)
+  statusText.value = '명령 분석 완료'
+  sleep()
+}
+
+const handleIntentError = (error, queuedFullText) => {
+  console.error(error)
+  statusText.value = '분석 실패: ' + error.message
+  
+  if (error.response) {
+    debugError.value = `Server Error [${error.response.status}]: ${JSON.stringify(error.response.data)}`
+  } else {
+    debugError.value = `Client/Parser Error: ${error.name} - ${error.message}\n${error.stack}`
+  }
+  
+  let errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
+  
+  if (error.response && error.response.status === 503) {
+    errorMsg = locale.value === 'es' ? 'El servidor está retrasado.' : '서버 접속 대기열에 등록되었습니다.'
+    if (queuedFullText) {
+      queuedCommand.value = queuedFullText
+      startRetryTimer()
+    }
+  } else if (error.response && error.response.status === 429) {
+    errorMsg = locale.value === 'es' ? 'Límite superado.' : 'AI 호출 한도를 초과했습니다.'
+  }
+  
+  speak(errorMsg, { continueListening: false })
+  sleep('timeout')
+}
+
 const processAwakeCommand = async (fullText) => {
+
   const cmd = (fullText || '').trim()
   if (!cmd) return
 
@@ -468,72 +593,9 @@ const processAwakeCommand = async (fullText) => {
 
   try {
     const intent = await parseIntent(cmd, props.validItems, lastIntent.value)
-
-    // 관리자 창고 재질문 답변: Gemini가 none으로 줘도, 직전이 search면 창고명으로 재시도
-    if (
-      intent.intent === 'none' &&
-      lastIntent.value?.intent === 'search' &&
-      lastIntent.value?.item &&
-      cmd.length <= 40
-    ) {
-      intent.intent = 'search'
-      intent.item = lastIntent.value.item
-      intent.warehouse = cmd
-    }
-
-    // meaningless noise filter
-    if (intent.intent === 'none') {
-      statusText.value = '명령이 명확하지 않아 무시됨'
-      sleep('timeout')
-      return
-    }
-
-    // 품명검색 → 담기 2단계: Gemini가 item을 빼먹거나 대명사만 주면 직전 품목 재사용
-    if ((intent.intent === 'add_order' || intent.intent === 'search') && lastIntent.value?.item) {
-      const rawItem = String(intent.item || '').trim()
-      const weakItem = !rawItem || /^(이거|이것|그거|그것|얘|this|that|eso|este|esta)$/i.test(rawItem)
-      if (weakItem) intent.item = lastIntent.value.item
-    }
-    if (intent.intent === 'add_order') {
-      const n = Number(intent.qty)
-      intent.qty = Number.isFinite(n) && n > 0 ? n : 1
-    }
-
-    lastIntent.value = intent
-    emit('intent-parsed', intent)
-    statusText.value = '명령 분석 완료'
-    // 부모 speak(결과)가 continueListening으로 이어서 듣게 함 — 여기서는 깨우지 않음
-    sleep()
+    handleParsedIntent(intent, cmd)
   } catch (error) {
-    console.error(error)
-    // 분석 실패해도 직전 품목 메모리는 유지 (검색→담기 흐름 보호)
-    statusText.value = '분석 실패: ' + error.message
-    
-    // 에러 원인 상세 출력 (디버그용)
-    if (error.response) {
-      debugError.value = `Server Error [${error.response.status}]: ${JSON.stringify(error.response.data)}`
-    } else {
-      debugError.value = `Client/Parser Error: ${error.name} - ${error.message}\n${error.stack}`
-    }
-    
-    let errorMsg = locale.value === 'es' ? 'Lo siento, no entendí.' : '죄송합니다. 무슨 말인지 이해하지 못했습니다.'
-    
-    if (error.response && error.response.status === 503) {
-      errorMsg = locale.value === 'es' ? 'El servidor de Google AI está retrasado. Puesto en cola para reintento automático.' : '현재 구글 AI 서버에 사용자가 몰려 지연되고 있습니다. 접속 대기열에 등록되었으며, 복구 시 자동 처리됩니다.'
-      
-      // 큐에 등록하고 자동 재시도 시작
-      queuedCommand.value = fullText
-      startRetryTimer()
-    } else if (error.response && error.response.status === 429) {
-      errorMsg = locale.value === 'es' ? 'Se ha superado el límite de uso de IA. Por favor, inténtelo de nuevo más tarde.' : 'AI 호출 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.'
-    } else if (error.response && error.response.status === 404) {
-      errorMsg = locale.value === 'es' ? 'Modelo de IA no encontrado.' : 'AI 모델을 찾을 수 없습니다.'
-    } else if (error.name === 'SyntaxError') {
-      errorMsg = locale.value === 'es' ? 'Error al procesar la respuesta de la IA.' : 'AI가 올바르지 않은 형식으로 대답했습니다.'
-    }
-    
-    speak(errorMsg, { continueListening: false })
-    sleep('timeout')
+    handleIntentError(error, fullText)
   }
 }
 
