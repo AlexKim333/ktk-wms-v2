@@ -105,6 +105,8 @@ const queuedCommand = ref(null)
 let recognition = null
 let mediaRecorder = null
 let audioChunks = []
+let activeMicStream = null
+let audioSessionId = 0
 let synthesis = window.speechSynthesis
 let isAwake = false
 let silenceTimer = null
@@ -114,6 +116,13 @@ let retryTimer = null
 let pttPointerId = null
 /** "다시 말해줘"용 — 분석 안내 TTS/버튼 뗌으로는 지우지 않음 */
 let cachedReply = ''
+
+const stopMicTracks = (stream) => {
+  try {
+    ;(stream || activeMicStream)?.getTracks?.().forEach((t) => t.stop())
+  } catch (e) {}
+  if (!stream || stream === activeMicStream) activeMicStream = null
+}
 
 /** 레거시(wake) 전용 타이머 상수 — PTT에서는 사용하지 않음 */
 const COMMAND_WINDOW_MS = 6000
@@ -203,29 +212,68 @@ const onPttDown = async (e) => {
   statusText.value = '녹음 중... 손을 떼면 분석합니다'
 
   if (isIOS) {
+    const sessionId = ++audioSessionId
     try {
+      // 이전 세션 마이크가 남아 있으면 정리
+      stopMicTracks()
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.stop() } catch (e) {}
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorder = new MediaRecorder(stream)
+      // 권한 대기 중 손을 이미 뗐으면 녹음 시작하지 않음 (레이스 방지)
+      if (!isPttHolding.value || sessionId !== audioSessionId) {
+        stopMicTracks(stream)
+        return
+      }
+
+      activeMicStream = stream
       audioChunks = []
+      const preferredMime = MediaRecorder.isTypeSupported?.('audio/mp4')
+        ? 'audio/mp4'
+        : (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '')
+      mediaRecorder = preferredMime
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream)
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunks.push(event.data)
       }
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' })
-        const reader = new FileReader()
-        reader.readAsDataURL(audioBlob)
-        reader.onloadend = () => {
-          const base64data = reader.result.split(',')[1]
-          processAudioCommand(base64data, audioBlob.type)
+      mediaRecorder.onstop = () => {
+        const mime = mediaRecorder?.mimeType || preferredMime || 'audio/mp4'
+        const audioBlob = new Blob(audioChunks, { type: mime })
+        stopMicTracks(stream)
+
+        if (sessionId !== audioSessionId) return
+        if (!audioBlob.size || audioChunks.length === 0) {
+          statusText.value = '버튼을 누른 채 말씀해 주세요'
+          isAwake = false
+          return
         }
-        // Release camera/mic
-        stream.getTracks().forEach(track => track.stop())
+
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          if (sessionId !== audioSessionId) return
+          const base64data = String(reader.result || '').split(',')[1]
+          if (!base64data) {
+            statusText.value = '오디오 변환에 실패했습니다.'
+            return
+          }
+          processAudioCommand(base64data, mime)
+        }
+        reader.onerror = () => {
+          statusText.value = '오디오 변환에 실패했습니다.'
+        }
+        reader.readAsDataURL(audioBlob)
       }
       mediaRecorder.start()
+      isListening.value = true
     } catch (err) {
-      statusText.value = '마이크 권한이 거부되었습니다.'
+      console.error('iOS MediaRecorder start failed:', err)
+      statusText.value = '마이크 권한이 거부되었거나 녹음을 시작할 수 없습니다.'
       isListening.value = false
       isPttHolding.value = false
+      stopMicTracks()
     }
     return
   }
@@ -257,8 +305,19 @@ const onPttUp = (e) => {
   isListening.value = false
 
   if (isIOS) {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    // getUserMedia 대기 중 손을 뗀 경우: 세션 무효화 후 마이크 정리
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      audioSessionId += 1
+      stopMicTracks()
+      statusText.value = '버튼을 누른 채 말씀해 주세요'
+      isAwake = false
+      return
+    }
+    try {
       mediaRecorder.stop()
+    } catch (err) {
+      stopMicTracks()
+      statusText.value = '녹음 종료에 실패했습니다.'
     }
     return
   }
@@ -493,11 +552,16 @@ const manualWakeUp = () => {
 
 
 const processAudioCommand = async (base64Audio, mimeType) => {
+  if (!base64Audio) {
+    statusText.value = '오디오가 비어 있습니다.'
+    return
+  }
   clearTimeout(silenceTimer)
   silenceTimer = null
   clearCommandWindow()
   statusText.value = 'AI 오디오 분석 중...'
   debugError.value = ''
+  lastQuestionText.value = '(음성 명령)'
   transcript.value = ''
   finalTranscript.value = '오디오 전송 완료 (분석 중)'
 
@@ -505,19 +569,31 @@ const processAudioCommand = async (base64Audio, mimeType) => {
   speak(analyzingMsg, { continueListening: false, saveCache: false })
 
   try {
-    const intent = await parseIntentFromAudio(base64Audio, mimeType, props.validItems, lastIntent.value)
-    handleParsedIntent(intent, '오디오 명령')
+    const safeMime = mimeType && String(mimeType).includes('/') ? mimeType : 'audio/mp4'
+    const intent = await parseIntentFromAudio(base64Audio, safeMime, props.validItems, lastIntent.value)
+    // 오디오 경로는 원문 텍스트가 없음 — 창고 재질문 폴백 문자열을 넣지 않음
+    handleParsedIntent(intent, null, { fromAudio: true })
   } catch (error) {
     handleIntentError(error, null)
   }
 }
 
-const handleParsedIntent = (intent, cmdRawText) => {
+const handleParsedIntent = (intent, cmdRawText, options = {}) => {
+  if (!intent || typeof intent !== 'object') {
+    statusText.value = '명령이 명확하지 않아 무시됨'
+    sleep('timeout')
+    return
+  }
+
+  // 텍스트 PTT만: none + 짧은 발화를 창고명 후속으로 간주
+  // (오디오 경로에서 더미 문자열이 warehouse로 들어가면 안 됨)
   if (
+    !options.fromAudio &&
     intent.intent === 'none' &&
     lastIntent.value?.intent === 'search' &&
     lastIntent.value?.item &&
-    cmdRawText && cmdRawText.length <= 40
+    cmdRawText &&
+    String(cmdRawText).length <= 40
   ) {
     intent.intent = 'search'
     intent.item = lastIntent.value.item

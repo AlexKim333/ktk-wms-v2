@@ -133,8 +133,11 @@ User's Command: "${text}"
       }
     });
 
-    let responseText = response.data.candidates[0].content.parts[0].text;
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const partText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!partText) {
+      throw new Error('Gemini returned empty candidates (blocked or no content).');
+    }
+    let responseText = partText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(responseText);
     
     // Add token usage metadata
@@ -277,8 +280,11 @@ The user's command is provided as the attached audio file.
       }
     });
 
-    let responseText = response.data.candidates[0].content.parts[0].text;
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const partText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!partText) {
+      throw new Error('Gemini audio returned empty candidates (blocked, unsupported mime, or no content).');
+    }
+    let responseText = partText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(responseText);
     
     // Add token usage metadata
