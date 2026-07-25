@@ -144,7 +144,19 @@ const handleLogin = async () => {
     }
   } catch (error) {
     console.error('Login Error:', error)
-    alert('Login failed: Please check your ID and Password, or Frappe server status.')
+    const status = error.response?.status
+    const serverMsg =
+      error.response?.data?.message ||
+      error.response?.data?.exc_type ||
+      error.message ||
+      ''
+    if (status === 404) {
+      alert('로그인 API를 찾을 수 없습니다(404). Vercel /api 프록시 배포 상태를 확인하세요.')
+    } else if (status === 401 || status === 403) {
+      alert('로그인 실패: 아이디/비밀번호를 확인하세요.')
+    } else {
+      alert(`Login failed (${status || 'network'}): ${serverMsg || 'Frappe server / proxy error'}`)
+    }
   } finally {
     isLoading.value = false
   }

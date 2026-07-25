@@ -1,24 +1,31 @@
 /**
  * Resolve WMS profile from the Frappe session cookie (no API token).
+ * Designed so login still succeeds even if User doctype read is restricted.
  */
 export async function resolveLoginProfile(frappeApi, username) {
   let roles = []
   let branch = null
   let accessLevel = 'Representative'
   let memberName = username
+  let fullName = null
 
   try {
     const loggedRes = await frappeApi.get('/api/method/frappe.auth.get_logged_user')
     const loggedUser = loggedRes.data?.message
     if (!loggedUser || loggedUser === 'Guest') {
-      throw new Error('Session not established after login')
+      throw new Error('Session not established after login (Guest)')
     }
     memberName = loggedUser
 
-    const rolesRes = await frappeApi.get('/api/method/frappe.get_roles', {
-      params: { uid: loggedUser }
-    })
-    roles = Array.isArray(rolesRes.data?.message) ? rolesRes.data.message : []
+    // 1) Roles via session method (does not require User doctype read)
+    try {
+      const rolesRes = await frappeApi.get('/api/method/frappe.get_roles', {
+        params: { uid: loggedUser }
+      })
+      roles = Array.isArray(rolesRes.data?.message) ? rolesRes.data.message : []
+    } catch (roleErr) {
+      console.warn('frappe.get_roles failed', roleErr)
+    }
 
     // Manager before Clerk — dual-role users should not be demoted
     if (roles.includes('System Manager') || roles.includes('Administrator')) {
@@ -29,6 +36,7 @@ export async function resolveLoginProfile(frappeApi, username) {
       accessLevel = 'Representative'
     }
 
+    // 2) Branch / name — best effort (may 403 for some accounts)
     try {
       const userRes = await frappeApi.get(`/api/resource/User/${encodeURIComponent(loggedUser)}`, {
         params: {
@@ -36,8 +44,9 @@ export async function resolveLoginProfile(frappeApi, username) {
         }
       })
       branch = userRes.data?.data?.location || null
-    } catch (_) {
-      /* User read may be restricted; fall through to User Permission */
+      fullName = userRes.data?.data?.full_name || null
+    } catch (userErr) {
+      console.warn('User resource read failed (session still valid)', userErr?.response?.status || userErr)
     }
 
     if (!branch) {
@@ -72,6 +81,7 @@ export async function resolveLoginProfile(frappeApi, username) {
 
   return {
     member_name: memberName,
+    full_name: fullName,
     access_level: accessLevel,
     branch_name: branch,
     roles
