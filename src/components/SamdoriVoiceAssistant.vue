@@ -2,13 +2,17 @@
   <div class="samdori-container" :class="{ active: isPttHolding || isListening }">
     <div
       class="samdori-button"
+      role="button"
+      aria-label="Samdori"
       :class="{ pulsing: isPttHolding || isListening }"
       @pointerdown="onPttDown"
       @pointerup="onPttUp"
       @pointercancel="onPttUp"
       @contextmenu.prevent
+      @dragstart.prevent
     >
-      <img src="/samdori-icon.jpg" class="samdori-avatar" alt="Samdori" />
+      <!-- img 대신 배경 이미지: iOS 길게 누르기 시 사진 확대/저장 팝업 방지 -->
+      <span class="samdori-avatar" aria-hidden="true"></span>
     </div>
     
     <div class="samdori-panel" v-if="isOpen">
@@ -857,6 +861,8 @@ defineExpose({
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .samdori-button:hover {
@@ -865,12 +871,17 @@ defineExpose({
   }
   
   .samdori-avatar {
-    width: 100%;
-    height: 100%;
+    width: 85%;
+    height: 85%;
     border-radius: 50%;
-    object-fit: cover;
-    transform: scale(0.85); /* Creates a glowing ring effect from the background gradient */
+    background-image: url('/samdori-icon.jpg');
+    background-size: cover;
+    background-position: center;
     box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   
   .samdori-button.pulsing {
