@@ -37,10 +37,23 @@ Never output a partial code like "P-160" if a full code like "P-160-NEGRO-400" e
 
   let contextPrompt = ''
   if (lastIntent && lastIntent.item) {
+    const lastAction = lastIntent.intent || 'unknown'
     contextPrompt = `
 CONVERSATION CONTEXT (MEMORY):
-The user recently interacted with the item: "${lastIntent.item}".
-If the user's command contains pronouns like "이거", "이것", "그거", "그것" (this/that) without explicitly naming a product, you MUST ASSUME they are referring to "${lastIntent.item}".
+The user recently interacted with the item: "${lastIntent.item}" (last action intent: "${lastAction}").
+You MUST reuse "${lastIntent.item}" as the "item" field when the user refers to that product WITHOUT stating a full new item code.
+
+Treat ALL of the following as referring to "${lastIntent.item}":
+- Pronouns: "이거", "이것", "그거", "그것", "얘", "this", "that", "eso", "este", "esta"
+- Recall phrases (Korean): "아까", "방금", "이전", "조회했던", "조회한", "검색한", "확인한", "그 제품", "그 품목", "그거", "아까 거", "아까 조회했던 것/거", "방금 본 거"
+- Recall phrases (Spanish): "el de antes", "el que busqué", "el que consulté", "ese producto", "el anterior", "el mismo"
+
+Examples that MUST resolve item to "${lastIntent.item}":
+- "아까 조회했던 거 한불또 장바구니에 넣어줘" -> add_order, item="${lastIntent.item}", qty=1
+- "방금 그거 두 박스 담아줘" -> add_order, item="${lastIntent.item}", qty=2
+- "그 제품 재고 다시 확인해줘" -> search, item="${lastIntent.item}"
+
+Only ignore this memory if the user clearly names a DIFFERENT explicit item code in the current command.
 `
   }
 
