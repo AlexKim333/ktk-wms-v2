@@ -750,6 +750,7 @@
   </div>
   <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
   <SamdoriVoiceAssistant ref="samdori" :valid-items="validItemCodes" @intent-parsed="handleSamdoriIntent" />
+  </div>
 </template>
 
 <script setup>
