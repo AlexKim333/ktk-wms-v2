@@ -750,7 +750,12 @@
     </div>
   </div>
   <ReceiptPrint ref="receiptPrintRef" :receiptData="receiptPrintData" :items="receiptPrintItems" />
-  <SamdoriVoiceAssistant ref="samdori" :valid-items="validItemCodes" @intent-parsed="handleSamdoriIntent" />
+  <SamdoriVoiceAssistant
+    ref="samdori"
+    :valid-items="validItemCodes"
+    :pending-stock-item="pendingVoiceStockItem"
+    @intent-parsed="handleSamdoriIntent"
+  />
   </div>
 </template>
 
@@ -2733,21 +2738,44 @@ const voiceWarehouseLabel = (warehouseName) => {
 const resolveVoiceWarehouse = (hint) => {
   if (!hint) return null
   const q = String(hint).toLowerCase().trim()
+    .replace(/[.,!?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!q) return null
-  // 흔한 별칭
-  if (/알라르꼰|알라르콘|alarcon|alarcón|본사|메인|main/.test(q)) {
+
+  // 본사/알라르꼰 별칭 (STT 오인식 포함)
+  if (/알라르꼰|알라르콘|알라르권|알라르고|알라르|알라콘|알라꼰|alarcon|alarcón|본사|메인|main|본부/.test(q)) {
     const main = warehouseList.value.find((w) => /ALARCON/i.test(w.name)) || { name: MAIN_WAREHOUSE }
     return main.name
   }
-  return (
-    warehouseList.value.find(
-      (b) =>
-        b.name?.toLowerCase() === q ||
-        b.warehouse_name?.toLowerCase() === q ||
-        b.name?.toLowerCase().includes(q) ||
-        b.warehouse_name?.toLowerCase().includes(q)
-    )?.name || null
-  )
+
+  // 까르멘 등 흔한 STT 변형
+  const aliasHints = [
+    { re: /carmen|까르멘|카르멘|까르맨|카르맨|까르면|카르면|까멘/, key: 'CARMEN' },
+    { re: /tienda|티엔다|띠엔다/, key: 'TIENDA' },
+    { re: /polanco|폴랑코|폴란코/, key: 'POLANCO' },
+    { re: /insurgentes|인수르|인сур르/, key: 'INSURGENTES' },
+    { re: /satelite|satélite|사텔|싸텔/, key: 'SATEL' },
+    { re: /queretaro|querétaro|께레|케레/, key: 'QUERETARO' }
+  ]
+  for (const { re, key } of aliasHints) {
+    if (re.test(q)) {
+      const hit = warehouseList.value.find(
+        (w) => w.name?.toUpperCase().includes(key) || w.warehouse_name?.toUpperCase().includes(key)
+      )
+      if (hit) return hit.name
+    }
+  }
+
+  // warehouseList 부분 일치 (이름/표시명, 공백·대괄호 제거 후 비교)
+  const norm = (s) => String(s || '').toLowerCase().replace(/[\[\]()-]/g, ' ').replace(/\s+/g, ' ').trim()
+  const qn = norm(q)
+  const found = warehouseList.value.find((b) => {
+    const n = norm(b.name)
+    const wn = norm(b.warehouse_name)
+    return n === qn || wn === qn || n.includes(qn) || wn.includes(qn) || qn.includes(n) || qn.includes(wn)
+  })
+  return found?.name || null
 }
 
 const findProductForVoice = (itemCode) => {
@@ -3001,11 +3029,29 @@ const handleSamdoriIntent = async (intentObj) => {
       }
 
       const branchWh = authStore.user?.branch_name || ''
-      const resolvedWh = resolveVoiceWarehouse(intentObj.warehouse)
+
+      // 다이어트 모드: Gemini가 warehouse 대신 raw에 창고명을 넣거나, 후속 보정 힌트를 씀
+      let warehouseHint =
+        intentObj._warehouseHint || intentObj.warehouse || ''
+      if (!resolveVoiceWarehouse(warehouseHint)) {
+        const altHints = [
+          intentObj._warehouseHint,
+          intentObj.warehouse,
+          intentObj.raw_spoken_item,
+          intentObj.item
+        ]
+        for (const alt of altHints) {
+          if (alt && resolveVoiceWarehouse(alt)) {
+            warehouseHint = alt
+            break
+          }
+        }
+      }
+      const resolvedWh = resolveVoiceWarehouse(warehouseHint)
 
       // ----- 관리자: 8개 창고 나열 안 함. 미지정/미인식이면 창고만 재질문 -----
       if (authStore.isAdmin) {
-        if (!intentObj.warehouse || !resolvedWh) {
+        if (!resolvedWh) {
           askWarehouseAgain()
           return
         }
@@ -3023,7 +3069,7 @@ const handleSamdoriIntent = async (intentObj) => {
       pendingVoiceStockItem.value = null
       const allowed = new Set([MAIN_WAREHOUSE, branchWh].filter(Boolean))
 
-      if (intentObj.warehouse) {
+      if (warehouseHint) {
         if (resolvedWh && allowed.has(resolvedWh)) {
           const boxes = boxesAt(resolvedWh)
           speakStock(
@@ -3034,7 +3080,7 @@ const handleSamdoriIntent = async (intentObj) => {
           return
         }
         // 타 지점/미인식 → 권한 안내 후 지점+본사 요약
-        if (intentObj.warehouse && resolvedWh && !allowed.has(resolvedWh)) {
+        if (resolvedWh && !allowed.has(resolvedWh)) {
           const branchBoxes = boxesAt(branchWh)
           const mainBoxes = boxesAt(MAIN_WAREHOUSE)
           speakStock(
@@ -3044,7 +3090,7 @@ const handleSamdoriIntent = async (intentObj) => {
           )
           return
         }
-        if (intentObj.warehouse && !resolvedWh) {
+        if (!resolvedWh) {
           // 지점장은 재질문보다 기본 요약이 더 매끄러움
           const branchBoxes = boxesAt(branchWh)
           const mainBoxes = boxesAt(MAIN_WAREHOUSE)

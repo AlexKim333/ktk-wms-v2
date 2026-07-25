@@ -87,6 +87,11 @@ const props = defineProps({
   validItems: {
     type: Array,
     default: () => []
+  },
+  /** 관리자가 창고명 재질문 대기 중인 품목 코드 (PosView pendingVoiceStockItem) */
+  pendingStockItem: {
+    type: String,
+    default: null
   }
 })
 
@@ -615,6 +620,15 @@ const manualWakeUp = () => {
 }
 
 
+/** Gemini/로컬 후속 보정용 컨텍스트 (직전 intent 또는 창고 재질문 대기 품목) */
+const getIntentContext = () => {
+  if (lastIntent.value?.item) return lastIntent.value
+  if (props.pendingStockItem) {
+    return { intent: 'search', item: props.pendingStockItem }
+  }
+  return null
+}
+
 const processAudioCommand = async (base64Audio, mimeType) => {
   if (!base64Audio) {
     statusText.value = '오디오가 비어 있습니다.'
@@ -637,8 +651,8 @@ const processAudioCommand = async (base64Audio, mimeType) => {
 
   try {
     const safeMime = mimeType && String(mimeType).includes('/') ? mimeType : 'audio/mp4'
-    const intent = await parseIntentFromAudio(base64Audio, safeMime, props.validItems, lastIntent.value)
-    // 오디오 경로는 원문 텍스트가 없음 — 창고 재질문 폴백 문자열을 넣지 않음
+    const intent = await parseIntentFromAudio(base64Audio, safeMime, props.validItems, getIntentContext())
+    // 오디오 경로는 원문 텍스트가 없음 — 창고 재질문 폴백은 handleParsedIntent에서 처리
     handleParsedIntent(intent, null, { fromAudio: true })
   } catch (error) {
     handleIntentError(error, null)
@@ -652,19 +666,44 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     return
   }
 
-  // 텍스트 PTT만: none + 짧은 발화를 창고명 후속으로 간주
-  // (오디오 경로에서 더미 문자열이 warehouse로 들어가면 안 됨)
-  if (
-    !options.fromAudio &&
-    intent.intent === 'none' &&
-    lastIntent.value?.intent === 'search' &&
-    lastIntent.value?.item &&
-    cmdRawText &&
-    String(cmdRawText).length <= 40
-  ) {
-    intent.intent = 'search'
-    intent.item = lastIntent.value.item
-    intent.warehouse = cmdRawText
+  // 창고 후속: 직전 search 또는 관리자 창고 재질문 대기(pendingStockItem)
+  const followItem = lastIntent.value?.item || props.pendingStockItem || null
+  const canWarehouseFollow =
+    !!followItem &&
+    (lastIntent.value?.intent === 'search' || !!props.pendingStockItem) &&
+    (intent.intent === 'none' || intent.intent === 'search')
+
+  if (canWarehouseFollow) {
+    const whHint =
+      intent.warehouse ||
+      intent._warehouseHint ||
+      (!options.fromAudio ? cmdRawText : null) ||
+      intent.raw_spoken_item ||
+      ''
+    const looksWh =
+      !!intent.warehouse ||
+      !!intent._warehouseHint ||
+      (whHint &&
+        String(whHint).length <= 40 &&
+        !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint)) &&
+        /(알라르꼰|알라르콘|알라르|알라콘|alarcon|carmen|까르멘|카르멘|까르맨|본사|메인|tienda|티엔다|창고|지점|sucursal)/i.test(
+          String(whHint)
+        ))
+
+    // 재질문 대기 중이면 짧은 답변을 창고명으로 간주 (별칭 정규식에 안 걸려도 PosView에서 resolve)
+    const pendingShortWh =
+      !!props.pendingStockItem &&
+      !!whHint &&
+      String(whHint).length <= 40 &&
+      !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint))
+
+    if ((looksWh || pendingShortWh) && whHint) {
+      intent.intent = 'search'
+      intent.item = followItem
+      intent.warehouse = String(intent.warehouse || intent._warehouseHint || whHint).trim()
+      intent._warehouseHint = intent.warehouse
+      intent.raw_spoken_item = followItem
+    }
   }
 
   if (intent.intent === 'none') {
@@ -677,6 +716,10 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     const rawItem = String(intent.item || '').trim()
     const weakItem = !rawItem || /^(이거|이것|그거|그것|얘|this|that|eso|este|esta)$/i.test(rawItem)
     if (weakItem) intent.item = lastIntent.value.item
+  }
+  // 창고만 말한 search인데 item이 비면 직전 품목 유지
+  if (intent.intent === 'search' && intent.warehouse && !intent.item && lastIntent.value?.item) {
+    intent.item = lastIntent.value.item
   }
   if (intent.intent === 'add_order') {
     const n = Number(intent.qty)
@@ -735,7 +778,7 @@ const processAwakeCommand = async (fullText) => {
   speak(analyzingMsg, { continueListening: false, saveCache: false })
 
   try {
-    const intent = await parseIntent(cmd, props.validItems, lastIntent.value)
+    const intent = await parseIntent(cmd, props.validItems, getIntentContext())
     handleParsedIntent(intent, cmd)
   } catch (error) {
     handleIntentError(error, fullText)
@@ -754,19 +797,18 @@ const startRetryTimer = () => {
     
     try {
       statusText.value = 'AI 서버 재접속 시도 중...'
-      const intent = await parseIntent(queuedCommand.value, props.validItems, lastIntent.value)
+      const queued = queuedCommand.value
+      const intent = await parseIntent(queued, props.validItems, getIntentContext())
       
-      // 성공하면 큐 비우고 처리
-      lastIntent.value = intent
-      emit('intent-parsed', intent)
-      statusText.value = '대기 명령 분석 완료'
-      
-      const successMsg = locale.value === 'es' ? 'El servidor se ha recuperado. Comando ejecutado.' : '서버가 복구되었습니다. 대기 중이던 명령 처리를 완료했습니다.'
-      speak(successMsg)
-      
+      // 성공하면 큐 비우고 처리 (창고 후속 보정 포함)
       queuedCommand.value = null
       clearInterval(retryTimer)
       retryTimer = null
+      statusText.value = '대기 명령 분석 완료'
+      handleParsedIntent(intent, queued)
+      
+      const successMsg = locale.value === 'es' ? 'El servidor se ha recuperado. Comando ejecutado.' : '서버가 복구되었습니다. 대기 중이던 명령 처리를 완료했습니다.'
+      speak(successMsg)
       
     } catch (error) {
       if (error.response && error.response.status === 503) {

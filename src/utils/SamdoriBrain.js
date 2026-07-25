@@ -124,9 +124,56 @@ function initFlexSearch(validItems) {
   flexIndexKey = key
 }
 
+/** 창고명만 말한 후속 답변인지 (품목/수량 명령 아님) */
+function looksLikeWarehouseUtterance(text) {
+  const raw = String(text || '').trim()
+  if (!raw || raw.length > 40) return false
+  // 품목/담기/수량 신호가 있으면 창고 후속이 아님
+  if (/(불또|bulto|박스|담아|넣어|추가|재고|검색|품명|피\s|전송|장바구니)/i.test(raw)) {
+    return false
+  }
+  if (/^[A-Za-z]{1,3}-?\d+/.test(raw)) return false
+  // STT 오인식 포함 (알라르꼰/까르멘 등)
+  return /(알라르꼰|알라르콘|알라르권|알라르고|알라르|알라콘|알라꼰|alarcon|alarcón|본사|메인|main|본부|carmen|까르멘|카르멘|까르맨|카르맨|까르면|카르면|까멘|티엔다|tienda|tienda|polanco|폴랑코|insurgentes|satelite|satélite|queretaro|querétaro|창고|지점|sucursal|warehouse)/i.test(
+    raw
+  )
+}
+
+/**
+ * 관리자 창고 재질문 후속: warehouse 필드가 비고 raw에 창고명만 있으면 보정
+ * (다이어트 모드에서 Gemini가 warehouse 대신 raw_spoken_item에 창고명을 넣는 경우가 많음)
+ */
+function applyWarehouseFollowUp(parsed, lastIntent) {
+  if (!parsed || !lastIntent?.item) return parsed
+  if (!['search', 'none'].includes(parsed.intent)) return parsed
+  if (lastIntent.intent !== 'search') return parsed
+
+  const hint = String(parsed.warehouse || parsed.raw_spoken_item || parsed.item || '').trim()
+  const hasWhField = !!String(parsed.warehouse || '').trim()
+  const looksWh = looksLikeWarehouseUtterance(hint)
+
+  // 명시 warehouse 또는 창고명처럼 들린 짧은 답만 후속으로 인정
+  if (!hasWhField && !looksWh) return parsed
+
+  if (!parsed.warehouse && looksWh) {
+    parsed.warehouse = hint
+  }
+  if (parsed.warehouse) {
+    parsed.intent = 'search'
+    parsed.item = lastIntent.item
+    // 원문 창고 힌트는 _warehouseHint 에 남기고, raw는 품목으로 맞춤
+    parsed._warehouseHint = String(parsed.warehouse).trim()
+    parsed.raw_spoken_item = lastIntent.item
+  }
+  return parsed
+}
+
 function matchItemCode(rawSpoken, color, validItems) {
   if (!rawSpoken) return null
   if (!validItems || validItems.length === 0) return null
+
+  // 창고명만 들어온 경우 품목 매칭하지 않음
+  if (looksLikeWarehouseUtterance(rawSpoken)) return null
 
   const raw = String(rawSpoken).trim()
   // 메모리/정식코드 정확 일치
@@ -306,13 +353,17 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    // 로컬 매칭: 한글 발음 → P-160-NEGRO… (실패 시 한글을 item에 넣지 않음)
-    if (parsed.raw_spoken_item) {
+    // 창고 후속 보정 → 그다음 품목 로컬 매칭
+    applyWarehouseFollowUp(parsed, lastIntent)
+
+    if (parsed.raw_spoken_item && !parsed.warehouse) {
       const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
-      parsed.item = matched || undefined
+      parsed.item = matched || parsed.item || undefined
       if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
         parsed.item = String(parsed.raw_spoken_item).trim()
       }
+    } else if (parsed.warehouse && lastIntent?.item) {
+      parsed.item = parsed.item || lastIntent.item
     }
     
     return parsed;
@@ -451,13 +502,16 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    // 로컬 매칭: 한글 발음 → P-160-NEGRO… (실패 시 한글을 item에 넣지 않음)
-    if (parsed.raw_spoken_item) {
+    applyWarehouseFollowUp(parsed, lastIntent)
+
+    if (parsed.raw_spoken_item && !parsed.warehouse) {
       const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
-      parsed.item = matched || undefined
+      parsed.item = matched || parsed.item || undefined
       if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
         parsed.item = String(parsed.raw_spoken_item).trim()
       }
+    } else if (parsed.warehouse && lastIntent?.item) {
+      parsed.item = parsed.item || lastIntent.item
     }
     
     return parsed;
