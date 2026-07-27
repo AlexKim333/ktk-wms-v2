@@ -140,6 +140,72 @@ function looksLikeWarehouseUtterance(text) {
 }
 
 /**
+ * 발화에 '정체성'이 강한 품번 신호가 있는지 (숫자 코드/정식코드)
+ * — 세션 메모리로 덮어쓰면 안 되는 경우
+ */
+function hasStrongItemIdentity(text) {
+  const raw = String(text || '').trim()
+  if (!raw || looksLikeWarehouseUtterance(raw)) return false
+  if (/[A-Za-z]{1,3}-?\d{2,}/i.test(raw)) return true
+  if (/\d{2,}/.test(raw)) return true
+  const { prefix } = normalizeSpokenQuery(raw, '')
+  return !!(prefix && /\d{2,}/.test(prefix))
+}
+
+/**
+ * 매칭된 품번이 발화의 숫자/코드 신호와 일치하는지
+ * 예: 발화 "3331" vs 매칭 P-160-REY-300 → false
+ */
+function itemMatchesSpokenIdentity(itemCode, spokenText) {
+  const item = String(itemCode || '').toUpperCase()
+  const spoken = String(spokenText || '').trim()
+  if (!item || !spoken) return true
+  if (!hasStrongItemIdentity(spoken)) return true
+
+  const itemCompact = item.replace(/[^A-Z0-9]/g, '')
+
+  // 정식 코드 형태가 발화에 있으면 그 접두가 품번에 포함되어야 함
+  const codeMatches = spoken.match(/[A-Za-z]{1,3}-?\d{2,}/gi) || []
+  if (codeMatches.length) {
+    return codeMatches.some((c) => {
+      const compact = c.toUpperCase().replace(/[^A-Z0-9]/g, '')
+      return itemCompact.includes(compact) || compact.includes(itemCompact.slice(0, compact.length))
+    })
+  }
+
+  // 한글 정규화 접두 (피 백육십 → P-160)
+  const { prefix } = normalizeSpokenQuery(spoken, '')
+  if (prefix) {
+    const p = prefix.toUpperCase()
+    if (item === p || item.startsWith(`${p}-`) || itemCompact.includes(p.replace(/-/g, ''))) {
+      return true
+    }
+  }
+
+  // 발화 숫자(긴 것 우선)가 품번 안에 있어야 함
+  const nums = (spoken.match(/\d{2,}/g) || []).sort((a, b) => b.length - a.length)
+  if (nums.length) {
+    if (nums.some((n) => item.includes(n))) return true
+    // 접두 숫자만 일치 (P-160 vs 발화 160)
+    if (prefix) {
+      const pn = (prefix.match(/\d+/) || [])[0]
+      if (pn && item.includes(pn) && nums.some((n) => n === pn || pn.includes(n) || n.includes(pn))) {
+        return true
+      }
+    }
+    return false
+  }
+
+  return true
+}
+
+function buildItemMismatchQuestion(spokenText, rejectedCode) {
+  const snippet = String(spokenText || '').replace(/\s+/g, ' ').trim().slice(0, 48)
+  const rejected = rejectedCode ? ` (방금 후보 ${rejectedCode}는 제외)` : ''
+  return `품번을 정확히 못 들었습니다. "${snippet}" 중 어떤 품번을 확인할까요?${rejected}`
+}
+
+/**
  * 발화에 품목/수량 신호가 있는지 (창고 후속과 구분)
  */
 function hasItemLikeSignal(text) {
@@ -147,6 +213,7 @@ function hasItemLikeSignal(text) {
   if (!raw) return false
   if (/^[A-Za-z]{1,3}-?\d+/.test(raw)) return true
   if (/(불또|bulto|박스|담아|넣어|추가|재고|검색|품명|장바구니)/i.test(raw)) return true
+  if (hasStrongItemIdentity(raw)) return true
   const { prefix } = normalizeSpokenQuery(raw, '')
   return !!prefix
 }
@@ -373,18 +440,50 @@ function shouldResolveItemCode(intent) {
 }
 
 async function attachResolvedItem(parsed, validItems, lastIntent) {
+  // 창고 follow-up이 raw를 덮기 전에, 사용자가 실제로 말한 품번 신호 보존
+  const spokenGuard = String(parsed.spoken_text || parsed.raw_spoken_item || '').trim()
+  const strongSpoken = hasStrongItemIdentity(spokenGuard)
+
   applyWarehouseFollowUp(parsed, lastIntent)
 
   if (parsed.raw_spoken_item && shouldResolveItemCode(parsed.intent)) {
     const matched = await matchItemCodeHybrid(parsed.raw_spoken_item, parsed.color, validItems, {
       skipTier2: looksLikeWarehouseUtterance(parsed.raw_spoken_item)
     })
-    parsed.item = matched || parsed.item || undefined
-    if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
-      parsed.item = String(parsed.raw_spoken_item).trim()
+    let item = matched || parsed.item || undefined
+    if (!item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
+      item = String(parsed.raw_spoken_item).trim()
     }
+
+    // 발화 품번 신호 ≠ 매칭 결과 → 잘못된 확정 응답 차단
+    if (item && strongSpoken && !itemMatchesSpokenIdentity(item, spokenGuard)) {
+      parsed.intent = 'ask_clarification'
+      parsed.question = buildItemMismatchQuestion(spokenGuard, item)
+      parsed._rejectedMatch = item
+      parsed.item = undefined
+      parsed.raw_spoken_item = spokenGuard
+      return parsed
+    }
+    parsed.item = item
   }
-  if (!parsed.item && parsed.warehouse && lastIntent?.item) {
+
+  // Gemini/메모리가 이미 item을 넣은 경우도 동일 검증
+  if (
+    parsed.item &&
+    strongSpoken &&
+    shouldResolveItemCode(parsed.intent) &&
+    !itemMatchesSpokenIdentity(parsed.item, spokenGuard)
+  ) {
+    parsed.intent = 'ask_clarification'
+    parsed.question = buildItemMismatchQuestion(spokenGuard, parsed.item)
+    parsed._rejectedMatch = parsed.item
+    parsed.item = undefined
+    parsed.raw_spoken_item = spokenGuard
+    return parsed
+  }
+
+  // 창고만 말한 후속 등: 강한 품번 신호가 없을 때만 직전 품목 채움
+  if (!parsed.item && parsed.warehouse && lastIntent?.item && !strongSpoken) {
     parsed.item = lastIntent.item
   }
   return parsed

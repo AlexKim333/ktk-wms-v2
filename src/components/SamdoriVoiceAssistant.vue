@@ -808,8 +808,10 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     }
     lastIntent.value = {
       ...intent,
-      // 직전 품목 유지 (역질문 중에도 2-step 메모리 보존)
-      item: intent.item || lastIntent.value?.item || props.pendingStockItem || undefined
+      // 오매칭 재질문은 잘못된 품번을 메모리에 남기지 않음
+      item: intent._rejectedMatch
+        ? undefined
+        : (intent.item || lastIntent.value?.item || props.pendingStockItem || undefined)
     }
     statusText.value =
       INPUT_MODE === 'ptt'
@@ -830,10 +832,18 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
   if ((intent.intent === 'add_order' || intent.intent === 'search') && lastIntent.value?.item) {
     const rawItem = String(intent.item || '').trim()
     const weakItem = !rawItem || /^(이거|이것|그거|그것|얘|this|that|eso|este|esta)$/i.test(rawItem)
-    if (weakItem) intent.item = lastIntent.value.item
+    // 발화에 숫자/품번이 있으면 직전 품목으로 덮지 않음 (3331 → P-160 오인 방지)
+    const spokenHasCode = /\d{2,}|[A-Za-z]{1,3}-?\d{2,}/i.test(userUtterance)
+    if (weakItem && !spokenHasCode) intent.item = lastIntent.value.item
   }
-  // 창고만 말한 search인데 item이 비면 직전 품목 유지
-  if (intent.intent === 'search' && intent.warehouse && !intent.item && lastIntent.value?.item) {
+  // 창고만 말한 search인데 item이 비면 직전 품목 유지 (강한 품번 발화 제외)
+  if (
+    intent.intent === 'search' &&
+    intent.warehouse &&
+    !intent.item &&
+    lastIntent.value?.item &&
+    !/\d{2,}|[A-Za-z]{1,3}-?\d{2,}/i.test(userUtterance)
+  ) {
     intent.item = lastIntent.value.item
   }
   if (intent.intent === 'add_order') {
