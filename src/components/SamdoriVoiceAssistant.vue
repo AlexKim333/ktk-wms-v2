@@ -1013,103 +1013,131 @@ defineExpose({
 <style scoped>
 .samdori-container {
   position: fixed;
-  bottom: 30px;
   right: 30px;
+  bottom: max(30px, env(safe-area-inset-bottom, 0px));
   z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  /* 아이콘 크기만 차지 — 패널이 레이아웃을 밀지 않음 */
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
 }
 
-  .samdori-button {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #3b82f6, #ec4899);
-    background-size: 200% 200%;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    position: relative;
-    z-index: 10;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  
-  .samdori-button:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
-  }
-  
-  .samdori-avatar {
-    width: 85%;
-    height: 85%;
-    border-radius: 50%;
-    background-image: url('/samdori-icon.jpg');
-    background-size: cover;
-    background-position: center;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-    pointer-events: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  
-  .samdori-button.pulsing {
-    background: linear-gradient(135deg, #ef4444, #f59e0b, #ec4899);
-    animation: gradientShift 3s ease infinite, pulseGlow 1.5s infinite;
-  }
+.samdori-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #3b82f6, #ec4899);
+  background-size: 200% 200%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  .samdori-button.pulsing::before,
-  .samdori-button.pulsing::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    border-radius: 50%;
-    background: inherit;
-    z-index: -1;
-    animation: ripple 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-  }
-  
-  .samdori-button.pulsing::after {
-    animation-delay: 0.75s;
-  }
-  
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  
-  @keyframes ripple {
-    0% { transform: scale(1); opacity: 0.7; }
-    100% { transform: scale(1.7); opacity: 0; }
-  }
-  
-  @keyframes pulseGlow {
-    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-  }
+.samdori-button:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+}
 
+.samdori-avatar {
+  width: 85%;
+  height: 85%;
+  border-radius: 50%;
+  background-image: url('/samdori-icon.jpg');
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.samdori-button.pulsing {
+  background: linear-gradient(135deg, #ef4444, #f59e0b, #ec4899);
+  animation: gradientShift 3s ease infinite, pulseGlow 1.5s infinite;
+}
+
+.samdori-button.pulsing::before,
+.samdori-button.pulsing::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  background: inherit;
+  z-index: -1;
+  animation: ripple 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.samdori-button.pulsing::after {
+  animation-delay: 0.75s;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes samdoriPanelUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 아이콘 위에 고정 팝업 — 아이콘 위치 불변 (iOS/Android/PC 공통) */
 .samdori-panel {
-  width: 320px;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: min(320px, calc(100vw - 40px));
+  max-height: min(70vh, 520px);
+  max-height: min(70dvh, 520px);
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  margin-bottom: 20px;
-  overflow: hidden;
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   border: 1px solid #e5e7eb;
+  pointer-events: auto;
+  transform-origin: bottom right;
+  animation: samdoriPanelUp 0.18s ease-out;
+  z-index: 9;
 }
 
 .panel-header {
@@ -1153,13 +1181,20 @@ defineExpose({
 
 @media (max-width: 768px) {
   .samdori-container {
-    bottom: 85px;
     right: 20px;
+    bottom: max(85px, calc(85px + env(safe-area-inset-bottom, 0px)));
+    width: 50px;
+    height: 50px;
   }
   .samdori-button {
     width: 50px;
     height: 50px;
     font-size: 20px;
+  }
+  .samdori-panel {
+    width: min(320px, calc(100vw - 32px));
+    max-height: min(65vh, 480px);
+    max-height: min(65dvh, 480px);
   }
 }
 
