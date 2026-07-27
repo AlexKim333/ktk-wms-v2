@@ -646,13 +646,48 @@ const manualWakeUp = () => {
 }
 
 
-/** Gemini/로컬 후속 보정용 컨텍스트 (직전 intent 또는 창고 재질문 대기 품목) */
-const getIntentContext = () => {
-  if (lastIntent.value?.item) return lastIntent.value
-  if (props.pendingStockItem) {
-    return { intent: 'search', item: props.pendingStockItem }
+const SESSION_HISTORY_MAX = 8 // 4턴 × (user+assistant)
+
+const sessionHistory = ref([])
+
+const trimSessionHistory = () => {
+  if (sessionHistory.value.length > SESSION_HISTORY_MAX) {
+    sessionHistory.value = sessionHistory.value.slice(-SESSION_HISTORY_MAX)
   }
-  return null
+}
+
+const pushSessionTurn = (userText, intent) => {
+  const spoken = String(userText || '').trim()
+  if (spoken && spoken !== '(음성 명령)') {
+    sessionHistory.value.push({ role: 'user', text: spoken })
+  }
+  if (intent?.intent) {
+    sessionHistory.value.push({
+      role: 'assistant',
+      intent: intent.intent,
+      item: intent.item,
+      warehouse: intent.warehouse,
+      qty: intent.qty,
+      question: intent.question,
+      text: intent.question || undefined
+    })
+  }
+  trimSessionHistory()
+}
+
+/** Gemini/로컬 후속 보정용 컨텍스트 (직전 intent 또는 창고 재질문 대기 품목 + 세션 캐시) */
+const getIntentContext = () => {
+  const base = lastIntent.value?.item
+    ? { ...lastIntent.value }
+    : props.pendingStockItem
+    ? { intent: 'search', item: props.pendingStockItem }
+    : {}
+  // sessionHistory는 항상 최신 슬라이스만 전달 (이전 intent에 묻어온 값 제거)
+  const { sessionHistory: _drop, ...rest } = base
+  return {
+    ...rest,
+    sessionHistory: sessionHistory.value.slice(-SESSION_HISTORY_MAX)
+  }
 }
 
 const processAudioCommand = async (base64Audio, mimeType) => {
@@ -675,11 +710,23 @@ const processAudioCommand = async (base64Audio, mimeType) => {
     const intent = await parseIntentFromAudio(base64Audio, safeMime, props.validItems, getIntentContext())
     // 다시/취소만 로컬 처리 (일반 명령의 spoken_text에 '다시'가 섞여도 Gemini intent 우선)
     const spoken = String(intent?.spoken_text || '').trim()
+    if (spoken) {
+      lastQuestionText.value = spoken
+      finalTranscript.value = spoken
+    }
     if (spoken && (intent?.intent === 'none' || !intent?.intent) && tryLocalCommand(spoken)) return
     handleParsedIntent(intent, spoken || null, { fromAudio: true })
   } catch (error) {
     handleIntentError(error, null)
   }
+}
+
+const looksLikeWhHint = (whHint) => {
+  if (!whHint) return false
+  const s = String(whHint)
+  if (s.length > 40) return false
+  if (/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(s)) return false
+  return /(알라르꼰|알라르콘|알라르|알라콘|alarcon|carmen|까르멘|카르멘|까르맨|본사|메인|tienda|티엔다|창고|지점|sucursal)/i.test(s)
 }
 
 const handleParsedIntent = (intent, cmdRawText, options = {}) => {
@@ -689,45 +736,89 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     return
   }
 
-  // 창고 후속: 직전 search 또는 관리자 창고 재질문 대기(pendingStockItem)
-  const followItem = lastIntent.value?.item || props.pendingStockItem || null
-  const canWarehouseFollow =
-    !!followItem &&
-    (lastIntent.value?.intent === 'search' || !!props.pendingStockItem) &&
-    (intent.intent === 'none' || intent.intent === 'search')
+  // question 없는 역질문은 무시
+  if (intent.intent === 'ask_clarification' && !String(intent.question || '').trim()) {
+    intent.intent = 'none'
+  }
 
-  if (canWarehouseFollow) {
-    const whHint =
-      intent.warehouse ||
-      intent._warehouseHint ||
-      cmdRawText ||
+  const userUtterance = String(
+    cmdRawText ||
       intent.spoken_text ||
-      intent.raw_spoken_item ||
+      (lastQuestionText.value !== '(음성 명령)' ? lastQuestionText.value : '') ||
       ''
-    const looksWh =
-      !!intent.warehouse ||
-      !!intent._warehouseHint ||
-      (whHint &&
-        String(whHint).length <= 40 &&
-        !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint)) &&
-        /(알라르꼰|알라르콘|알라르|알라콘|alarcon|carmen|까르멘|카르멘|까르맨|본사|메인|tienda|티엔다|창고|지점|sucursal)/i.test(
-          String(whHint)
-        ))
+  ).trim()
 
-    // 재질문 대기 중이면 짧은 답변을 창고명으로 간주 (별칭 정규식에 안 걸려도 PosView에서 resolve)
-    const pendingShortWh =
-      !!props.pendingStockItem &&
-      !!whHint &&
-      String(whHint).length <= 40 &&
-      !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint))
+  const followItem = lastIntent.value?.item || props.pendingStockItem || null
+  const whHint =
+    intent.warehouse ||
+    intent._warehouseHint ||
+    cmdRawText ||
+    intent.spoken_text ||
+    intent.raw_spoken_item ||
+    ''
+  const looksWh = !!intent.warehouse || !!intent._warehouseHint || looksLikeWhHint(whHint)
+  const pendingShortWh =
+    !!props.pendingStockItem &&
+    !!whHint &&
+    String(whHint).length <= 40 &&
+    !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint))
 
-    if ((looksWh || pendingShortWh) && whHint) {
-      intent.intent = 'search'
-      intent.item = followItem
-      intent.warehouse = String(intent.warehouse || intent._warehouseHint || whHint).trim()
-      intent._warehouseHint = intent.warehouse
-      intent.raw_spoken_item = followItem
+  // 창고 재질문 대기 + 명백한 창고명 → 역질문보다 창고 후속 우선
+  const forceWarehouseFollow =
+    !!followItem &&
+    (looksWh || pendingShortWh) &&
+    (!!props.pendingStockItem || lastIntent.value?.intent === 'search') &&
+    (intent.intent === 'none' ||
+      intent.intent === 'search' ||
+      intent.intent === 'ask_clarification')
+
+  if (forceWarehouseFollow && whHint) {
+    intent.intent = 'search'
+    intent.item = followItem
+    intent.warehouse = String(intent.warehouse || intent._warehouseHint || whHint).trim()
+    intent._warehouseHint = intent.warehouse
+    intent.raw_spoken_item = followItem
+    intent.question = undefined
+  } else if (
+    // 일반 창고 후속 (역질문이 아닐 때만)
+    intent.intent !== 'ask_clarification' &&
+    followItem &&
+    (lastIntent.value?.intent === 'search' || !!props.pendingStockItem) &&
+    (intent.intent === 'none' || intent.intent === 'search') &&
+    (looksWh || pendingShortWh) &&
+    whHint
+  ) {
+    intent.intent = 'search'
+    intent.item = followItem
+    intent.warehouse = String(intent.warehouse || intent._warehouseHint || whHint).trim()
+    intent._warehouseHint = intent.warehouse
+    intent.raw_spoken_item = followItem
+  }
+
+  // 세션 캐시 기록 (오디오는 spoken_text / cmdRawText 사용)
+  pushSessionTurn(userUtterance, intent)
+
+  // 역질문: PosView로 보내지 않고 TTS만. lastIntent는 갱신해 후속 "응/맞아" 맥락 유지
+  if (intent.intent === 'ask_clarification') {
+    const q = String(intent.question || '').trim()
+    if (!q) {
+      statusText.value = '명령이 명확하지 않아 무시됨'
+      sleep('timeout')
+      return
     }
+    lastIntent.value = {
+      ...intent,
+      // 직전 품목 유지 (역질문 중에도 2-step 메모리 보존)
+      item: intent.item || lastIntent.value?.item || props.pendingStockItem || undefined
+    }
+    statusText.value =
+      INPUT_MODE === 'ptt'
+        ? (locale.value === 'es'
+          ? 'Confirme: mantenga el botón y responda'
+          : '확인 질문 — 버튼을 다시 눌러 답해 주세요')
+        : 'AI 의도 확인 질문 중...'
+    speak(q, { continueListening: INPUT_MODE === 'wake' })
+    return
   }
 
   if (intent.intent === 'none') {
