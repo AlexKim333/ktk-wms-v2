@@ -140,31 +140,50 @@ function looksLikeWarehouseUtterance(text) {
 }
 
 /**
- * 관리자 창고 재질문 후속: warehouse 필드가 비고 raw에 창고명만 있으면 보정
- * (다이어트 모드에서 Gemini가 warehouse 대신 raw_spoken_item에 창고명을 넣는 경우가 많음)
+ * 발화에 품목/수량 신호가 있는지 (창고 후속과 구분)
+ */
+function hasItemLikeSignal(text) {
+  const raw = String(text || '').trim()
+  if (!raw) return false
+  if (/^[A-Za-z]{1,3}-?\d+/.test(raw)) return true
+  if (/(불또|bulto|박스|담아|넣어|추가|재고|검색|품명|장바구니)/i.test(raw)) return true
+  const { prefix } = normalizeSpokenQuery(raw, '')
+  return !!prefix
+}
+
+/**
+ * 관리자 창고 재질문 후속: 창고명만 말한 경우에만 lastIntent 품목 유지
+ * (품목+창고 한 문장은 Gemini raw를 덮어쓰지 않음)
  */
 function applyWarehouseFollowUp(parsed, lastIntent) {
   if (!parsed || !lastIntent?.item) return parsed
   if (!['search', 'none'].includes(parsed.intent)) return parsed
   if (lastIntent.intent !== 'search') return parsed
 
-  const hint = String(parsed.warehouse || parsed.raw_spoken_item || parsed.item || '').trim()
-  const hasWhField = !!String(parsed.warehouse || '').trim()
-  const looksWh = looksLikeWarehouseUtterance(hint)
+  const raw = String(parsed.raw_spoken_item || parsed.spoken_text || '').trim()
+  const wh = String(parsed.warehouse || '').trim()
 
-  // 명시 warehouse 또는 창고명처럼 들린 짧은 답만 후속으로 인정
-  if (!hasWhField && !looksWh) return parsed
+  // 신규 품목 신호가 raw에 있으면 후속 보정 금지
+  if (raw && !looksLikeWarehouseUtterance(raw) && hasItemLikeSignal(raw)) {
+    return parsed
+  }
 
-  if (!parsed.warehouse && looksWh) {
-    parsed.warehouse = hint
-  }
-  if (parsed.warehouse) {
-    parsed.intent = 'search'
-    parsed.item = lastIntent.item
-    // 원문 창고 힌트는 _warehouseHint 에 남기고, raw는 품목으로 맞춤
-    parsed._warehouseHint = String(parsed.warehouse).trim()
-    parsed.raw_spoken_item = lastIntent.item
-  }
+  const warehouseOnly =
+    looksLikeWarehouseUtterance(raw) ||
+    (wh &&
+      looksLikeWarehouseUtterance(wh) &&
+      (!raw || raw === lastIntent.item || looksLikeWarehouseUtterance(raw)))
+
+  if (!warehouseOnly) return parsed
+
+  const hint = wh || raw
+  if (!hint) return parsed
+
+  parsed.warehouse = wh || hint
+  parsed.intent = 'search'
+  parsed.item = lastIntent.item
+  parsed._warehouseHint = String(parsed.warehouse).trim()
+  parsed.raw_spoken_item = lastIntent.item
   return parsed
 }
 
@@ -217,6 +236,158 @@ function matchItemCode(rawSpoken, color, validItems) {
   if (hits.length === 1) return hits[0]
   if (hits.length > 1) return hits.find((i) => /NEGRO/i.test(i)) || hits[0]
   return null
+}
+
+/**
+ * Tier 2 후보 압축: 정규화된 발음 기준으로 유사 코드만 모음 (무관한 앞 N개 패딩 금지)
+ */
+function selectCandidatesForGemini(rawSpoken, color, validItems, max = 60) {
+  if (!validItems || !validItems.length) return []
+  if (validItems.length <= max) return validItems
+
+  const raw = String(rawSpoken || '').trim()
+  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color)
+  const candidateSet = new Set()
+  const add = (item) => {
+    if (!item || candidateSet.size >= max) return
+    candidateSet.add(item)
+  }
+
+  // 1) 정규화 접두 가족 (P-160 → P-160-*)
+  if (prefix) {
+    const upper = prefix.toUpperCase()
+    for (const item of validItems) {
+      if (candidateSet.size >= max) break
+      const u = String(item).toUpperCase()
+      if (u === upper || u.startsWith(`${upper}-`)) add(item)
+    }
+  }
+
+  // 2) FlexSearch (정규화 쿼리 우선)
+  initFlexSearch(validItems)
+  if (flexIndex) {
+    const q = flexQuery || prefix || raw
+    const results = flexIndex.search(q, 30)
+    const ids = results?.[0]?.result || []
+    ids.forEach((id) => add(validItems[id]))
+  }
+
+  // 3) 숫자 부분일치 (한글→숫자 변환 결과 포함). 단일 문자 접두(P/B)만으로 전체 쓸어담지 않음
+  const numStr =
+    (prefix && (prefix.match(/\d+/) || [])[0]) ||
+    (raw.match(/\d+/) || [])[0] ||
+    ''
+  if (numStr) {
+    for (const item of validItems) {
+      if (candidateSet.size >= max) break
+      const u = String(item).toUpperCase()
+      if (!u.includes(numStr)) continue
+      if (col && !u.includes(col)) {
+        // 색 힌트가 있으면 숫자+색 우선, 여유 있을 때만 숫자만
+        continue
+      }
+      add(item)
+    }
+    // 색 필터로 비었으면 숫자만이라도
+    if (col && candidateSet.size < 5) {
+      for (const item of validItems) {
+        if (candidateSet.size >= max) break
+        if (String(item).includes(numStr)) add(item)
+      }
+    }
+  }
+
+  return Array.from(candidateSet).slice(0, max)
+}
+
+/**
+ * Tier 2: 압축 후보만 Gemini에 넘겨 정밀 코드 판별
+ */
+async function resolveItemCodeWithGemini(rawSpoken, color, validItems) {
+  if (!GEMINI_API_KEY) return null
+  if (looksLikeWarehouseUtterance(rawSpoken)) return null
+
+  const candidates = selectCandidatesForGemini(rawSpoken, color, validItems, 60)
+  if (!candidates.length) return null
+
+  const prompt = `You are a strict WMS Item Code Resolver (Hybrid RAG Tier 2).
+User voice/text input: "${rawSpoken}" ${color ? `(Color hint: "${color}")` : ''}
+
+Below is the list of existing valid item codes in our WMS database:
+${JSON.stringify(candidates)}
+
+Which EXACT item code from the array above best corresponds to what the user said?
+Rules:
+1. Return ONLY a valid JSON object: {"matched_code": "EXACT_ITEM_CODE"}
+2. If none of the item codes correspond, return {"matched_code": null}
+3. No markdown formatting, no explanations.`
+
+  try {
+    const response = await axios.post(
+      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          temperature: 0.1
+        }
+      }
+    )
+
+    const partText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!partText) return null
+    const responseText = partText.replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(responseText)
+    const code = parsed?.matched_code
+    if (!code) return null
+
+    return (
+      validItems.find((i) => i === code) ||
+      validItems.find((i) => String(i).toUpperCase() === String(code).toUpperCase()) ||
+      null
+    )
+  } catch (err) {
+    console.warn('Tier 2 Gemini Item Resolver fallback warning:', err?.message || err)
+  }
+  return null
+}
+
+/**
+ * Two-Tier Hybrid RAG
+ * Tier1 로컬 → 실패 시에만 Tier2 (창고/스킵 옵션 시 Tier2 생략)
+ */
+async function matchItemCodeHybrid(rawSpoken, color, validItems, options = {}) {
+  if (!rawSpoken || !validItems || !validItems.length) return null
+  if (looksLikeWarehouseUtterance(rawSpoken)) return null
+
+  const localMatch = matchItemCode(rawSpoken, color, validItems)
+  if (localMatch) return localMatch
+  if (options.skipTier2) return null
+
+  return resolveItemCodeWithGemini(rawSpoken, color, validItems)
+}
+
+/** search/add_order 만 품목 코드 해석 필요 */
+function shouldResolveItemCode(intent) {
+  return intent === 'search' || intent === 'add_order'
+}
+
+async function attachResolvedItem(parsed, validItems, lastIntent) {
+  applyWarehouseFollowUp(parsed, lastIntent)
+
+  if (parsed.raw_spoken_item && shouldResolveItemCode(parsed.intent)) {
+    const matched = await matchItemCodeHybrid(parsed.raw_spoken_item, parsed.color, validItems, {
+      skipTier2: looksLikeWarehouseUtterance(parsed.raw_spoken_item)
+    })
+    parsed.item = matched || parsed.item || undefined
+    if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
+      parsed.item = String(parsed.raw_spoken_item).trim()
+    }
+  }
+  if (!parsed.item && parsed.warehouse && lastIntent?.item) {
+    parsed.item = lastIntent.item
+  }
+  return parsed
 }
 
 // SamdoriBrain.js
@@ -290,6 +461,7 @@ Supported intents:
    Examples: "품명검색 P-160", "P-160 검색", "P-160 검정 재고 확인해줘", "Busca P-160 negro"
    Required fields: "intent": "search", "raw_spoken_item": "<what_the_user_said>"
    Optional fields: "warehouse": "<warehouse_name>" (e.g. "알라르꼰" -> "ALARCON", "까르멘" -> "CARMEN")
+   - CRITICAL: Whenever the user mentions any warehouse or branch name in the command (e.g. "P-160 검정 알라르꼰 창고에 몇 개 있지?", "Alarcón stock de P-160"), you MUST extract that warehouse into the "warehouse" field! Never omit it!
    Optional fields: "color": "<color>" (UPPERCASE Spanish if possible)
    
 2. "add_order": ONE unified action = add item into the shopping cart (장바구니 담기).
@@ -353,18 +525,8 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    // 창고 후속 보정 → 그다음 품목 로컬 매칭
-    applyWarehouseFollowUp(parsed, lastIntent)
-
-    if (parsed.raw_spoken_item && !parsed.warehouse) {
-      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
-      parsed.item = matched || parsed.item || undefined
-      if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
-        parsed.item = String(parsed.raw_spoken_item).trim()
-      }
-    } else if (parsed.warehouse && lastIntent?.item) {
-      parsed.item = parsed.item || lastIntent.item
-    }
+    // 창고 후속 보정 → search/add_order 만 Two-Tier 품목 매칭
+    await attachResolvedItem(parsed, validItems, lastIntent)
     
     return parsed;
   } catch (error) {
@@ -429,6 +591,7 @@ Supported intents:
    Examples: "품명검색 P-160", "P-160 검색", "P-160 검정 재고 확인해줘", "Busca P-160 negro"
    Required fields: "intent": "search", "raw_spoken_item": "<what_the_user_said>"
    Optional fields: "warehouse": "<warehouse_name>" (e.g. "알라르꼰" -> "ALARCON", "까르멘" -> "CARMEN")
+   - CRITICAL: Whenever the user mentions any warehouse or branch name in the command (e.g. "P-160 검정 알라르꼰 창고에 몇 개 있지?", "Alarcón stock de P-160"), you MUST extract that warehouse into the "warehouse" field! Never omit it!
    Optional fields: "color": "<color>" (UPPERCASE Spanish if possible)
    
 2. "add_order": ONE unified action = add item into the shopping cart (장바구니 담기).
@@ -503,17 +666,8 @@ try {
       parsed._tokenUsage = response.data.usageMetadata;
     }
     
-    applyWarehouseFollowUp(parsed, lastIntent)
-
-    if (parsed.raw_spoken_item && !parsed.warehouse) {
-      const matched = matchItemCode(parsed.raw_spoken_item, parsed.color, validItems)
-      parsed.item = matched || parsed.item || undefined
-      if (!parsed.item && /^[A-Za-z]{1,3}-?\d+/.test(String(parsed.raw_spoken_item).trim())) {
-        parsed.item = String(parsed.raw_spoken_item).trim()
-      }
-    } else if (parsed.warehouse && lastIntent?.item) {
-      parsed.item = parsed.item || lastIntent.item
-    }
+    // 창고 후속 보정 → search/add_order 만 Two-Tier 품목 매칭
+    await attachResolvedItem(parsed, validItems, lastIntent)
     
     return parsed;
   } catch (error) {
