@@ -77,8 +77,8 @@ const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navig
 
 /**
  * 입력 모드
- * - 'ptt'  : 버튼을 누르는 동안만 녹음, 손을 떼면 즉시 분석 (현재 기본)
- * - 'wake' : 호출어 연속 듣기 (검증된 레거시 — 기본 비활성, 복구용으로만 유지)
+ * - 'ptt'  : 버튼을 누르는 동안 MediaRecorder 녹음 → Gemini 오디오 분석 (iOS/Android/PC 공통)
+ * - 'wake' : 호출어 + Web Speech 연속 듣기 (검증된 레거시 — 기본 비활성, 복구용으로만 유지)
  * PosView 장바구니/전송 로직은 이 파일 밖이므로 건드리지 않음.
  */
 const INPUT_MODE = 'ptt'
@@ -129,6 +129,7 @@ let cachedReply = ''
 let iosSpeechUnlocked = false
 let iosAudioCtx = null
 let iosSpeakTimer = null
+let currentUtterance = null
 
 const stopMicTracks = (stream) => {
   try {
@@ -253,6 +254,141 @@ const submitManual = () => {
   processAwakeCommand(cmd)
 }
 
+/** Android/desktop/iOS 공통: MediaRecorder가 쓸 mime */
+const pickRecorderMime = () => {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus'
+  ]
+  for (const m of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(m)) return m
+  }
+  return ''
+}
+
+/** 대기 중 TTS/타이머를 끊고(홀드는 유지) 새 PTT 녹음 준비 */
+const cancelPendingSpeechForPtt = () => {
+  if (iosSpeakTimer) {
+    clearTimeout(iosSpeakTimer)
+    iosSpeakTimer = null
+  }
+  if (window.ttsFallbackTimer) {
+    clearTimeout(window.ttsFallbackTimer)
+    window.ttsFallbackTimer = null
+  }
+  if (synthesis) {
+    try { synthesis.cancel() } catch (err) {}
+  }
+  isTTSPlaying = false
+  currentUtterance = null
+}
+
+/**
+ * PTT 공통: MediaRecorder → Gemini 오디오 분석 (iOS + Android/desktop)
+ * Web Speech는 wake 레거시 전용.
+ */
+const startPttMediaRecording = async () => {
+  const sessionId = ++audioSessionId
+  try {
+    stopMicTracks()
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop() } catch (e) {}
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1
+      }
+    })
+    // 권한 대기 중 손을 이미 뗐으면 녹음 시작하지 않음
+    if (!isPttHolding.value || sessionId !== audioSessionId) {
+      stopMicTracks(stream)
+      return
+    }
+
+    activeMicStream = stream
+    audioChunks = []
+    const preferredMime = pickRecorderMime()
+    mediaRecorder = preferredMime
+      ? new MediaRecorder(stream, { mimeType: preferredMime })
+      : new MediaRecorder(stream)
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) audioChunks.push(event.data)
+    }
+    mediaRecorder.onstop = () => {
+      const mime = mediaRecorder?.mimeType || preferredMime || 'audio/webm'
+      const audioBlob = new Blob(audioChunks, { type: mime })
+      // 트랙은 onstop 이후에만 정리 (너무 일찍 stop 하면 빈 blob)
+      stopMicTracks(stream)
+
+      if (sessionId !== audioSessionId) return
+      if (!audioBlob.size || audioChunks.length === 0) {
+        statusText.value = '버튼을 누른 채 말씀해 주세요'
+        isAwake = false
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (sessionId !== audioSessionId) return
+        const base64data = String(reader.result || '').split(',')[1]
+        if (!base64data) {
+          statusText.value = '오디오 변환에 실패했습니다.'
+          return
+        }
+        processAudioCommand(base64data, mime)
+      }
+      reader.onerror = () => {
+        statusText.value = '오디오 변환에 실패했습니다.'
+      }
+      reader.readAsDataURL(audioBlob)
+    }
+    // timeslice: 짧은 발화에서도 dataavailable이 안정적으로 쌓이도록
+    try {
+      mediaRecorder.start(250)
+    } catch (e) {
+      mediaRecorder.start()
+    }
+    isListening.value = true
+  } catch (err) {
+    console.error('PTT MediaRecorder start failed:', err)
+    statusText.value = '마이크 권한이 거부되었거나 녹음을 시작할 수 없습니다.'
+    isListening.value = false
+    isPttHolding.value = false
+    stopMicTracks()
+  }
+}
+
+const stopPttMediaRecording = () => {
+  // getUserMedia 대기 중 손을 뗀 경우
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    audioSessionId += 1
+    stopMicTracks()
+    statusText.value = '버튼을 누른 채 말씀해 주세요'
+    isAwake = false
+    return
+  }
+  try {
+    // requestData로 마지막 청크 flush 후 stop (지원 브라우저)
+    if (typeof mediaRecorder.requestData === 'function' && mediaRecorder.state === 'recording') {
+      try { mediaRecorder.requestData() } catch (e) {}
+    }
+    mediaRecorder.stop()
+  } catch (err) {
+    stopMicTracks()
+    statusText.value = '녹음 종료에 실패했습니다.'
+    return
+  }
+  // 트랙은 onstop에서 정리. iOS만 제스처 안에서 TTS 재언락
+  if (isIOS) unlockSpeechForIOS(true)
+}
+
 const onPttDown = async (e) => {
   if (INPUT_MODE !== 'ptt') return
   e.preventDefault()
@@ -263,11 +399,8 @@ const onPttDown = async (e) => {
     pttPointerId = e.pointerId
   } catch (err) {}
 
-  // 이전 TTS 큐 정리 후 제스처 안에서 언락 (녹음 전)
-  if (synthesis) {
-    try { synthesis.cancel() } catch (err) {}
-  }
-  isTTSPlaying = false
+  // 이전 TTS가 2회차 홀드/녹음을 끊지 않도록 큐만 정리 (isPttHolding은 건드리지 않음)
+  cancelPendingSpeechForPtt()
   unlockSpeechForIOS(true)
 
   isOpen.value = true
@@ -277,82 +410,7 @@ const onPttDown = async (e) => {
   transcript.value = ''
   statusText.value = '녹음 중... 손을 떼면 분석합니다'
 
-  if (isIOS) {
-    const sessionId = ++audioSessionId
-    try {
-      // 이전 세션 마이크가 남아 있으면 정리
-      stopMicTracks()
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        try { mediaRecorder.stop() } catch (e) {}
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // 권한 대기 중 손을 이미 뗐으면 녹음 시작하지 않음 (레이스 방지)
-      if (!isPttHolding.value || sessionId !== audioSessionId) {
-        stopMicTracks(stream)
-        return
-      }
-
-      activeMicStream = stream
-      audioChunks = []
-      const preferredMime = MediaRecorder.isTypeSupported?.('audio/mp4')
-        ? 'audio/mp4'
-        : (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '')
-      mediaRecorder = preferredMime
-        ? new MediaRecorder(stream, { mimeType: preferredMime })
-        : new MediaRecorder(stream)
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunks.push(event.data)
-      }
-      mediaRecorder.onstop = () => {
-        const mime = mediaRecorder?.mimeType || preferredMime || 'audio/mp4'
-        const audioBlob = new Blob(audioChunks, { type: mime })
-        stopMicTracks(stream)
-
-        if (sessionId !== audioSessionId) return
-        if (!audioBlob.size || audioChunks.length === 0) {
-          statusText.value = '버튼을 누른 채 말씀해 주세요'
-          isAwake = false
-          return
-        }
-
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          if (sessionId !== audioSessionId) return
-          const base64data = String(reader.result || '').split(',')[1]
-          if (!base64data) {
-            statusText.value = '오디오 변환에 실패했습니다.'
-            return
-          }
-          processAudioCommand(base64data, mime)
-        }
-        reader.onerror = () => {
-          statusText.value = '오디오 변환에 실패했습니다.'
-        }
-        reader.readAsDataURL(audioBlob)
-      }
-      mediaRecorder.start()
-      isListening.value = true
-    } catch (err) {
-      console.error('iOS MediaRecorder start failed:', err)
-      statusText.value = '마이크 권한이 거부되었거나 녹음을 시작할 수 없습니다.'
-      isListening.value = false
-      isPttHolding.value = false
-      stopMicTracks()
-    }
-    return
-  }
-
-  if (!recognition) initSpeech()
-  if (!recognition) return
-
-  isListening.value = true
-  try {
-    recognition.start()
-  } catch (err) {
-    // 이미 시작된 경우 무시
-  }
+  await startPttMediaRecording()
 }
 
 const onPttUp = (e) => {
@@ -369,42 +427,7 @@ const onPttUp = (e) => {
   } catch (err) {}
 
   isListening.value = false
-
-  if (isIOS) {
-    // getUserMedia 대기 중 손을 뗀 경우: 세션 무효화 후 마이크 정리
-    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-      audioSessionId += 1
-      stopMicTracks()
-      statusText.value = '버튼을 누른 채 말씀해 주세요'
-      isAwake = false
-      return
-    }
-    try {
-      mediaRecorder.stop()
-    } catch (err) {
-      stopMicTracks()
-      statusText.value = '녹음 종료에 실패했습니다.'
-    }
-    // 녹음 종료 직후(여전히 pointerup 제스처) TTS 재언락 — 마이크 세션이 언락을 무력화함
-    stopMicTracks()
-    unlockSpeechForIOS(true)
-    return
-  }
-
-  const cmd = `${finalTranscript.value || ''} ${transcript.value || ''}`.trim()
-  if (recognition) {
-    try { recognition.stop() } catch (err) {}
-  }
-
-  if (!cmd) {
-    statusText.value = '버튼을 누른 채 말씀해 주세요'
-    isAwake = false
-    return
-  }
-
-  // 다시/취소는 캐시·로컬만 — API 사이드 이펙트 없음
-  if (tryLocalCommand(cmd)) return
-  processAwakeCommand(cmd)
+  stopPttMediaRecording()
 }
 
 const initSpeech = () => {
@@ -580,7 +603,10 @@ const sleep = (reason = '') => {
   silenceTimer = null
   clearCommandWindow()
   isAwake = false
-  isPttHolding.value = false
+  // PTT: 분석 완료 sleep이 다음 버튼 홀드를 강제로 끊지 않음
+  if (INPUT_MODE !== 'ptt') {
+    isPttHolding.value = false
+  }
   transcript.value = ''
   finalTranscript.value = ''
   statusText.value = INPUT_MODE === 'ptt'
@@ -643,17 +669,14 @@ const processAudioCommand = async (base64Audio, mimeType) => {
   transcript.value = ''
   finalTranscript.value = '오디오 전송 완료 (분석 중)'
 
-  // iOS: 분석중 TTS는 결과 TTS를 더 잘 막음 → 스킵 (화면 상태로만 표시)
-  if (!isIOS) {
-    const analyzingMsg = locale.value === 'es' ? 'Analizando audio...' : '오디오 분석 중입니다.'
-    speak(analyzingMsg, { continueListening: false, saveCache: false })
-  }
-
+  // 분석중 TTS는 결과 TTS/다음 PTT와 충돌 → 전 플랫폼 스킵 (상태로만 표시)
   try {
-    const safeMime = mimeType && String(mimeType).includes('/') ? mimeType : 'audio/mp4'
+    const safeMime = mimeType && String(mimeType).includes('/') ? mimeType : 'audio/webm'
     const intent = await parseIntentFromAudio(base64Audio, safeMime, props.validItems, getIntentContext())
-    // 오디오 경로는 원문 텍스트가 없음 — 창고 재질문 폴백은 handleParsedIntent에서 처리
-    handleParsedIntent(intent, null, { fromAudio: true })
+    // 다시/취소만 로컬 처리 (일반 명령의 spoken_text에 '다시'가 섞여도 Gemini intent 우선)
+    const spoken = String(intent?.spoken_text || '').trim()
+    if (spoken && (intent?.intent === 'none' || !intent?.intent) && tryLocalCommand(spoken)) return
+    handleParsedIntent(intent, spoken || null, { fromAudio: true })
   } catch (error) {
     handleIntentError(error, null)
   }
@@ -677,7 +700,8 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     const whHint =
       intent.warehouse ||
       intent._warehouseHint ||
-      (!options.fromAudio ? cmdRawText : null) ||
+      cmdRawText ||
+      intent.spoken_text ||
       intent.raw_spoken_item ||
       ''
     const looksWh =
@@ -826,8 +850,6 @@ const startRetryTimer = () => {
   }, 15000) // 15초마다 재시도
 }
 
-let currentUtterance = null
-
 const speak = (text, options = {}) => {
   // PTT: 부모(PosView)가 continueListening을 넘겨도 자동 마이크 개방하지 않음
   const continueListening = INPUT_MODE === 'wake' && (options.continueListening !== false)
@@ -843,6 +865,12 @@ const speak = (text, options = {}) => {
   }
 
   const runSpeak = () => {
+    // 사용자가 이미 다음 PTT를 누르고 있으면 TTS로 홀드를 깨지 않음
+    if (isPttHolding.value) {
+      isTTSPlaying = false
+      return
+    }
+
     try {
       if (synthesis.paused) synthesis.resume()
       synthesis.cancel()
@@ -900,8 +928,8 @@ const speak = (text, options = {}) => {
     }
 
     isTTSPlaying = true
-    isPttHolding.value = false
-    if (recognition) {
+    // PTT 홀드를 TTS가 강제 해제하지 않음 (2회차 인식 버그 원인)
+    if (INPUT_MODE === 'wake' && recognition) {
       try { recognition.stop() } catch (e) {}
     }
 
@@ -929,16 +957,18 @@ const speak = (text, options = {}) => {
     }
   }
 
-  // iOS: 마이크 녹음 세션이 완전히 풀린 뒤 TTS (바로 speak하면 무음인 경우 많음)
+  // 마이크 트랙이 남아 있으면 TTS 전에 정리 (iOS/Android 공통)
+  stopMicTracks()
   if (isIOS) {
-    stopMicTracks()
     unlockAudioContextForIOS()
     if (iosSpeakTimer) clearTimeout(iosSpeakTimer)
     iosSpeakTimer = setTimeout(runSpeak, 450)
     return
   }
 
-  runSpeak()
+  // Android: 녹음 세션 해제 직후 짧게 쉬고 TTS
+  if (iosSpeakTimer) clearTimeout(iosSpeakTimer)
+  iosSpeakTimer = setTimeout(runSpeak, 120)
 }
 
 /** wake 레거시 토글 — PTT에서는 버튼이 pointer 이벤트를 사용 */
@@ -961,13 +991,16 @@ const toggleListen = () => {
 }
 
 onMounted(() => {
-  initSpeech()
+  // PTT는 MediaRecorder 경로 — Web Speech는 wake 레거시만
+  if (INPUT_MODE === 'wake') initSpeech()
 })
 
 onUnmounted(() => {
+  cancelPendingSpeechForPtt()
+  stopMicTracks()
   if (recognition) {
     isListening.value = false
-    recognition.stop()
+    try { recognition.stop() } catch (e) {}
   }
 })
 

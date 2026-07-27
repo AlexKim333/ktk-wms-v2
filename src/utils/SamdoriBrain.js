@@ -471,6 +471,7 @@ The frontend will handle searching the actual database.
   const prompt = promptCore + `
 
 The user's command is provided as the attached audio file.
+Always include "spoken_text": a short transcript of what was said (for cancel/repeat local handling).
 `;
 try {
     const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
