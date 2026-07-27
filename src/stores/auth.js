@@ -69,10 +69,12 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * 화면 깜빡임 없이 로그아웃:
-     * 1) loggingOut=true 로 /login 이동 허용
-     * 2) 서버 세션 종료
-     * 3) user 제거
+     * 로그아웃 로그아웃:
+     * 1) loggingOut=true (가드가 /login 허용)
+     * 2) 서버 세션 종료 시도
+     * 3) 로컬 user 제거
+     * 호출측에서 router.replace('/login') 은 logout() 이후에 할 것
+     * (모바일: 먼저 replace 하면 언마운트 후 logout이 스킵될 수 있음)
      */
     async logout() {
       this.loggingOut = true

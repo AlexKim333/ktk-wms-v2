@@ -245,9 +245,8 @@ const loadProducts = async () => {
     const status = err.response?.status
     if (status === 401) {
       alert('세션이 만료되었습니다. 다시 로그인해 주세요.')
-      authStore.loggingOut = true
-      await router.replace('/login')
       await authStore.logout()
+      await router.replace('/login')
     } else if (status === 403) {
       alert('상품 데이터 조회 권한이 없습니다. 계정 역할을 확인하세요.')
     } else {

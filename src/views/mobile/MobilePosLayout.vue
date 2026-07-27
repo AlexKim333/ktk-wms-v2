@@ -6,7 +6,7 @@
       <div class="m-user" v-if="authStore.user">
         {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? '본부' }})
       </div>
-      <button class="m-logout" @click="handleLogout">{{ $t('nav.logout') }}</button>
+      <button type="button" class="m-logout" @click.stop.prevent="handleLogout">{{ $t('nav.logout') }}</button>
     </header>
 
     <!-- 메인 렌더링 영역 -->
@@ -150,9 +150,9 @@ defineExpose({
 })
 
 const handleLogout = async () => {
-  authStore.loggingOut = true
-  await router.replace('/login')
+  // 반드시 세션 정리 먼저 — replace 후 언마운트되면 logout이 실행되지 않을 수 있음
   await authStore.logout()
+  await router.replace('/login')
 }
 </script>
 
@@ -172,28 +172,46 @@ const handleLogout = async () => {
   color: white;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 0 12px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1100;
 }
 
 .m-logo {
   font-weight: bold;
   font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .m-user {
+  flex: 1;
+  min-width: 0;
   font-size: 0.85rem;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .m-logout {
+  flex-shrink: 0;
   background: #ef4444;
   color: white;
   border: none;
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 36px;
+  min-width: 64px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  z-index: 1101;
+  position: relative;
 }
 
 .mobile-main-content {
