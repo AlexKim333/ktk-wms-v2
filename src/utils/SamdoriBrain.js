@@ -128,11 +128,12 @@ function initFlexSearch(validItems) {
 function looksLikeWarehouseUtterance(text) {
   const raw = String(text || '').trim()
   if (!raw || raw.length > 40) return false
-  // 품목/담기/수량 신호가 있으면 창고 후속이 아님
-  if (/(불또|bulto|박스|담아|넣어|추가|재고|검색|품명|피\s|전송|장바구니)/i.test(raw)) {
+  // 숫자(2자리 이상)가 있거나 품목/담기/수량/질문 신호가 있으면 창고명만 말한 후속이 절대 아님
+  if (/\d{2,}/.test(raw)) return false
+  if (/(불또|bulto|박스|담아|넣어|추가|재고|검색|품명|품번|피\s|전송|장바구니|몇\s*개|몇개|얼마|있는가|있어|있지|있나|있어요|조회|확인|수량|개수|개야)/i.test(raw)) {
     return false
   }
-  if (/^[A-Za-z]{1,3}-?\d+/.test(raw)) return false
+  if (/([A-Za-z]{1,4}-?\d+|\d{2,})/.test(raw)) return false
   // STT 오인식 포함 (알라르꼰/까르멘 등)
   return /(알라르꼰|알라르콘|알라르권|알라르고|알라르|알라콘|알라꼰|alarcon|alarcón|본사|메인|main|본부|carmen|까르멘|카르멘|까르맨|카르맨|까르면|카르면|까멘|티엔다|tienda|tienda|polanco|폴랑코|insurgentes|satelite|satélite|queretaro|querétaro|창고|지점|sucursal|warehouse)/i.test(
     raw
@@ -146,7 +147,7 @@ function looksLikeWarehouseUtterance(text) {
 function hasStrongItemIdentity(text) {
   const raw = String(text || '').trim()
   if (!raw || looksLikeWarehouseUtterance(raw)) return false
-  if (/[A-Za-z]{1,3}-?\d{2,}/i.test(raw)) return true
+  if (/[A-Za-z]{1,4}-?\d{2,}/i.test(raw)) return true
   if (/\d{2,}/.test(raw)) return true
   const { prefix } = normalizeSpokenQuery(raw, '')
   return !!(prefix && /\d{2,}/.test(prefix))
@@ -267,6 +268,18 @@ function matchItemCode(rawSpoken, color, validItems) {
     validItems.find((i) => i === raw) ||
     validItems.find((i) => String(i).toUpperCase() === raw.toUpperCase())
   if (exact) return exact
+
+  // 발화 내 단어 중 정확히 일치하는 품번이 있는지 먼저 검사 (예: "3331 알라르꼰 창고..." 중 "3331")
+  const tokens = raw.split(/\s+/)
+  for (const token of tokens) {
+    const cleanToken = token.replace(/[^A-Za-z0-9-]/g, '')
+    if (cleanToken.length >= 2) {
+      const found =
+        validItems.find((i) => i === cleanToken) ||
+        validItems.find((i) => String(i).toUpperCase() === cleanToken.toUpperCase())
+      if (found) return found
+    }
+  }
 
   const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color)
 
