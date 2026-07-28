@@ -76,15 +76,26 @@ function normalizeSpokenQuery(rawSpoken, color, validItems = []) {
   let s = String(rawSpoken || '').trim()
   const resolvedColor = resolveColorToken(color, s)
 
-  // 이미 알파벳 정식 코드 (P-160 / P-160-REY-300)
-  if (/^[A-Za-z]+-\d+/.test(s)) {
-    const m = s.toUpperCase().match(/^([A-Z]+-\d+)/)
+  // 이미 알파벳 정식 코드 (P-160 / P-160-REY-300 / L-OP80 / L-OP80-NEGRO-12)
+  if (/^[A-Za-z]+-[A-Za-z0-9]+/.test(s)) {
+    const m = s.toUpperCase().match(/^([A-Z]+-[A-Z0-9]+)/)
     return { prefix: m ? m[1] : s.toUpperCase(), color: resolvedColor, flexQuery: s.toUpperCase() }
   }
-  // 숫자로 시작하는 코드/단축번호 (3331, 3331-SURTIDO-200)
+  // 숫자로 시작하는 코드/단축번호 (3331, 3331-SURTIDO-200) - 단, DB에 해당 숫자 토큰이 존재하는 경우에만
   if (/^\d{2,}/.test(s)) {
     const m = s.toUpperCase().match(/^(\d{2,})/)
-    return { prefix: m ? m[1] : s.toUpperCase(), color: resolvedColor, flexQuery: s.toUpperCase() }
+    const numStr = m ? m[1] : s.toUpperCase()
+    const hasTokenInDb =
+      Array.isArray(validItems) &&
+      validItems.length > 0 &&
+      validItems.some((i) => {
+        const u = String(i).toUpperCase()
+        const numRegex = new RegExp(`(^|[^0-9])${numStr}([^0-9]|$)`, 'i')
+        return numRegex.test(u)
+      })
+    if (hasTokenInDb) {
+      return { prefix: numStr, color: resolvedColor, flexQuery: s.toUpperCase() }
+    }
   }
 
   // 접두 문자 (명시적 발음이나 알파벳이 없으면 비워둠)
@@ -115,19 +126,20 @@ function normalizeSpokenQuery(rawSpoken, color, validItems = []) {
     if (letter) {
       prefix = `${letter}-${num}`
     } else {
-      // 명시적 알파벳을 말하지 않은 경우: DB에 해당 숫자 시작 품목(예: 3331-*, 3358-*)이 있으면 숫자 자체를 prefix로 사용
+      // 명시적 알파벳을 말하지 않은 경우: DB에 해당 숫자 독립 토큰이 존재하면 숫자 자체를 prefix로 사용
       const numStr = String(num)
-      const hasNumericCodeInDb =
+      const hasTokenInDb =
         Array.isArray(validItems) &&
         validItems.length > 0 &&
         validItems.some((i) => {
           const u = String(i).toUpperCase()
-          return u === numStr || u.startsWith(`${numStr}-`)
+          const numRegex = new RegExp(`(^|[^0-9])${numStr}([^0-9]|$)`, 'i')
+          return numRegex.test(u)
         })
-      if (hasNumericCodeInDb) {
+      if (hasTokenInDb) {
         prefix = numStr
       } else {
-        // DB에 숫자로 시작하는 코드가 없으면 관습적 P- 접두사 사용 (예: "160" -> "P-160")
+        // DB에 숫자가 포함된 품목이 아예 없으면 관습적 P- 접두사 사용 (예: DB에 없는 "999" -> "P-999")
         prefix = `P-${numStr}`
       }
     }
@@ -247,14 +259,58 @@ function buildMultiCandidateQuestion(spokenCode, candidates, text) {
   const list = (Array.isArray(candidates) ? candidates : []).slice(0, 5)
   const count = Array.isArray(candidates) ? candidates.length : list.length
   const listed = list.length ? list.join(', ') : ''
-  if (isSpanishUtterance(text)) {
+  const isEs = isSpanishUtterance(text)
+
+  // 1단계: 10개 초과 대량 후보 (예: '60' -> 88개)
+  if (count > 10) {
+    if (isEs) {
+      return `Hay ${count} productos con "${code}". Son demasiados. Por favor, diga el código completo con letras o modelo.`
+    }
+    return `"${code}" 포함 상품이 ${count}가지로 너무 많습니다. 영문자(예: P, L 등)나 규격을 함께 말씀해 주세요.`
+  }
+
+  // 2단계: 6~10개 중규모 후보 (예: '3331' 6개)
+  // 단, 모든 후보가 SURTIDO(혼색)뿐인지 확인
+  const allSurtido =
+    Array.isArray(candidates) &&
+    candidates.length > 0 &&
+    candidates.every((i) => /SURTIDO/i.test(String(i)))
+  if (count > 5) {
+    if (isEs) {
+      return allSurtido
+        ? `Hay ${count} productos surtidos para "${code}". Por favor, dígame la cantidad de empaque o número.`
+        : `Hay ${count} productos para "${code}". Por favor, dígame el color o la cantidad de empaque.`
+    }
+    return allSurtido
+      ? `"${code}" 기본 색상(SURTIDO) 상품이 ${count}가지 있습니다. 포장개수나 세부 번호를 말씀해 주세요.`
+      : `"${code}" 검색 결과가 ${count}가지 있습니다. 색상이나 포장개수를 말씀해 주세요.`
+  }
+
+  // 3단계: 2~5개 소수 정밀 후보 (예: '160' -> P-160, L-PL160)
+  if (isEs) {
     return listed
-      ? `Hay ${count} productos para "${code}": ${listed}. Digame el color o la cantidad de empaque.`
+      ? `Hay ${count} productos para "${code}": ${listed}. ¿Cuál desea consultar?`
       : `Hay ${count} productos relacionados con "${code}". Digame el color o la cantidad de empaque.`
   }
   return listed
-    ? `"${code}" 관련 상품이 ${count}가지 있습니다. 예: ${listed}. 색상이나 포장개수를 말씀해 주세요.`
+    ? `"${code}" 관련 상품이 ${count}가지 있습니다. 예: ${listed}. 어떤 상품을 조회할까요?`
     : `"${code}" 관련 상품이 ${count}가지 있습니다. 색상이나 포장개수를 말씀해 주세요.`
+}
+
+/** 품번 가족 키: P-160-REY-300 → P-160, L-OP80-NEGRO-12 → L-OP80, 3331-SURTIDO-200 → 3331 */
+function itemFamilyKey(itemCode) {
+  const u = String(itemCode || '').toUpperCase()
+  const letter = u.match(/^([A-Z]+-[A-Z0-9]+)/)
+  if (letter) return letter[1]
+  const num = u.match(/^(\d+)/)
+  if (num) return num[1]
+  return u
+}
+
+function candidatesShareSingleFamily(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return false
+  const keys = new Set(candidates.map(itemFamilyKey).filter(Boolean))
+  return keys.size === 1
 }
 
 /**
@@ -340,7 +396,12 @@ function matchItemCode(rawSpoken, color, validItems) {
     let hits = validItems.filter(
       (i) => {
         const u = String(i).toUpperCase()
-        return u === upper || u.startsWith(`${upper}-`)
+        if (u === upper || u.startsWith(`${upper}-`)) return true
+        if (/^\d+$/.test(upper)) {
+          const numRegex = new RegExp(`(^|[^0-9])${upper}([^0-9]|$)`, 'i')
+          return numRegex.test(u)
+        }
+        return false
       }
     )
     if (col) {
@@ -380,7 +441,12 @@ function findMatchingCandidates(rawSpoken, color, validItems) {
   const upper = prefix.toUpperCase()
   let hits = validItems.filter((i) => {
     const u = String(i).toUpperCase()
-    return u === upper || u.startsWith(`${upper}-`)
+    if (u === upper || u.startsWith(`${upper}-`)) return true
+    if (/^\d+$/.test(upper)) {
+      const numRegex = new RegExp(`(^|[^0-9])${upper}([^0-9]|$)`, 'i')
+      return numRegex.test(u)
+    }
+    return false
   })
   if (col) {
     const colored = hits.filter((i) => String(i).toUpperCase().includes(col))
@@ -562,6 +628,16 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
     if (multiCandidates.length > 1) {
       const exactSingle = multiCandidates.find((c) => String(c).toUpperCase() === targetSpoken.toUpperCase())
       if (!exactSingle) {
+        // [SURTIDO 디폴트] 후보>5, 색상 미지정, SURTIDO 유일, 그리고 모든 후보가 동일 품번 가족일 때만
+        // (예: P-160-* 만) — "160"처럼 P-160 + L-PL160 혼재 시에는 자동 확정하지 않음
+        if (!parsed.color && multiCandidates.length > 5) {
+          const surtidoHits = multiCandidates.filter((c) => /SURTIDO/i.test(String(c)))
+          if (surtidoHits.length === 1 && candidatesShareSingleFamily(multiCandidates)) {
+            parsed.item = surtidoHits[0]
+            parsed.intent = 'search'
+            return parsed
+          }
+        }
         const { prefix } = normalizeSpokenQuery(targetSpoken, parsed.color, validItems)
         const numOrCode = prefix || (targetSpoken.match(/[A-Za-z0-9-]+/) || [targetSpoken])[0]
         parsed.intent = 'ask_clarification'
@@ -623,7 +699,7 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
 // SamdoriBrain.js
 // Handles NLP via Gemini API for the Samdori Voice Assistant
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const GEMINI_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) || '';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
 
 /**
