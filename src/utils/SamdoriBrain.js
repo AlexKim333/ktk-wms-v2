@@ -72,22 +72,30 @@ function resolveColorToken(color, rawSpoken) {
  * Gemini가 준 발음 문자열 → 로컬 검색 키
  * 예: "피 백육십 네그로" → { prefix: "P-160", color: "NEGRO" }
  */
-function normalizeSpokenQuery(rawSpoken, color) {
+function normalizeSpokenQuery(rawSpoken, color, validItems = []) {
   let s = String(rawSpoken || '').trim()
   const resolvedColor = resolveColorToken(color, s)
 
-  // 이미 정식 코드면 그대로
+  // 이미 알파벳 정식 코드 (P-160 / P-160-REY-300)
   if (/^[A-Za-z]+-\d+/.test(s)) {
     const m = s.toUpperCase().match(/^([A-Z]+-\d+)/)
     return { prefix: m ? m[1] : s.toUpperCase(), color: resolvedColor, flexQuery: s.toUpperCase() }
   }
+  // 숫자로 시작하는 코드/단축번호 (3331, 3331-SURTIDO-200)
+  if (/^\d{2,}/.test(s)) {
+    const m = s.toUpperCase().match(/^(\d{2,})/)
+    return { prefix: m ? m[1] : s.toUpperCase(), color: resolvedColor, flexQuery: s.toUpperCase() }
+  }
 
-  // 접두 문자
-  let letter = 'P'
+  // 접두 문자 (명시적 발음이나 알파벳이 없으면 비워둠)
+  let letter = ''
   if (/^(비|비이|b\b)/i.test(s) || /^b/i.test(s.replace(/\s/g, ''))) letter = 'B'
-  if (/^(피|프이|pee|p\b)/i.test(s) || /^p/i.test(s.replace(/\s/g, ''))) letter = 'P'
-  const latin = s.match(/[A-Za-z]/)
-  if (latin) letter = latin[0].toUpperCase()
+  else if (/^(피|프이|pee|p\b)/i.test(s) || /^p/i.test(s.replace(/\s/g, ''))) letter = 'P'
+  else {
+    // 알라르꼰 등 창고명이 알파벳으로 들어오는 경우 제외하고, 코드 접두 알파벳만
+    const latin = s.match(/^[A-Za-z]/) || s.match(/\b[A-Za-z](?=-\d)/)
+    if (latin) letter = latin[0].toUpperCase()
+  }
 
   // 숫자: 아라비아 또는 한글 수사
   let num = ''
@@ -102,7 +110,29 @@ function normalizeSpokenQuery(rawSpoken, color) {
     num = parseKoreanNumberChunk(hangulChunk)
   }
 
-  const prefix = num ? `${letter}-${num}` : ''
+  let prefix = ''
+  if (num) {
+    if (letter) {
+      prefix = `${letter}-${num}`
+    } else {
+      // 명시적 알파벳을 말하지 않은 경우: DB에 해당 숫자 시작 품목(예: 3331-*, 3358-*)이 있으면 숫자 자체를 prefix로 사용
+      const numStr = String(num)
+      const hasNumericCodeInDb =
+        Array.isArray(validItems) &&
+        validItems.length > 0 &&
+        validItems.some((i) => {
+          const u = String(i).toUpperCase()
+          return u === numStr || u.startsWith(`${numStr}-`)
+        })
+      if (hasNumericCodeInDb) {
+        prefix = numStr
+      } else {
+        // DB에 숫자로 시작하는 코드가 없으면 관습적 P- 접두사 사용 (예: "160" -> "P-160")
+        prefix = `P-${numStr}`
+      }
+    }
+  }
+
   const flexQuery = [prefix || s, resolvedColor].filter(Boolean).join(' ')
   return { prefix, color: resolvedColor, flexQuery }
 }
@@ -206,6 +236,27 @@ function buildItemMismatchQuestion(spokenText, rejectedCode) {
   return `품번을 정확히 못 들었습니다. "${snippet}" 중 어떤 품번을 확인할까요?${rejected}`
 }
 
+function isSpanishUtterance(text) {
+  const s = String(text || '').trim()
+  if (/[\u3131-\uD79D]/.test(s)) return false
+  return /[a-záéíóúñ¿¡]/i.test(s)
+}
+
+function buildMultiCandidateQuestion(spokenCode, candidates, text) {
+  const code = String(spokenCode || '').trim() || '해당'
+  const list = (Array.isArray(candidates) ? candidates : []).slice(0, 5)
+  const count = Array.isArray(candidates) ? candidates.length : list.length
+  const listed = list.length ? list.join(', ') : ''
+  if (isSpanishUtterance(text)) {
+    return listed
+      ? `Hay ${count} productos para "${code}": ${listed}. Digame el color o la cantidad de empaque.`
+      : `Hay ${count} productos relacionados con "${code}". Digame el color o la cantidad de empaque.`
+  }
+  return listed
+    ? `"${code}" 관련 상품이 ${count}가지 있습니다. 예: ${listed}. 색상이나 포장개수를 말씀해 주세요.`
+    : `"${code}" 관련 상품이 ${count}가지 있습니다. 색상이나 포장개수를 말씀해 주세요.`
+}
+
 /**
  * 발화에 품목/수량 신호가 있는지 (창고 후속과 구분)
  */
@@ -281,9 +332,9 @@ function matchItemCode(rawSpoken, color, validItems) {
     }
   }
 
-  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color)
+  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color, validItems)
 
-  // 1) 접두 매칭 (P-160 → P-160-*)
+  // 1) 접두 매칭 (P-160 → P-160-* / 3331 → 3331-*)
   if (prefix) {
     const upper = prefix.toUpperCase()
     let hits = validItems.filter(
@@ -297,9 +348,8 @@ function matchItemCode(rawSpoken, color, validItems) {
       if (colored.length) hits = colored
     }
     if (hits.length === 1) return hits[0]
-    if (hits.length > 1) {
-      return hits.find((i) => /NEGRO/i.test(i)) || hits[0]
-    }
+    // 여러 후보는 임의 확정하지 않음 (다중 후보 역질문이 처리)
+    if (hits.length > 1) return null
   }
 
   // 2) FlexSearch 보조 (영문/숫자 쿼리일 때 유효)
@@ -314,8 +364,35 @@ function matchItemCode(rawSpoken, color, validItems) {
     if (colored.length) hits = colored
   }
   if (hits.length === 1) return hits[0]
-  if (hits.length > 1) return hits.find((i) => /NEGRO/i.test(i)) || hits[0]
+  if (hits.length > 1) return null
   return null
+}
+
+/**
+ * 색상/포장단위 지정 없이 단축번호(예: "3331") 조회 시 여러 파생 상품이 있는지 검사하는 함수
+ */
+function findMatchingCandidates(rawSpoken, color, validItems) {
+  if (!validItems || !validItems.length) return []
+  if (looksLikeWarehouseUtterance(rawSpoken)) return []
+  const raw = String(rawSpoken || '').trim()
+  const { prefix, color: col } = normalizeSpokenQuery(raw, color, validItems)
+  if (!prefix) return []
+  const upper = prefix.toUpperCase()
+  let hits = validItems.filter((i) => {
+    const u = String(i).toUpperCase()
+    return u === upper || u.startsWith(`${upper}-`)
+  })
+  if (col) {
+    const colored = hits.filter((i) => String(i).toUpperCase().includes(col))
+    if (colored.length) hits = colored
+  }
+  // 사용자가 포장수량/서브번호 등 추가 숫자나 단서(예: '200', '-1')를 말했으면 필터링
+  const nums = (raw.match(/\d+/g) || []).filter((n) => n !== upper.replace(/[^0-9]/g, ''))
+  if (nums.length && hits.length > 1) {
+    const numFiltered = hits.filter((i) => nums.some((num) => String(i).includes(num)))
+    if (numFiltered.length) hits = numFiltered
+  }
+  return hits
 }
 
 /**
@@ -326,7 +403,7 @@ function selectCandidatesForGemini(rawSpoken, color, validItems, max = 60) {
   if (validItems.length <= max) return validItems
 
   const raw = String(rawSpoken || '').trim()
-  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color)
+  const { prefix, color: col, flexQuery } = normalizeSpokenQuery(raw, color, validItems)
   const candidateSet = new Set()
   const add = (item) => {
     if (!item || candidateSet.size >= max) return
@@ -457,7 +534,46 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
   const spokenGuard = String(parsed.spoken_text || parsed.raw_spoken_item || '').trim()
   const strongSpoken = hasStrongItemIdentity(spokenGuard)
 
+  // 단축번호 역질문 후속: "네그로"/"200"만 말하면 pending short code와 결합
+  if (
+    lastIntent?._pendingShortCode &&
+    parsed.raw_spoken_item &&
+    shouldResolveItemCode(parsed.intent)
+  ) {
+    const raw = String(parsed.raw_spoken_item).trim()
+    const pending = String(lastIntent._pendingShortCode).trim()
+    const alreadyHasPending =
+      raw.toUpperCase().includes(pending.toUpperCase()) ||
+      new RegExp(`\\b${pending}\\b`, 'i').test(raw)
+    if (!alreadyHasPending && (!hasStrongItemIdentity(raw) || !/\d{3,}/.test(raw))) {
+      parsed.raw_spoken_item = `${pending} ${raw}`.trim()
+      if (parsed.spoken_text) {
+        parsed.spoken_text = `${pending} ${parsed.spoken_text}`.trim()
+      }
+    }
+  }
+
   applyWarehouseFollowUp(parsed, lastIntent)
+
+  // (0) 동일 품번 하위 다중 후보군 역질문 엔진 (Multi-Candidate Clarification Engine)
+  const targetSpoken = String(parsed.raw_spoken_item || spokenGuard || '').trim()
+  if (targetSpoken && shouldResolveItemCode(parsed.intent) && !looksLikeWarehouseUtterance(targetSpoken)) {
+    const multiCandidates = findMatchingCandidates(targetSpoken, parsed.color, validItems)
+    if (multiCandidates.length > 1) {
+      const exactSingle = multiCandidates.find((c) => String(c).toUpperCase() === targetSpoken.toUpperCase())
+      if (!exactSingle) {
+        const { prefix } = normalizeSpokenQuery(targetSpoken, parsed.color, validItems)
+        const numOrCode = prefix || (targetSpoken.match(/[A-Za-z0-9-]+/) || [targetSpoken])[0]
+        parsed.intent = 'ask_clarification'
+        parsed.question = buildMultiCandidateQuestion(numOrCode, multiCandidates, spokenGuard || targetSpoken)
+        parsed._ambiguousCandidates = multiCandidates.slice(0, 5)
+        parsed._pendingShortCode = numOrCode
+        parsed.item = undefined
+        parsed.raw_spoken_item = String(numOrCode)
+        return parsed
+      }
+    }
+  }
 
   if (parsed.raw_spoken_item && shouldResolveItemCode(parsed.intent)) {
     const matched = await matchItemCodeHybrid(parsed.raw_spoken_item, parsed.color, validItems, {
@@ -469,15 +585,17 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
     }
 
     // 발화 품번 신호 ≠ 매칭 결과 → 잘못된 확정 응답 차단
-    if (item && strongSpoken && !itemMatchesSpokenIdentity(item, spokenGuard)) {
+    const guardForMismatch = String(parsed.spoken_text || spokenGuard || parsed.raw_spoken_item || '').trim()
+    if (item && hasStrongItemIdentity(guardForMismatch) && !itemMatchesSpokenIdentity(item, guardForMismatch)) {
       parsed.intent = 'ask_clarification'
-      parsed.question = buildItemMismatchQuestion(spokenGuard, item)
+      parsed.question = buildItemMismatchQuestion(guardForMismatch, item)
       parsed._rejectedMatch = item
       parsed.item = undefined
-      parsed.raw_spoken_item = spokenGuard
+      parsed.raw_spoken_item = guardForMismatch
       return parsed
     }
     parsed.item = item
+    if (item) parsed._pendingShortCode = undefined
   }
 
   // Gemini/메모리가 이미 item을 넣은 경우도 동일 검증
@@ -528,9 +646,23 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 function buildContextPrompt(lastIntent) {
   if (!lastIntent) return ''
   const item = lastIntent.item || ''
+  const pendingShort = lastIntent._pendingShortCode || ''
   const history = Array.isArray(lastIntent.sessionHistory) ? lastIntent.sessionHistory : []
 
   let prompt = ''
+  if (pendingShort && !item) {
+    const candidates = Array.isArray(lastIntent._ambiguousCandidates)
+      ? lastIntent._ambiguousCandidates.slice(0, 5).join(', ')
+      : ''
+    prompt += `
+PENDING SHORT CODE CLARIFICATION:
+The user previously searched incomplete code "${pendingShort}" and was asked to pick color/pack size.
+${candidates ? `Candidate SKUs: ${candidates}` : ''}
+If the current utterance is ONLY a color, pack size, or sub-code (e.g. "네그로", "200", "SURTIDO", "negro"),
+set raw_spoken_item to combine them, e.g. "${pendingShort} 네그로" or "${pendingShort}-200".
+Do NOT fall back to an unrelated older item from memory.
+`
+  }
   if (item) {
     const lastAction = lastIntent.intent || 'unknown'
     prompt += `
@@ -562,6 +694,9 @@ If the user answers with ONLY a warehouse/branch name (no new item code), return
 Examples: "알라르꼰", "까르멘", "Alarcón", "Carmen", "본사", "지점" -> search same item + warehouse.
 
 Only ignore this memory if the user clearly names a DIFFERENT explicit item code in the current command.
+
+CRITICAL RULE FOR NUMERIC AND SHORT CODES (e.g., "3331", "3358", "4308", "7001", "160", "P-160"):
+If the user's current command mentions ANY 2+ digit number (e.g. "3331 알라르꼰 창고에 몇 개가 있는가", "3331 재고 알려줘", "4308"), DO NOT copy "${item}" from memory!! You MUST extract that number as the NEW "raw_spoken_item" (e.g. "raw_spoken_item": "3331"). A 4-digit number is an item code, NOT just a quantity!
 `
   }
 
@@ -818,5 +953,12 @@ try {
     console.error('Samdori Brain Audio Error:', error);
     throw error;
   }
+}
+
+export const _testExports = {
+  normalizeSpokenQuery,
+  findMatchingCandidates,
+  buildMultiCandidateQuestion,
+  attachResolvedItem
 }
 

@@ -808,10 +808,17 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     }
     lastIntent.value = {
       ...intent,
-      // 오매칭 재질문은 잘못된 품번을 메모리에 남기지 않음
-      item: intent._rejectedMatch
-        ? undefined
-        : (intent.item || lastIntent.value?.item || props.pendingStockItem || undefined)
+      // 오매칭/다중후보 재질문: 구 품번 메모리를 남기지 않고 단축코드만 보존
+      item:
+        intent._rejectedMatch || (intent._ambiguousCandidates && intent._ambiguousCandidates.length)
+          ? undefined
+          : (intent.item || lastIntent.value?.item || props.pendingStockItem || undefined),
+      raw_spoken_item:
+        intent._pendingShortCode ||
+        intent.raw_spoken_item ||
+        lastIntent.value?.raw_spoken_item,
+      _pendingShortCode: intent._pendingShortCode || undefined,
+      _ambiguousCandidates: intent._ambiguousCandidates || undefined
     }
     statusText.value =
       INPUT_MODE === 'ptt'
