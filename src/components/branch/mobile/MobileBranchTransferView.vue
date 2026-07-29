@@ -1075,6 +1075,7 @@ watch(() => props.editingDraftName, async (newDraftName) => {
         }
         tabs.value.push(newTab)
         currentTabIndex.value = tabs.value.length - 1
+        mobileMode.value = 'cart'
       } catch (e) {
         console.error('Error fetching specific draft:', e)
         alert('예약 정보를 불러오는 중 오류가 발생했습니다.')
@@ -1082,6 +1083,7 @@ watch(() => props.editingDraftName, async (newDraftName) => {
     } else {
       const idx = tabs.value.findIndex(t => t.docName === newDraftName)
       currentTabIndex.value = idx
+      mobileMode.value = 'cart'
     }
   }
 }, { immediate: true })
@@ -1184,8 +1186,15 @@ const submitTransfer = async () => {
       const res = await adminApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
       
-      let totalQtyCount = 0
-      currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+      let totalBoxCount = 0
+      let totalEachCount = 0
+      currentTab.value.cartItems.forEach(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        totalBoxCount += box
+        totalEachCount += each
+      })
       
       receiptPrintData.value = {
         title: 'Immediate (Stock Entry)',
@@ -1197,16 +1206,21 @@ const submitTransfer = async () => {
         solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
-        summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+        summary: { items: currentTab.value.cartItems.length, bulto: totalBoxCount, pzs: totalEachCount }
       }
       
-      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
-        name: item.item_code,
-        item_name: item.item_name || item.item_code,
-        input_box: item.totalQty,
-        input_each: 0,
-        price_list_rate: item.price_list_rate || 0
-      }))))
+      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        return {
+          name: item.item_code,
+          item_name: item.item_name || item.item_code,
+          input_box: box,
+          input_each: each,
+          price_list_rate: item.price_list_rate || 0
+        }
+      })))
       
       await nextTick()
       if (receiptPrintRef.value) {
@@ -1243,8 +1257,15 @@ const submitTransfer = async () => {
       const res = await adminApi.post('/api/resource/Material Request', payload)
       docName = res.data.data.name
       
-      let totalQtyCount = 0
-      currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+      let totalBoxCount = 0
+      let totalEachCount = 0
+      currentTab.value.cartItems.forEach(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        totalBoxCount += box
+        totalEachCount += each
+      })
       
       receiptPrintData.value = {
         title: 'Material Pending',
@@ -1256,16 +1277,21 @@ const submitTransfer = async () => {
         solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
-        summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+        summary: { items: currentTab.value.cartItems.length, bulto: totalBoxCount, pzs: totalEachCount }
       }
       
-      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
-        name: item.item_code,
-        item_name: item.item_name || item.item_code,
-        input_box: item.totalQty,
-        input_each: 0,
-        price_list_rate: item.price_list_rate || 0
-      }))))
+      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        return {
+          name: item.item_code,
+          item_name: item.item_name || item.item_code,
+          input_box: box,
+          input_each: each,
+          price_list_rate: item.price_list_rate || 0
+        }
+      })))
       
       await nextTick()
       if (receiptPrintRef.value) {

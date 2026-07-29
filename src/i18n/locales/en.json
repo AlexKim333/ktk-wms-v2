@@ -55,6 +55,7 @@
     "settings": "Settings",
     "logout": "Logout",
     "branch_group": "Branch",
+    "branch_pos": "Branch POS (VENTA)",
     "branch_transfer": "Create Transfer",
     "branch_reservation": "Transfer Reservations",
     "branch_inventory": "Check Inventory"

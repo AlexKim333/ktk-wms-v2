@@ -161,6 +161,9 @@
             <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 0" @click="$emit('edit-reservation', selectedReservation.name)" style="background: #0ea5e9; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
               🛒 {{ $t('mobile.btn_cart') }}로 이동하여 수정/출고
             </button>
+            <button v-if="selectedReservation.is_stock_entry && selectedReservation.docstatus === 1" @click="$emit('edit-reservation', selectedReservation.name)" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+              🛒 변경출고 (Return/Swap Diff)
+            </button>
           </div>
         </div>
       </div>

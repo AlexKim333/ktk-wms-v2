@@ -438,6 +438,8 @@ const saveChanges = async () => {
         custom_tier_3_qty: item.value.custom_tier_3_qty,
         custom_tier_4_barcode: item.value.custom_tier_4_barcode,
         custom_tier_4_qty: item.value.custom_tier_4_qty,
+        custom_tier_5_barcode: item.value.custom_tier_5_barcode,
+        custom_tier_5_qty: item.value.custom_tier_5_qty,
         disabled: item.value.disabled
       })
     }
@@ -478,9 +480,25 @@ watch(() => props.itemId, () => {
 .detail-container {
   padding: 20px;
   background: var(--theme-bg-gradient);
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   color: var(--text-primary);
   font-family: var(--sans);
+}
+
+.detail-container::-webkit-scrollbar {
+  width: 10px;
+}
+.detail-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+}
+.detail-container::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 5px;
+}
+.detail-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 .detail-header {

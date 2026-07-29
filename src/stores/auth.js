@@ -60,6 +60,12 @@ export const useAuthStore = defineStore('auth', {
           return false
         }
         this.user = await resolveLoginProfile(frappeApi, loggedUser)
+        try {
+          const { useBranchSessionStore } = await import('./branchSession.js')
+          useBranchSessionStore().initForUser()
+        } catch (e) {
+          console.warn('branchSession init failed', e)
+        }
         return !!this.user
       } catch (error) {
         console.error('Session restore failed:', error)
@@ -86,6 +92,10 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.user = null
         this.loggingOut = false
+        try {
+          const { useBranchSessionStore } = await import('./branchSession.js')
+          useBranchSessionStore().reset()
+        } catch (e) {}
       }
     }
   }

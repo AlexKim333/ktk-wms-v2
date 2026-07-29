@@ -55,6 +55,7 @@
     "settings": "Configuración",
     "logout": "Cerrar sesión",
     "branch_group": "Sucursal (Branch)",
+    "branch_pos": "Punto de Venta (POS)",
     "branch_transfer": "Crear Transferencia",
     "branch_reservation": "Reservas de Transferencia",
     "branch_inventory": "Consultar Inventario"

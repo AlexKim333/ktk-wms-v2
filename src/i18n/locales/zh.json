@@ -55,6 +55,7 @@
     "settings": "设置",
     "logout": "注销",
     "branch_group": "分公司专用",
+    "branch_pos": "分公司 POS 销售 (VENTA)",
     "branch_transfer": "创建调拨单",
     "branch_reservation": "调拨预约状态",
     "branch_inventory": "库存查询"

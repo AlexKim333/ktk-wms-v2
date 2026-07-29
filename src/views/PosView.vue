@@ -18,25 +18,50 @@
       <div v-if="authStore.user" class="nav-user-info">
         <span class="nav-user-name">{{ authStore.user.member_name || authStore.user.full_name }}</span>
         <span class="nav-user-meta">{{ authStore.user.branch_name ?? '본부' }} · {{ isAdmin ? 'Admin' : (authStore.user.access_level || '-') }}</span>
+        <span
+          v-if="!isAdmin && branchSession.needsPinGate"
+          class="nav-user-meta"
+          style="display:block; margin-top:4px; font-weight:800;"
+          :style="{ color: branchSession.isManagerMode ? '#86efac' : '#38bdf8' }"
+        >
+          {{ branchSession.isManagerMode ? '🔓 지점장 모드' : `🧑‍💼 점원: ${branchSession.selectedClerkName || '-'}` }}
+        </span>
+        <button
+          v-if="!isAdmin && branchSession.needsPinGate && branchSession.isClerkMode"
+          type="button"
+          style="margin-top:8px; width:100%; background:#f59e0b; color:#111; border:none; border-radius:6px; padding:8px; font-weight:800; cursor:pointer; font-size:12px;"
+          @click="branchSession.openPinModal()"
+        >🔐 지점장 PIN 잠금해제</button>
+        <button
+          v-else-if="!isAdmin && branchSession.needsPinGate && branchSession.isManagerMode"
+          type="button"
+          style="margin-top:8px; width:100%; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:8px; font-weight:700; cursor:pointer; font-size:12px;"
+          @click="branchSession.lockToClerk()"
+        >↩️ 점원 모드로 잠금</button>
       </div>
       <div class="nav-lang-switcher" style="padding: 0 12px; margin-bottom: 12px;">
         <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
       </div>
       <nav class="nav-menu">
-        <!-- 지점 전용 VENTA (항상 가장 먼저 노출) -->
-        <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')" style="background-color: #38bdf8; color: #0f172a; font-weight: bold;">
-          🛒 VENTA (판매)
-        </a> -->
+        <!-- 지점 POS VENTA (항상 가장 먼저 노출: 지점장 및 관리자 모두 사용 가능) -->
+        <a href="#" class="nav-item pos-venta-btn" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #ffffff !important; font-weight: 800; border-radius: 8px; margin: 8px 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(14,165,233,0.35); text-decoration: none;">
+          <span style="font-size: 15px;">🛒 {{ $t('nav.branch_pos', '지점 POS (VENTA)') }}</span>
+          <span style="background: rgba(255,255,255,0.22); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 900; letter-spacing: 0.5px;">POS</span>
+        </a>
 
         <!-- 지점 전용 메뉴: 관리자가 지점장 UI로 오인되지 않도록 지점 계정에만 상단 노출 -->
         <div v-if="!isAdmin" class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
           <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.branch_group') }}</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">{{ $t('nav.branch_reservation') }} <span v-if="branchReservationCount > 0" class="res-badge">{{ branchReservationCount }}</span></a>
-            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
-            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-sales' }" @click.prevent="setActiveNav('branch-sales')">판매 내역</a> -->
-            <!-- <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-staff' }" @click.prevent="setActiveNav('branch-staff')">점원/포스 관리</a> -->
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')">🛒 {{ $t('nav.branch_pos', '지점 POS (VENTA)') }}</a>
+            <template v-if="branchSession.isManagerMode">
+              <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
+              <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">{{ $t('nav.branch_reservation') }} <span v-if="branchReservationCount > 0" class="res-badge">{{ branchReservationCount }}</span></a>
+              <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
+            </template>
+            <div v-else style="padding: 8px 15px; font-size: 11px; color: #94a3b8; line-height: 1.4;">
+              점원 모드: 판매 보류만 가능합니다.<br/>이동/재고/설정은 지점장 PIN 후 사용.
+            </div>
           </div>
         </div>
 
@@ -96,7 +121,7 @@
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
           <a href="#" class="nav-item" :class="{ active: activeNav === 'staff-management' }" @click.prevent="activeNav = 'staff-management'">👨‍👩‍👧 가족 관리</a>
         </template>
-        <template v-else>
+        <template v-else-if="branchSession.isManagerMode">
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
         </template>
         <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 {{ $t('nav.logout') }}</button>
@@ -109,6 +134,7 @@
       <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
       <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav(previousNavForProductDetail)" />
+      <BranchProductDetailView v-else-if="activeNav === 'branch-product-detail'" :item-id="activeProductId" :current-branch="authStore.user?.branch_name" @go-back="setActiveNav(previousNavForProductDetail)" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
       
       <!-- 지점 전용 영역 -->
@@ -118,6 +144,8 @@
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
         :branch-list="branchList"
+        :customer-list="customerList"
+        :sales-person-list="salesPersonList"
         @refresh-items="fetchFrappeItems"
       />
       <!-- 지점 재고 이동 예약 -->
@@ -161,6 +189,13 @@
       <NodeManagement v-else-if="activeNav === 'node'" />
       
       <StaffManagementView v-else-if="activeNav === 'staff-management'" />
+      
+      <!-- 지점 및 일반 설정창 -->
+      <BranchSettingsView 
+        v-else-if="activeNav === 'settings'"
+        :current-branch="authStore.user?.branch_name"
+        @close="setActiveNav('branch-pos')"
+      />
 
       <div v-else class="workspace-body">
         
@@ -756,6 +791,34 @@
     :pending-stock-item="pendingVoiceStockItem"
     @intent-parsed="handleSamdoriIntent"
   />
+  <!-- 지점장 PIN (사이드바에서도 열림 — 프론트 전용) -->
+  <div
+    v-if="branchSession.pinModalOpen"
+    style="position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center;"
+    @click.self="branchSession.closePinModal()"
+  >
+    <div style="background:white; border-radius:12px; width:min(380px,92vw); padding:20px; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; font-size:18px;">🔐 지점장 PIN 잠금해제</h3>
+        <button type="button" style="border:none; background:transparent; font-size:18px; cursor:pointer;" @click="branchSession.closePinModal()">✕</button>
+      </div>
+      <p style="font-size:13px; color:#64748b; margin:0 0 12px 0;">점원 계정은 Frappe에 없습니다. PIN은 이 기기 localStorage에만 저장됩니다.</p>
+      <input
+        v-model="branchSession.pinInput"
+        type="password"
+        inputmode="numeric"
+        maxlength="4"
+        placeholder="4자리 PIN"
+        style="width:100%; box-sizing:border-box; padding:12px; font-size:22px; letter-spacing:8px; text-align:center; border:1px solid #cbd5e1; border-radius:8px;"
+        @keyup.enter="onBranchPinUnlock"
+      />
+      <p v-if="branchSession.pinError" style="color:#ef4444; font-weight:700; margin:10px 0 0;">{{ branchSession.pinError }}</p>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button type="button" style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:#f8fafc; font-weight:700; cursor:pointer;" @click="branchSession.closePinModal()">취소</button>
+        <button type="button" style="flex:1; padding:12px; border-radius:8px; border:none; background:#0ea5e9; color:white; font-weight:800; cursor:pointer;" @click="onBranchPinUnlock">잠금해제</button>
+      </div>
+    </div>
+  </div>
   </div>
 </template>
 
@@ -768,6 +831,7 @@ import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { useBranchSessionStore } from '../stores/branchSession.js'
 import { useItemSearch, rankItemNameMatches } from '../composables/useItemSearch.js'
 import { usePagedList } from '../composables/usePagedList.js'
 import axios from 'axios'
@@ -781,6 +845,8 @@ import BranchPosView from '../components/branch/BranchPosView.vue'
 import BranchTransferView from '../components/branch/BranchTransferView.vue'
 import BranchTransferReservationList from '../components/branch/BranchTransferReservationList.vue'
 import BranchInventoryList from '../components/branch/BranchInventoryList.vue'
+import BranchSettingsView from '../components/branch/BranchSettingsView.vue'
+import BranchProductDetailView from '../components/branch/BranchProductDetailView.vue'
 import QuickItemAddModal from '../components/QuickItemAddModal.vue'
 import QuickCustomerAddModal from '../components/QuickCustomerAddModal.vue'
 import QuickSalesPersonAddModal from '../components/QuickSalesPersonAddModal.vue'
@@ -796,6 +862,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const { isMobile } = useMobile()
 const isAdmin = computed(() => authStore.isAdmin)
+const branchSession = useBranchSessionStore()
 const { t, locale } = useI18n();
 
 const {
@@ -944,8 +1011,8 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items,
 // ----------------------------
 const isGridModalOpen = ref(false)
 const activeGroup = ref(null)
-// 지점 사용자는 VENTA(판매) 대신 '재고 이동 작성 (입력)' 화면을 기본값으로 사용
-const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-transfer')
+// 지점 사용자는 POS VENTA(판매) 화면을 기본값으로 사용
+const activeNav = ref(isAdmin.value ? 'outbound' : 'branch-pos')
 
 // 역할 복구 타이밍에 activeNav가 지점으로 고정되는 것 방지
 watch(
@@ -968,7 +1035,11 @@ const previousNavForProductDetail = ref('product-list')
 const openProductDetail = (itemId) => {
   activeProductId.value = itemId
   previousNavForProductDetail.value = activeNav.value
-  activeNav.value = 'product-detail'
+  if (!isAdmin.value || activeNav.value === 'branch-inventory') {
+    activeNav.value = 'branch-product-detail'
+  } else {
+    activeNav.value = 'product-detail'
+  }
 }
 
 const barcodeQuery = ref('')
@@ -1514,8 +1585,8 @@ const pollReservations = async () => {
 
 const fetchFrappeItems = async () => {
   try {
-    // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원, 예약 건수)
-    const [whRes, itemRes, binRes, custRes, spRes, supRes] = await Promise.all([
+    // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원, 공급업체, 판매단가)
+    const [whRes, itemRes, binRes, custRes, spRes, supRes, priceRes] = await Promise.all([
       frappeApi.get('/api/resource/Warehouse', {
         params: { 
           fields: JSON.stringify(['name', 'warehouse_name', 'parent_warehouse']),
@@ -1562,6 +1633,13 @@ const fetchFrappeItems = async () => {
           fields: JSON.stringify(['name', 'supplier_name']),
           limit_page_length: 0
         }
+      }).catch(() => ({ data: { data: [] } })),
+      frappeApi.get('/api/resource/Item Price', {
+        params: {
+          fields: JSON.stringify(['item_code', 'price_list_rate', 'price_list']),
+          filters: JSON.stringify([['price_list', '=', 'Standard Selling']]),
+          limit_page_length: 0
+        }
       }).catch(() => ({ data: { data: [] } }))
     ]);
 
@@ -1570,6 +1648,14 @@ const fetchFrappeItems = async () => {
     customerList.value = custRes.data.data || []
     salesPersonList.value = spRes.data.data || []
     supplierList.value = supRes.data.data || []
+
+    const priceList = priceRes.data.data || []
+    const priceMap = {}
+    priceList.forEach(p => {
+      if (p.item_code) {
+        priceMap[p.item_code] = Number(p.price_list_rate || 0)
+      }
+    })
     
     await pollReservations()
     
@@ -1599,6 +1685,7 @@ const fetchFrappeItems = async () => {
       
       groupedByName[groupId].variants.push({
         ...item,
+        price_list_rate: priceMap[item.name] || Number(item.valuation_rate || 0),
         input_box: 0,
         input_each: 0
       });
@@ -1673,7 +1760,37 @@ const setTransactionMode = (mode) => {
   transactionMode.value = mode
 }
 
+const onBranchPinUnlock = () => {
+  if (branchSession.unlockWithPin()) {
+    // stay on current nav; manager menus appear
+  }
+}
+
+watch(
+  () => branchSession.mode,
+  (mode) => {
+    if (
+      mode === 'clerk' &&
+      !isAdmin.value &&
+      activeNav.value !== 'branch-pos'
+    ) {
+      activeNav.value = 'branch-pos'
+    }
+  }
+)
+
 const setActiveNav = (nav, mode = null) => {
+  if (
+    !isAdmin.value &&
+    branchSession.needsPinGate &&
+    branchSession.isClerkMode &&
+    nav !== 'branch-pos'
+  ) {
+    alert('점원 모드에서는 판매 보류(지점 POS)만 사용할 수 있습니다.\n지점장 PIN으로 잠금해제 하세요.')
+    branchSession.openPinModal()
+    return
+  }
+
   if (currentTab.value && (currentTab.value.activeReservationId || currentTab.value.amendingStockEntry)) {
     const isEntryView = activeNav.value === 'outbound' || activeNav.value === 'inbound' || activeNav.value === 'transfer' || activeNav.value === 'branch-transfer'
     if (isEntryView) {

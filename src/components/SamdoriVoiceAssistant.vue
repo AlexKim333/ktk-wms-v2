@@ -212,7 +212,7 @@ const tryLocalCommand = (rawText) => {
 /**
  * iOS Safari: speechSynthesis는 사용자 제스처 안 speak로 언락 필요.
  * 주의: getUserMedia 녹음이 오디오 세션을 가로채면 언락이 무효화되므로
- * pointerdown + pointerup(녹음 종료 직후) 모두에서 호출한다.
+ * pointerdown + pointerup(제스처) + onstop(마이크 해제 직후) 모두에서 호출한다.
  */
 const unlockSpeechForIOS = (force = false) => {
   if (!isIOS || !synthesis) return
@@ -223,9 +223,9 @@ const unlockSpeechForIOS = (force = false) => {
   if (iosSpeechUnlocked && !force) return
   try {
     // volume 0은 일부 iOS에서 언락으로 인정 안 됨 → 아주 작게
-    const warm = new SpeechSynthesisUtterance('.')
+    const warm = new SpeechSynthesisUtterance(' ')
     warm.volume = 0.01
-    warm.rate = 2
+    warm.rate = 1.0
     warm.lang = locale.value === 'es' ? 'es-MX' : 'ko-KR'
     const voices = synthesis.getVoices() || []
     const match = voices.find((v) =>
@@ -326,6 +326,10 @@ const startPttMediaRecording = async () => {
       const audioBlob = new Blob(audioChunks, { type: mime })
       // 트랙은 onstop 이후에만 정리 (너무 일찍 stop 하면 빈 blob)
       stopMicTracks(stream)
+      if (isIOS) {
+        unlockAudioContextForIOS()
+        unlockSpeechForIOS(true)
+      }
 
       if (sessionId !== audioSessionId) return
       if (!audioBlob.size || audioChunks.length === 0) {
@@ -385,7 +389,7 @@ const stopPttMediaRecording = () => {
     statusText.value = '녹음 종료에 실패했습니다.'
     return
   }
-  // 트랙은 onstop에서 정리. iOS만 제스처 안에서 TTS 재언락
+  // pointerup 제스처 안에서 재언락 (onstop은 비동기라 제스처 밖일 수 있음)
   if (isIOS) unlockSpeechForIOS(true)
 }
 
@@ -980,8 +984,10 @@ const speak = (text, options = {}) => {
     }
 
     try {
-      if (synthesis.paused) synthesis.resume()
-      synthesis.cancel()
+      if (synthesis.speaking || synthesis.pending) {
+        if (synthesis.paused) synthesis.resume()
+        synthesis.cancel()
+      }
     } catch (e) {}
 
     currentUtterance = new SpeechSynthesisUtterance(text)
@@ -1070,7 +1076,7 @@ const speak = (text, options = {}) => {
   if (isIOS) {
     unlockAudioContextForIOS()
     if (iosSpeakTimer) clearTimeout(iosSpeakTimer)
-    iosSpeakTimer = setTimeout(runSpeak, 450)
+    iosSpeakTimer = setTimeout(runSpeak, 120)
     return
   }
 

@@ -55,6 +55,7 @@
     "settings": "설정",
     "logout": "로그아웃",
     "branch_group": "지점 전용 (Branch)",
+    "branch_pos": "지점 POS 판매 (VENTA)",
     "branch_transfer": "재고 이동 작성 (입력)",
     "branch_reservation": "재고 이동 예약 현황",
     "branch_inventory": "재고 조회"

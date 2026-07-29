@@ -5,7 +5,17 @@
       <div class="m-logo">🏆 WMS PRO</div>
       <div class="m-user" v-if="authStore.user">
         {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? '본부' }})
+        <span v-if="branchSession.needsPinGate" style="display:block; font-size:11px; font-weight:800; margin-top:2px;" :style="{ color: branchSession.isManagerMode ? '#86efac' : '#38bdf8' }">
+          {{ branchSession.isManagerMode ? '🔓 지점장' : `🧑‍💼 ${branchSession.selectedClerkName || '점원'}` }}
+        </span>
       </div>
+      <button
+        v-if="branchSession.needsPinGate && branchSession.isClerkMode"
+        type="button"
+        class="m-logout"
+        style="background:#f59e0b; color:#111; margin-right:6px;"
+        @click.stop.prevent="branchSession.openPinModal()"
+      >PIN</button>
       <button type="button" class="m-logout" @click.stop.prevent="handleLogout">{{ $t('nav.logout') }}</button>
     </header>
 
@@ -52,27 +62,75 @@
 
     <!-- 모바일 하단 탭 바 (지점 4종 메뉴) -->
     <nav class="mobile-bottom-nav">
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-inventory' }" @click="activeNav = 'branch-inventory'">
+      <button
+        v-if="branchSession.isManagerMode"
+        class="m-nav-item"
+        :class="{ active: activeNav === 'branch-inventory' }"
+        @click="setMobileNav('branch-inventory')"
+      >
         🔍<br/>{{ $t('mobile.nav_inventory') }}
       </button>
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="activeNav = 'branch-pos'">
+      <button class="m-nav-item" :class="{ active: activeNav === 'branch-pos' || activeNav === 'pos' }" @click="setMobileNav('branch-pos')">
         🛒<br/>{{ $t('mobile.nav_outbound') }}
       </button>
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-transfer' }" @click="activeNav = 'branch-transfer'">
+      <button
+        v-if="branchSession.isManagerMode"
+        class="m-nav-item"
+        :class="{ active: activeNav === 'branch-transfer' }"
+        @click="setMobileNav('branch-transfer')"
+      >
         🚚<br/>{{ $t('mobile.nav_transfer') }}
       </button>
-      <button class="m-nav-item" :class="{ active: activeNav === 'branch-reservation' }" @click="activeNav = 'branch-reservation'" style="position: relative;">
+      <button
+        v-if="branchSession.isManagerMode"
+        class="m-nav-item"
+        :class="{ active: activeNav === 'branch-reservation' }"
+        @click="setMobileNav('branch-reservation')"
+        style="position: relative;"
+      >
         📅<br/>{{ $t('mobile.nav_reservation') }}
         <span v-if="branchReservationCount > 0" class="mobile-badge">{{ branchReservationCount }}</span>
       </button>
+      <button
+        v-if="branchSession.needsPinGate && branchSession.isManagerMode"
+        class="m-nav-item"
+        @click="branchSession.lockToClerk()"
+      >
+        🔒<br/>점원잠금
+      </button>
     </nav>
+
+    <div
+      v-if="branchSession.pinModalOpen"
+      style="position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center;"
+      @click.self="branchSession.closePinModal()"
+    >
+      <div style="background:white; border-radius:12px; width:min(380px,92vw); padding:20px;">
+        <h3 style="margin:0 0 12px;">🔐 지점장 PIN</h3>
+        <input
+          v-model="branchSession.pinInput"
+          type="password"
+          inputmode="numeric"
+          maxlength="4"
+          placeholder="4자리 PIN"
+          style="width:100%; box-sizing:border-box; padding:12px; font-size:22px; letter-spacing:8px; text-align:center; border:1px solid #cbd5e1; border-radius:8px;"
+          @keyup.enter="branchSession.unlockWithPin()"
+        />
+        <p v-if="branchSession.pinError" style="color:#ef4444; font-weight:700;">{{ branchSession.pinError }}</p>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button type="button" style="flex:1; padding:12px;" @click="branchSession.closePinModal()">취소</button>
+          <button type="button" style="flex:1; padding:12px; background:#0ea5e9; color:white; border:none; border-radius:8px; font-weight:800;" @click="branchSession.unlockWithPin()">잠금해제</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
+import { useBranchSessionStore } from '../../stores/branchSession.js'
 import MobileBranchInventoryView from '../../components/branch/mobile/MobileBranchInventoryView.vue'
 import MobileBranchPosView from '../../components/branch/mobile/MobileBranchPosView.vue'
 import MobileBranchTransferView from '../../components/branch/mobile/MobileBranchTransferView.vue'
@@ -91,9 +149,28 @@ const emit = defineEmits(['refresh-items', 'edit-reservation'])
 
 const router = useRouter()
 const authStore = useAuthStore()
+const branchSession = useBranchSessionStore()
 
 // 모바일에서는 기본적으로 지점 출고 화면(또는 이동)을 표시
 const activeNav = ref('branch-pos')
+
+const setMobileNav = (nav) => {
+  if (branchSession.needsPinGate && branchSession.isClerkMode && nav !== 'branch-pos' && nav !== 'pos') {
+    alert('점원 모드에서는 판매/출고 보류 화면만 사용할 수 있습니다.')
+    branchSession.openPinModal()
+    return
+  }
+  activeNav.value = nav
+}
+
+watch(
+  () => branchSession.mode,
+  (mode) => {
+    if (mode === 'clerk' && activeNav.value !== 'branch-pos' && activeNav.value !== 'pos') {
+      activeNav.value = 'branch-pos'
+    }
+  }
+)
 
 const mobilePosViewRef = ref(null)
 const mobileTransferViewRef = ref(null)

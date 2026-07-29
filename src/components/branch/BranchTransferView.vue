@@ -237,7 +237,17 @@
 
       <!-- Cart Table -->
       <div class="cart-table-wrapper" style="flex: 1; overflow-y: auto; padding: 15px; position: relative;">
-        <div v-if="currentTab && currentTab.docName && !isClerk" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
+        <!-- docstatus === 1 (서브밑 완료 전표 변경 모드 안내 배너) -->
+        <div v-if="currentTab && currentTab.docName && currentTab.docstatus === 1" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <span style="font-weight: bold; color: #1e3a8a; font-size: 14px;">🔒 [서브밑 완료 전표 변경 모드] 원본 전표: {{ currentTab.docName }}</span>
+            <div style="font-size: 12px; color: #3b82f6; margin-top: 4px;">
+              수량을 변경(증가/감소)하거나 상품을 추가하세요. 시스템이 원본과의 차이값(Delta)을 감시하여 반품 및 추가출고 전표를 자동 전송합니다.
+            </div>
+          </div>
+          <span style="background: #3b82f6; color: white; font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 4px; white-space: nowrap;">Cart Diff Engine</span>
+        </div>
+        <div v-if="currentTab && currentTab.docName && currentTab.docstatus !== 1 && !isClerk" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
           <button @click="rejectDraft(currentTab.docName)" style="background: white; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">{{ $t('branch.transfer.btn_reject_all') }}</button>
         </div>
         <table class="pos-cart-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
@@ -306,12 +316,22 @@
         
         <div class="action-btn-double-group" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;" v-if="!(isClerk && currentTab.docName)">
           <template v-if="currentTab.docName && !isClerk">
-            <button class="btn-outbound-reserve" style="background: #ef4444; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="removeTab(currentTabIndex)" :disabled="isSubmitting">
-              ❌ {{ $t('common.cancel', 'Cancel Edit') }}
-            </button>
-            <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(true)" :disabled="isSubmitting">
-              {{ isSubmitting ? $t('common.loading') : 'Save Draft' }}
-            </button>
+            <template v-if="currentTab.docstatus === 1">
+              <button class="btn-outbound-reserve" style="background: #64748b; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="removeTab(currentTabIndex)" :disabled="isSubmitting">
+                ⬅️ 변경취소 후 리스트로 돌아가기
+              </button>
+              <button class="btn-final-submit" style="background: #3b82f6; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="submitSubmittedDiff()" :disabled="isSubmitting">
+                ⚡ {{ isSubmitting ? '전송 중...' : '변경제출 (차이값 자동 발행)' }}
+              </button>
+            </template>
+            <template v-else>
+              <button class="btn-outbound-reserve" style="background: #ef4444; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="removeTab(currentTabIndex)" :disabled="isSubmitting">
+                ❌ {{ $t('common.cancel', 'Cancel Edit') }}
+              </button>
+              <button class="btn-final-submit" style="background: #00a896; color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; transition: 0.2s;" @click="updateDraft(true)" :disabled="isSubmitting">
+                {{ isSubmitting ? $t('common.loading') : 'Save Draft' }}
+              </button>
+            </template>
           </template>
           <template v-else>
             <div style="grid-column: 1 / -1; display: flex; justify-content: center; gap: 20px; padding-bottom: 10px;">
@@ -435,7 +455,22 @@ const addNewTab = () => {
 }
 
 const removeTab = (idx) => {
-  if (tabs.value.length <= 1) return
+  if (tabs.value.length <= 1) {
+    tabs.value[0] = {
+      id: nextTabId.value++,
+      title: t('branch.transfer.tab_title') + ' 1',
+      docName: null,
+      docstatus: null,
+      originalItems: [],
+      targetBranch: authStore.user?.branch_name,
+      sourceBranch: '[MAIN] ALARCON - K',
+      selectedRequester: authStore.user?.full_name || authStore.user?.member_name || '',
+      selectedCreator: authStore.user?.member_name || '',
+      cartItems: []
+    }
+    currentTabIndex.value = 0
+    return
+  }
   tabs.value.splice(idx, 1)
   if (currentTabIndex.value >= tabs.value.length) {
     currentTabIndex.value = tabs.value.length - 1
@@ -913,10 +948,16 @@ watch(() => props.editingDraftName, async (newDraftName) => {
         const detailRes = await adminApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
         const doc = detailRes.data.data
         
+        const lineTargetWh = (doc.items || []).find(i => i.t_warehouse)?.t_warehouse
+        const lineSourceWh = (doc.items || []).find(i => i.s_warehouse)?.s_warehouse
         const newTab = {
           id: nextTabId.value++,
           title: doc.custom_orderer || 'Unknown Clerk',
           docName: doc.name,
+          docstatus: doc.docstatus,
+          originalItems: JSON.parse(JSON.stringify(doc.items || [])),
+          targetBranch: doc.to_warehouse || doc.set_warehouse || lineTargetWh || authStore.user?.branch_name,
+          sourceBranch: doc.from_warehouse || lineSourceWh || '[MAIN] ALARCON - K',
           selectedRequester: doc.custom_orderer || '',
           selectedCreator: doc.owner || '',
           cartItems: doc.items.map(i => {
@@ -946,6 +987,129 @@ watch(() => props.editingDraftName, async (newDraftName) => {
     }
   }
 }, { immediate: true })
+
+const resolveTransferWarehouses = (tab) => {
+  const branchWh = tab?.targetBranch || authStore.user?.branch_name
+  const mainWh = tab?.sourceBranch || '[MAIN] ALARCON - K'
+  return { branchWh, mainWh }
+}
+
+const submitSubmittedDiff = async () => {
+  if (!currentTab.value || !currentTab.value.docName) return
+  if (!confirm(`[전표 수정 제출]\n수량 변경 사항을 분석하여 반품 및 추가 출고 전표를 자동 발행하시겠습니까?`)) return
+
+  isSubmitting.value = true
+  const originalDocName = currentTab.value.docName
+  let returnDocName = null
+  let outboundDocName = null
+  try {
+    const origItems = currentTab.value.originalItems || []
+    const origMap = {}
+    origItems.forEach(i => {
+      origMap[i.item_code] = (origMap[i.item_code] || 0) + Number(i.qty || 0)
+    })
+
+    const newMap = {}
+    currentTab.value.cartItems.forEach(i => {
+      newMap[i.item_code] = (newMap[i.item_code] || 0) + Number(i.totalQty || 0)
+    })
+
+    const { branchWh, mainWh } = resolveTransferWarehouses(currentTab.value)
+    if (!branchWh) {
+      alert('대상 지점 창고를 확인할 수 없습니다. 전표를 다시 열어 주세요.')
+      return
+    }
+
+    const allCodes = new Set([...Object.keys(origMap), ...Object.keys(newMap)])
+    const returnItems = []
+    const outboundItems = []
+
+    allCodes.forEach(code => {
+      const oldQty = origMap[code] || 0
+      const newQty = newMap[code] || 0
+      const delta = newQty - oldQty
+
+      if (delta < 0) {
+        returnItems.push({
+          item_code: code,
+          qty: Math.abs(delta),
+          s_warehouse: branchWh,
+          t_warehouse: mainWh,
+          uom: 'Nos',
+          conversion_factor: 1
+        })
+      } else if (delta > 0) {
+        outboundItems.push({
+          item_code: code,
+          qty: delta,
+          s_warehouse: mainWh,
+          t_warehouse: branchWh,
+          uom: 'Nos',
+          conversion_factor: 1
+        })
+      }
+    })
+
+    if (returnItems.length === 0 && outboundItems.length === 0) {
+      alert('수량 변경 사항(차이값)이 없습니다.')
+      return
+    }
+
+    const remarks = `Diff amend of ${originalDocName}`
+
+    if (returnItems.length > 0) {
+      const returnPayload = {
+        doctype: 'Stock Entry',
+        stock_entry_type: 'Material Transfer',
+        purpose: 'Material Transfer',
+        from_warehouse: branchWh,
+        to_warehouse: mainWh,
+        docstatus: 1,
+        remarks,
+        items: returnItems
+      }
+      const res = await adminApi.post('/api/resource/Stock Entry', returnPayload)
+      returnDocName = res.data?.data?.name
+    }
+
+    if (outboundItems.length > 0) {
+      const outPayload = {
+        doctype: 'Stock Entry',
+        stock_entry_type: 'Material Transfer',
+        purpose: 'Material Transfer',
+        from_warehouse: mainWh,
+        to_warehouse: branchWh,
+        docstatus: 1,
+        remarks,
+        items: outboundItems
+      }
+      const res = await adminApi.post('/api/resource/Stock Entry', outPayload)
+      outboundDocName = res.data?.data?.name
+    }
+
+    let msg = '✅ [변경제출 성공]\n'
+    if (returnDocName) {
+      msg += `\n📦 반품 전표 (지점→본사): ${returnDocName} (총 ${returnItems.reduce((acc, x) => acc + x.qty, 0)}개 반송)`
+    }
+    if (outboundDocName) {
+      msg += `\n🚀 추가출고 전표 (본사→지점): ${outboundDocName} (총 ${outboundItems.reduce((acc, x) => acc + x.qty, 0)}개 출고)`
+    }
+    alert(msg)
+
+    removeTab(currentTabIndex.value)
+  } catch (err) {
+    console.error('Submitted diff error:', err)
+    let msg = '변경제출 처리 중 오류가 발생했습니다: ' + (err.response?.data?.message || err.message)
+    if (returnDocName || outboundDocName) {
+      msg += '\n\n⚠️ 일부 전표는 이미 생성되었습니다. ERP에서 확인하세요.'
+      if (returnDocName) msg += `\n- 반품: ${returnDocName}`
+      if (outboundDocName) msg += `\n- 추가출고: ${outboundDocName}`
+    }
+    alert(msg)
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
 const updateDraft = async (isFinalApproval) => {
   if (!currentTab.value || !currentTab.value.docName) return
@@ -1045,8 +1209,15 @@ const submitTransfer = async () => {
       const res = await adminApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
       
-      let totalQtyCount = 0
-      currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+      let totalBoxCount = 0
+      let totalEachCount = 0
+      currentTab.value.cartItems.forEach(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        totalBoxCount += box
+        totalEachCount += each
+      })
       
       receiptPrintData.value = {
         title: 'Immediate (Stock Entry)',
@@ -1058,16 +1229,21 @@ const submitTransfer = async () => {
         solicitante: currentTab.value.selectedRequester,
         creador: authStore.user?.email,
         shippingInfo: null,
-        summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+        summary: { items: currentTab.value.cartItems.length, bulto: totalBoxCount, pzs: totalEachCount }
       }
       
-      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
-        name: item.item_code,
-        item_name: item.item_name || item.item_code,
-        input_box: item.totalQty,
-        input_each: 0,
-        price_list_rate: item.price_list_rate || 0
-      }))))
+      receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => {
+        const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+        const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+        const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+        return {
+          name: item.item_code,
+          item_name: item.item_name || item.item_code,
+          input_box: box,
+          input_each: each,
+          price_list_rate: item.price_list_rate || 0
+        }
+      })))
       
       await nextTick()
       if (receiptPrintRef.value) {
@@ -1104,8 +1280,15 @@ const submitTransfer = async () => {
         const res = await adminApi.post('/api/resource/Material Request', payload)
         docName = res.data.data.name
         
-        let totalQtyCount = 0
-        currentTab.value.cartItems.forEach(item => totalQtyCount += Number(item.totalQty || 0))
+        let totalBoxCount = 0
+        let totalEachCount = 0
+        currentTab.value.cartItems.forEach(item => {
+          const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+          const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+          const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+          totalBoxCount += box
+          totalEachCount += each
+        })
         
         receiptPrintData.value = {
           title: 'Material Pending',
@@ -1117,16 +1300,21 @@ const submitTransfer = async () => {
           solicitante: currentTab.value.selectedRequester,
           creador: authStore.user?.email,
           shippingInfo: null,
-          summary: { items: currentTab.value.cartItems.length, bulto: totalQtyCount, pzs: 0 }
+          summary: { items: currentTab.value.cartItems.length, bulto: totalBoxCount, pzs: totalEachCount }
         }
         
-        receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => ({
-          name: item.item_code,
-          item_name: item.item_name || item.item_code,
-          input_box: item.totalQty,
-          input_each: 0,
-          price_list_rate: item.price_list_rate || 0
-        }))))
+        receiptPrintItems.value = JSON.parse(JSON.stringify(currentTab.value.cartItems.map(item => {
+          const pack = Number(item.pack_qty || item.custom_pack_qty || 1)
+          const box = item.boxQty !== undefined ? Number(item.boxQty || 0) : Math.floor(Number(item.totalQty || 0) / pack)
+          const each = item.eachQty !== undefined ? Number(item.eachQty || 0) : (Number(item.totalQty || 0) % pack)
+          return {
+            name: item.item_code,
+            item_name: item.item_name || item.item_code,
+            input_box: box,
+            input_each: each,
+            price_list_rate: item.price_list_rate || 0
+          }
+        })))
         
         await nextTick()
         if (receiptPrintRef.value) {

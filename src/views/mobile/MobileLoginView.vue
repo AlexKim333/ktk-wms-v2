@@ -133,6 +133,10 @@ const handleLogin = async () => {
         // 세션 쿠키 기준으로 역할/지점 해석 (API 토큰 사용 금지)
         authStore.user = await resolveLoginProfile(frappeApi, username.value)
         authStore.sessionChecked = true
+        try {
+          const { useBranchSessionStore } = await import('../../stores/branchSession.js')
+          useBranchSessionStore().initForUser()
+        } catch (e) {}
         router.push('/pos')
     }
   } catch (error) {
