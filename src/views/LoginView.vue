@@ -99,11 +99,12 @@ const otpCode = ref('')
 const otpSent = ref(false)
 
 onMounted(() => {
+  // 과거 버전이 평문으로 저장한 비밀번호 제거
+  localStorage.removeItem('lady_polo_pwd')
+
   const savedUsr = localStorage.getItem('lady_polo_usr')
-  const savedPwd = localStorage.getItem('lady_polo_pwd')
-  if (savedUsr && savedPwd) {
+  if (savedUsr) {
     username.value = savedUsr
-    password.value = savedPwd
     rememberMe.value = true
   }
 })
@@ -125,10 +126,8 @@ const handleLogin = async () => {
     if (response.status === 200) {
       if (rememberMe.value) {
         localStorage.setItem('lady_polo_usr', username.value)
-        localStorage.setItem('lady_polo_pwd', password.value)
       } else {
         localStorage.removeItem('lady_polo_usr')
-        localStorage.removeItem('lady_polo_pwd')
       }
         // 세션 쿠키 기준으로 역할/지점 해석 (API 토큰 사용 금지)
         authStore.user = await resolveLoginProfile(frappeApi, username.value)

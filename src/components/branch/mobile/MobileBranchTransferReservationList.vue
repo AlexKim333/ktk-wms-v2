@@ -43,7 +43,7 @@
               <span class="progress-text">{{ getProgressPercent(res) }}%</span>
             </td>
             <td>
-              <button v-if="userRole === 'Manager' && res.custom_approval_stage === '점원 요청' && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
+              <button v-if="userRole === 'Manager' && isClerkRequest(res) && res.docstatus === 0" class="btn-approve" @click.stop="approveDraft(res)">
                 ✅ {{ $t('common.approve', 'Approve') }}
               </button>
               <button v-if="res.docstatus === 0 && !res.is_stock_entry" class="btn-edit" @click.stop="editReservation(res)" title="수정" style="margin-left:5px;">📝</button>
@@ -197,6 +197,7 @@ import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import ReceiptPrint from '../../ReceiptPrint.vue'
 import MobileNumpadModal from './MobileNumpadModal.vue'
 import frappeApi from '../../../api/frappe.js'
+import { APPROVAL_STAGE, isStage, stageI18nKey } from '../../../constants/approvalStage.js'
 import { useAuthStore } from '../../../stores/auth.js'
 
 // 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
@@ -369,10 +370,17 @@ const fetchReservations = async () => {
   }
 }
 
+const stageLabel = (stage) => {
+  const key = stageI18nKey(stage)
+  return key ? t(key) : stage
+}
+
+const isClerkRequest = (res) => isStage(res.custom_approval_stage, APPROVAL_STAGE.CLERK_REQUEST)
+
 const translateStatus = (status, docstatus, approval_stage, is_stock_entry) => {
   if (is_stock_entry && docstatus === 0) return 'Pending Main Outbound'
   if (docstatus === 0) {
-    if (approval_stage) return `Draft(${approval_stage})`
+    if (approval_stage) return `Draft(${stageLabel(approval_stage)})`
     return 'Draft'
   }
   if (docstatus === 2) return 'Cancelled'
@@ -571,7 +579,7 @@ const approveDraft = async (res) => {
   if (!confirm(t('branch.transfer.msg_confirm_submit'))) return
   try {
     await frappeApi.put(`/api/resource/Material Request/${res.name}`, {
-      custom_approval_stage: '지점장 승인'
+      custom_approval_stage: APPROVAL_STAGE.MANAGER_APPROVAL
     })
     alert(t('branch.transfer.msg_submit_success'))
     fetchReservations()

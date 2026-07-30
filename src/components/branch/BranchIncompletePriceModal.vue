@@ -100,34 +100,16 @@
               </div>
             </div>
 
-            <div class="tier-card" :class="{ 'is-empty': !formPrices[3] || formPrices[3] === 0 }">
+            <div class="tier-card box-tier" :class="{ 'is-empty': !formPrices[3] || formPrices[3] === 0 }">
               <div class="tier-header">
-                <span class="tier-badge">4구간</span>
-                <span class="tier-name">가격 4 (대팩 할인가)</span>
+                <span class="tier-badge text-gold">4구간</span>
+                <span class="tier-name">가격 4 (BOX 할인가 - {{ currentItem.custom_pack_qty || 96 }}개)</span>
               </div>
               <div class="input-wrapper">
                 <span class="currency-symbol">$</span>
                 <input
                   type="number"
                   v-model.number="formPrices[3]"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  class="price-input"
-                />
-              </div>
-            </div>
-
-            <div class="tier-card box-tier" :class="{ 'is-empty': !formPrices[4] || formPrices[4] === 0 }">
-              <div class="tier-header">
-                <span class="tier-badge text-gold">5구간</span>
-                <span class="tier-name">가격 5 (BOX 할인가 - {{ currentItem.custom_pack_qty || 96 }}개)</span>
-              </div>
-              <div class="input-wrapper">
-                <span class="currency-symbol">$</span>
-                <input
-                  type="number"
-                  v-model.number="formPrices[4]"
                   min="0"
                   step="0.01"
                   placeholder="0.00"
@@ -192,7 +174,7 @@ const emit = defineEmits(['close', 'completed'])
 
 const currentIndex = ref(0)
 const isSaving = ref(false)
-const formPrices = ref([0, 0, 0, 0, 0])
+const formPrices = ref([0, 0, 0, 0])
 
 const currentItem = computed(() => {
   if (!props.items || props.items.length === 0) return null
@@ -207,11 +189,10 @@ watch(
         Number(newItem.prices[0] || 0),
         Number(newItem.prices[1] || 0),
         Number(newItem.prices[2] || 0),
-        Number(newItem.prices[3] || 0),
-        Number(newItem.prices[4] || 0)
+        Number(newItem.prices[3] || 0)
       ]
     } else {
-      formPrices.value = [0, 0, 0, 0, 0]
+      formPrices.value = [0, 0, 0, 0]
     }
   },
   { immediate: true }
@@ -239,8 +220,7 @@ const handleSaveAndNext = async () => {
     price_list_rate: Number(formPrices.value[0] || 0),
     custom_tier_2_price: Number(formPrices.value[1] || 0),
     custom_tier_3_price: Number(formPrices.value[2] || 0),
-    custom_tier_4_price: Number(formPrices.value[3] || 0),
-    custom_tier_5_price: Number(formPrices.value[4] || 0)
+    custom_tier_4_price: Number(formPrices.value[3] || 0)
   }
 
   try {

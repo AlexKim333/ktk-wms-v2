@@ -4,9 +4,9 @@
     <header class="mobile-header">
       <div class="m-logo">🏆 WMS PRO</div>
       <div class="m-user" v-if="authStore.user">
-        {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? '본부' }})
+        {{ authStore.user.member_name || authStore.user.full_name }} ({{ authStore.user.branch_name ?? $t('pos.hq_label') }})
         <span v-if="branchSession.needsPinGate" style="display:block; font-size:11px; font-weight:800; margin-top:2px;" :style="{ color: branchSession.isManagerMode ? '#86efac' : '#38bdf8' }">
-          {{ branchSession.isManagerMode ? '🔓 지점장' : `🧑‍💼 ${branchSession.selectedClerkName || '점원'}` }}
+          {{ branchSession.isManagerMode ? $t('mobile.role_manager_short') : $t('mobile.role_clerk_short', { name: branchSession.selectedClerkName || $t('mobile.clerk_default') }) }}
         </span>
       </div>
       <button
@@ -55,7 +55,7 @@
         @refresh-items="$emit('refresh-items')"
       />
       <div v-else class="mobile-not-supported">
-        <p>이 메뉴는 모바일에서 지원되지 않습니다.</p>
+        <p>{{ $t('mobile.not_supported') }}</p>
         <button @click="activeNav = 'branch-inventory'">{{ $t('mobile.btn_goto_inventory') }}</button>
       </div>
     </main>
@@ -96,33 +96,11 @@
         class="m-nav-item"
         @click="branchSession.lockToClerk()"
       >
-        🔒<br/>점원잠금
+        🔒<br/>{{ $t('mobile.nav_lock_clerk') }}
       </button>
     </nav>
 
-    <div
-      v-if="branchSession.pinModalOpen"
-      style="position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center;"
-      @click.self="branchSession.closePinModal()"
-    >
-      <div style="background:white; border-radius:12px; width:min(380px,92vw); padding:20px;">
-        <h3 style="margin:0 0 12px;">🔐 지점장 PIN</h3>
-        <input
-          v-model="branchSession.pinInput"
-          type="password"
-          inputmode="numeric"
-          maxlength="4"
-          placeholder="4자리 PIN"
-          style="width:100%; box-sizing:border-box; padding:12px; font-size:22px; letter-spacing:8px; text-align:center; border:1px solid #cbd5e1; border-radius:8px;"
-          @keyup.enter="branchSession.unlockWithPin()"
-        />
-        <p v-if="branchSession.pinError" style="color:#ef4444; font-weight:700;">{{ branchSession.pinError }}</p>
-        <div style="display:flex; gap:10px; margin-top:16px;">
-          <button type="button" style="flex:1; padding:12px;" @click="branchSession.closePinModal()">취소</button>
-          <button type="button" style="flex:1; padding:12px; background:#0ea5e9; color:white; border:none; border-radius:8px; font-weight:800;" @click="branchSession.unlockWithPin()">잠금해제</button>
-        </div>
-      </div>
-    </div>
+    <PinUnlockModal variant="mobile" @unlock="branchSession.unlockWithPin()" />
   </div>
 </template>
 
@@ -135,6 +113,7 @@ import MobileBranchInventoryView from '../../components/branch/mobile/MobileBran
 import MobileBranchPosView from '../../components/branch/mobile/MobileBranchPosView.vue'
 import MobileBranchTransferView from '../../components/branch/mobile/MobileBranchTransferView.vue'
 import MobileBranchTransferReservationList from '../../components/branch/mobile/MobileBranchTransferReservationList.vue'
+import PinUnlockModal from '../../components/PinUnlockModal.vue'
 
 const props = defineProps({
   rawItems: { type: Array, default: () => [] },

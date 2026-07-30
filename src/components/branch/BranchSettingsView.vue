@@ -290,13 +290,12 @@ const tabs = [
   { id: 'shift-config', label: '🔐 권한 및 마감 설정 (Permissions)', icon: '🔐' }
 ]
 
-// 5 Quantity Tiers default config
+// 4 Quantity Tiers default config
 const defaultTiers = [
   { minQty: 1, label: '1구간 (단품)', desc: '1개 이상 소량/단품 판매 단가', color: '#3b82f6' },
   { minQty: 10, label: '2구간 (소팩)', desc: '10개 이상 소팩 할인 단가', color: '#10b981' },
   { minQty: 50, label: '3구간 (중팩)', desc: '50개 이상 중팩 할인 단가', color: '#f59e0b' },
-  { minQty: 100, label: '4구간 (대량)', desc: '100개 이상 대량 판매 단가', color: '#ef4444' },
-  { minQty: 200, label: '5구간 (박스)', desc: '200개 이상 상자/특판 판매 단가', color: '#8b5cf6' }
+  { minQty: 100, label: '4구간 (박스)', desc: '100개 이상 상자/특판 판매 단가', color: '#8b5cf6' }
 ]
 
 const priceTiers = ref([...defaultTiers.map(t => ({ ...t }))])
@@ -415,8 +414,9 @@ const loadSavedTiers = () => {
     }
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length === 5) {
-        priceTiers.value = parsed
+      // 5구간 시절 설정이 남아 있어도 현재 구간 수만큼만 쓴다.
+      if (Array.isArray(parsed) && parsed.length >= defaultTiers.length) {
+        priceTiers.value = parsed.slice(0, defaultTiers.length)
         return
       }
     }
@@ -431,7 +431,7 @@ const sortTiersIfRequired = () => {
 }
 
 const handleResetTiers = () => {
-  if (confirm('수량 구간 설정을 기본값(1개, 10개, 50개, 100개, 200개)으로 복원하시겠습니까?')) {
+  if (confirm('수량 구간 설정을 기본값(1개, 10개, 50개, 100개)으로 복원하시겠습니까?')) {
     priceTiers.value = defaultTiers.map(t => ({ ...t }))
     showToast('🔄 기본 수량 구간으로 복원되었습니다.')
   }

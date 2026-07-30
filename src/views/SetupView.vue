@@ -25,6 +25,8 @@
 <script setup>
 import { ref } from 'vue'
 import axios from 'axios'
+import { branchPriceListName, ensureBranchPriceList } from '../utils/branchPriceList.js'
+import { frappeErrorMessage } from '../utils/frappeError.js'
 
 const logs = ref([])
 const isProcessing = ref(false)
@@ -105,26 +107,14 @@ const createPriceLists = async () => {
     const branches = resWh.data.data
 
     for (const branch of branches) {
-      const plName = branch.name
-      try {
-        // 이미 있는지 체크
-        await frappeApi.get(`/api/resource/Price List/${encodeURIComponent(plName)}`)
-        logSuccess(`[Price List] ${plName} 이미 존재함.`)
-      } catch (e) {
-        if (e.response && e.response.status === 404) {
-          // 없으면 생성
-          logInfo(`[Price List] ${plName} 생성 중...`)
-          await frappeApi.post('/api/resource/Price List', {
-            price_list_name: plName,
-            selling: 1,
-            buying: 0,
-            currency: 'USD', // 기본 통화가 USD라고 가정 (ERPNext 기본값에 따름)
-            enabled: 1
-          })
-          logSuccess(`[Price List] ${plName} 생성 완료!`)
-        } else {
-          logError(`[Price List] ${plName} 확인 중 에러: ${e.message}`)
-        }
+      // POS / 지점 상품 상세가 조회하는 이름과 반드시 같아야 한다. 규칙은 branchPriceListName 한 곳에서만 정의한다.
+      const plName = branchPriceListName(branch.name)
+      // 통화는 기준 단가표에서 물려받는다. 지점 단가표가 본사와 다른 통화로 생기는 것을 막기 위함.
+      const result = await ensureBranchPriceList(frappeApi, branch.name)
+      if (result.ok) {
+        logSuccess(`[Price List] ${plName} ${result.created ? '생성 완료!' : '이미 존재함.'}`)
+      } else {
+        logError(`[Price List] ${plName} 생성 실패: ${frappeErrorMessage(result.error)}`)
       }
     }
     logInfo('단가표 일괄 생성이 완료되었습니다!')

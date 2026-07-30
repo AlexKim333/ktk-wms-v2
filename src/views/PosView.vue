@@ -17,27 +17,27 @@
       <div class="nav-logo">🏆 WMS PRO</div>
       <div v-if="authStore.user" class="nav-user-info">
         <span class="nav-user-name">{{ authStore.user.member_name || authStore.user.full_name }}</span>
-        <span class="nav-user-meta">{{ authStore.user.branch_name ?? '본부' }} · {{ isAdmin ? 'Admin' : (authStore.user.access_level || '-') }}</span>
+        <span class="nav-user-meta">{{ authStore.user.branch_name ?? $t('pos.hq_label') }} · {{ isAdmin ? 'Admin' : (authStore.user.access_level || '-') }}</span>
         <span
           v-if="!isAdmin && branchSession.needsPinGate"
           class="nav-user-meta"
           style="display:block; margin-top:4px; font-weight:800;"
           :style="{ color: branchSession.isManagerMode ? '#86efac' : '#38bdf8' }"
         >
-          {{ branchSession.isManagerMode ? '🔓 지점장 모드' : `🧑‍💼 점원: ${branchSession.selectedClerkName || '-'}` }}
+          {{ branchSession.isManagerMode ? $t('pos.mode_manager') : $t('pos.mode_clerk', { name: branchSession.selectedClerkName || '-' }) }}
         </span>
         <button
           v-if="!isAdmin && branchSession.needsPinGate && branchSession.isClerkMode"
           type="button"
           style="margin-top:8px; width:100%; background:#f59e0b; color:#111; border:none; border-radius:6px; padding:8px; font-weight:800; cursor:pointer; font-size:12px;"
           @click="branchSession.openPinModal()"
-        >🔐 지점장 PIN 잠금해제</button>
+        >{{ $t('pos.btn_pin_unlock') }}</button>
         <button
           v-else-if="!isAdmin && branchSession.needsPinGate && branchSession.isManagerMode"
           type="button"
           style="margin-top:8px; width:100%; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:8px; font-weight:700; cursor:pointer; font-size:12px;"
           @click="branchSession.lockToClerk()"
-        >↩️ 점원 모드로 잠금</button>
+        >{{ $t('pos.btn_lock_clerk') }}</button>
       </div>
       <div class="nav-lang-switcher" style="padding: 0 12px; margin-bottom: 12px;">
         <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
@@ -60,14 +60,14 @@
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
             </template>
             <div v-else style="padding: 8px 15px; font-size: 11px; color: #94a3b8; line-height: 1.4;">
-              점원 모드: 판매 보류만 가능합니다.<br/>이동/재고/설정은 지점장 PIN 후 사용.
+              {{ $t('pos.clerk_notice_1') }}<br/>{{ $t('pos.clerk_notice_2') }}
             </div>
           </div>
         </div>
 
         <template v-if="isAdmin">
           <div style="border-top: 1px solid #334155; margin: 5px 0;"></div>
-          <span style="padding: 5px 15px; font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">메인 관리자 전용 (Admin)</span>
+          <span style="padding: 5px 15px; font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.admin_group') }}</span>
           <a href="#" class="nav-item" :class="{ active: activeNav === 'home' }" @click.prevent="setActiveNav('home')">🏠 {{ $t('nav.home') }}</a>
           <button class="nav-item nav-btn-inline" @click.prevent="isOutboundMenuOpen = !isOutboundMenuOpen">
           {{ $t('nav.outbound_group') }} <span style="float:right;">{{ isOutboundMenuOpen ? '▲' : '▼' }}</span>
@@ -119,7 +119,7 @@
 
         <template v-if="isAdmin">
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
-          <a href="#" class="nav-item" :class="{ active: activeNav === 'staff-management' }" @click.prevent="activeNav = 'staff-management'">👨‍👩‍👧 가족 관리</a>
+          <a href="#" class="nav-item" :class="{ active: activeNav === 'staff-management' }" @click.prevent="activeNav = 'staff-management'">👨‍👩‍👧 {{ $t('nav.staff_management') }}</a>
         </template>
         <template v-else-if="branchSession.isManagerMode">
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
@@ -134,7 +134,7 @@
       <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
       <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav(previousNavForProductDetail)" />
-      <BranchProductDetailView v-else-if="activeNav === 'branch-product-detail'" :item-id="activeProductId" :current-branch="authStore.user?.branch_name" @go-back="setActiveNav(previousNavForProductDetail)" />
+      <BranchProductDetailView v-else-if="activeNav === 'branch-product-detail'" :item-id="activeProductId" :current-branch="authStore.user?.branch_name" :raw-items="rawSingleItems" @go-back="setActiveNav(previousNavForProductDetail)" />
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
       
       <!-- 지점 전용 영역 -->
@@ -203,8 +203,8 @@
           <!-- Header Incomplete Overlay Gate -->
           <div v-if="!isHeaderComplete" class="header-gate-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.4); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px;">
             <div style="font-size: 55px; margin-bottom: 20px; text-shadow: 0 4px 6px rgba(0,0,0,0.1);">🛑</div>
-            <h2 style="color: #ef4444; margin: 0 0 10px 0; text-align: center; font-size: 26px; font-weight: 900; background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">잠깐! 우측 상단 헤더를 모두 채워주세요!</h2>
-            <p style="color: #1e293b; font-size: 16px; font-weight: 800; text-align: center; line-height: 1.6; background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">우측 상단의 전표 헤더(출발/도착 창고, 담당자 등)<br>필수 항목을 모두 선택해야 상품 검색 및 추가 작업이 활성화됩니다.</p>
+            <h2 style="color: #ef4444; margin: 0 0 10px 0; text-align: center; font-size: 26px; font-weight: 900; background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">{{ $t('pos.gate_title') }}</h2>
+            <p style="color: #1e293b; font-size: 16px; font-weight: 800; text-align: center; line-height: 1.6; background: rgba(255,255,255,0.9); padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">{{ $t('pos.gate_desc_1') }}<br>{{ $t('pos.gate_desc_2') }}</p>
           </div>
           <div class="search-section dual-search">
             <!-- 동적 검색 (자동완성) -->
@@ -309,8 +309,8 @@
           <div class="hotkey-block">
             <div class="block-header">
               <h3>👍 
-                <span v-if="transactionMode === 'inbound'">주요 공급사 (Supplier Quick Pick)</span>
-                <span v-else-if="transactionMode === 'transfer'">주요 목적지 (Target Quick Pick)</span>
+                <span v-if="transactionMode === 'inbound'">{{ $t('pos.qp_supplier') }}</span>
+                <span v-else-if="transactionMode === 'transfer'">{{ $t('pos.qp_target') }}</span>
                 <span v-else>{{ $t('pos.qp_customer') }}</span>
               </h3>
             </div>
@@ -327,8 +327,8 @@
                   <button class="hotkey-btn-core empty-slot" @click="openPartnerSlotEdit(idx)">
                     <span class="empty-icon">➕</span>
                     <div class="line-2">
-                      <span v-if="transactionMode === 'inbound'">공급사 지정</span>
-                      <span v-else-if="transactionMode === 'transfer'">도착지 지정</span>
+                      <span v-if="transactionMode === 'inbound'">{{ $t('pos.qp_assign_supplier') }}</span>
+                      <span v-else-if="transactionMode === 'transfer'">{{ $t('pos.qp_assign_target') }}</span>
                       <span v-else>{{ $t('pos.qp_assign_customer') }}</span>
                     </div>
                   </button>
@@ -496,10 +496,10 @@
                   <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
                     <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
                       {{ item.item_name }}
-                      <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">[가용: {{ Math.floor(getAvailableStock(item.name) / (item.custom_pack_qty || 1)) }} 박스]</span>
+                      <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">{{ $t('pos.avail_box', { qty: Math.floor(getAvailableStock(item.name) / (item.custom_pack_qty || 1)) }) }}</span>
                     </div>
                     <div class="p-stock-info" style="font-size: 11px; color: #64748b; margin-top: 4px;">
-                      {{ item.custom_color || t('pos.default_color') }} | 1박스 = {{ item.custom_pack_qty || 1 }}개
+                      {{ item.custom_color || t('pos.default_color') }} | {{ $t('pos.pack_info', { qty: item.custom_pack_qty || 1 }) }}
                     </div>
                   </td>
                   <td class="input-blue" style="border: 1px solid #e2e8f0; padding: 2px !important; background-color: #dbeafe !important;">
@@ -548,17 +548,17 @@
                   style="background:#ef4444"
                   @click="cancelReservationCheckout()"
                 >
-                  {{ transactionMode === 'transfer' ? '❌ 예약이동 취소' : $t('pos.btn_cancel_res') }}
+                  {{ transactionMode === 'transfer' ? $t('pos.btn_cancel_res_transfer') : $t('pos.btn_cancel_res') }}
                 </button>
                 <button
                   class="btn-outbound-reserve"
                   style="background:#f59e0b"
                   @click="submitReservation()"
                 >
-                  {{ transactionMode === 'transfer' ? '📝 이동예약 수정' : '📝 출고예약 수정' }}
+                  {{ transactionMode === 'transfer' ? $t('pos.btn_edit_res_transfer') : $t('pos.btn_edit_res_outbound') }}
                 </button>
                 <button class="btn-final-submit" @click="submitToFrappe">
-                  {{ transactionMode === 'transfer' ? '✅ 이동전표 발행' : '✅ 출고전표 발행' }}
+                  {{ transactionMode === 'transfer' ? $t('pos.btn_issue_transfer') : $t('pos.btn_issue_outbound') }}
                 </button>
               </template>
               <template v-else>
@@ -678,15 +678,15 @@
       <div class="modal-content slot-edit-modal">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">
-            <span v-if="transactionMode === 'inbound'">단축키 공급사 지정 (슬롯</span>
-            <span v-else-if="transactionMode === 'transfer'">단축키 도착지 지정 (슬롯</span>
+            <span v-if="transactionMode === 'inbound'">{{ $t('pos.slot_title_supplier') }}</span>
+            <span v-else-if="transactionMode === 'transfer'">{{ $t('pos.slot_title_target') }}</span>
             <span v-else>{{ $t('pos.slot_title_customer') }}</span>
             {{ editPartnerSlotIndex + 1 }})
           </h3>
           <button class="close-text-btn" @click="isPartnerSlotEditModalOpen = false" style="margin:0;">{{ $t('pos.btn_close') }}</button>
         </div>
         <div class="search-section" style="margin-top: 15px;">
-          <input type="text" v-model="partnerSlotSearchQuery" :placeholder="transactionMode === 'inbound' ? '공급사 검색' : (transactionMode === 'transfer' ? '도착지 검색' : $t('pos.ph_customer_search'))" class="search-bar" />
+          <input type="text" v-model="partnerSlotSearchQuery" :placeholder="transactionMode === 'inbound' ? $t('pos.ph_supplier_search') : (transactionMode === 'transfer' ? $t('pos.ph_target_search') : $t('pos.ph_customer_search'))" class="search-bar" />
         </div>
         <div class="slot-item-list">
           <div v-for="ptn in filteredPartnerSlotItems" :key="ptn.name" class="slot-list-item" @click="assignPartnerToSlot(ptn)">
@@ -714,7 +714,7 @@
 
           <div style="display:flex; gap:10px; margin-top:20px;">
             <div style="flex:1;">
-              <label style="font-size:12px; font-weight:bold; color:#64748b;">{{ $t('pos.qa_lbl_box') }} ({{ quickAdjustItem?.custom_pack_qty || 1 }}입)</label>
+              <label style="font-size:12px; font-weight:bold; color:#64748b;">{{ $t('pos.qa_lbl_box') }} ({{ quickAdjustItem?.custom_pack_qty || 1 }}{{ $t('pos.pack_unit') }})</label>
               <input type="number" v-model.number="quickAdjustForm.input_box" class="search-bar" placeholder="0" min="0" style="margin-top:5px; padding: 10px;"/>
             </div>
             <div style="flex:1;">
@@ -746,13 +746,13 @@
     <!-- 잔여 예약 종결 모달 -->
     <div class="modal-overlay" v-if="isPartialCloseModalOpen">
       <div class="modal-content partial-close-modal" style="text-align:center; padding:30px; border-radius:12px; max-width:400px;">
-        <h3 style="margin-bottom:20px; font-size:1.4em; color:#333;">잔여 예약 처리</h3>
+        <h3 style="margin-bottom:20px; font-size:1.4em; color:#333;">{{ $t('pos.partial_title') }}</h3>
         <p style="font-size:1.1em; line-height:1.5; margin-bottom:30px;">
-          <strong>{{ partialCloseReservationId }}</strong>번 예약<br>부분출고 했습니다.<br><br>잔여분을 예약으로 유지하시겠습니까?
+          <strong>{{ $t('pos.partial_desc_1', { id: partialCloseReservationId }) }}</strong><br>{{ $t('pos.partial_desc_2') }}<br><br>{{ $t('pos.partial_desc_3') }}
         </p>
         <div class="modal-actions" style="display:flex; gap:15px; justify-content:center;">
-          <button class="btn btn-secondary" style="flex:1; padding:12px; font-size:1.1em; background-color:#10b981; color:white; border:none; border-radius:6px; cursor:pointer;" @click="cancelPartialClose">유지 (계속 대기)</button>
-          <button class="btn btn-danger" style="flex:1; padding:12px; font-size:1.1em; background-color:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;" @click="confirmPartialClose">취소(삭제)</button>
+          <button class="btn btn-secondary" style="flex:1; padding:12px; font-size:1.1em; background-color:#10b981; color:white; border:none; border-radius:6px; cursor:pointer;" @click="cancelPartialClose">{{ $t('pos.partial_keep') }}</button>
+          <button class="btn btn-danger" style="flex:1; padding:12px; font-size:1.1em; background-color:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer;" @click="confirmPartialClose">{{ $t('pos.partial_cancel') }}</button>
         </div>
       </div>
     </div>
@@ -766,11 +766,11 @@
     <div class="modal-overlay" v-if="isShippingAddressModalOpen">
       <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-          <div class="product-title">DIRECCIÓN DE ENTREGA (배송지 선택)</div>
+          <div class="product-title">{{ $t('pos.shipping_title') }}</div>
           <button class="close-btn" @click="cancelShippingAddress">✖</button>
         </div>
         <div class="modal-body" style="margin-top: 15px;">
-          <p style="margin-bottom: 10px; color: #475569;">El cliente tiene varias direcciones. Seleccione una para el comprobante.</p>
+          <p style="margin-bottom: 10px; color: #475569;">{{ $t('pos.shipping_desc') }}</p>
           <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
             <li v-for="(addr, idx) in shippingAddressList" :key="idx" 
                 @click="selectShippingAddress(addr)"
@@ -792,33 +792,7 @@
     @intent-parsed="handleSamdoriIntent"
   />
   <!-- 지점장 PIN (사이드바에서도 열림 — 프론트 전용) -->
-  <div
-    v-if="branchSession.pinModalOpen"
-    style="position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center;"
-    @click.self="branchSession.closePinModal()"
-  >
-    <div style="background:white; border-radius:12px; width:min(380px,92vw); padding:20px; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h3 style="margin:0; font-size:18px;">🔐 지점장 PIN 잠금해제</h3>
-        <button type="button" style="border:none; background:transparent; font-size:18px; cursor:pointer;" @click="branchSession.closePinModal()">✕</button>
-      </div>
-      <p style="font-size:13px; color:#64748b; margin:0 0 12px 0;">점원 계정은 Frappe에 없습니다. PIN은 이 기기 localStorage에만 저장됩니다.</p>
-      <input
-        v-model="branchSession.pinInput"
-        type="password"
-        inputmode="numeric"
-        maxlength="4"
-        placeholder="4자리 PIN"
-        style="width:100%; box-sizing:border-box; padding:12px; font-size:22px; letter-spacing:8px; text-align:center; border:1px solid #cbd5e1; border-radius:8px;"
-        @keyup.enter="onBranchPinUnlock"
-      />
-      <p v-if="branchSession.pinError" style="color:#ef4444; font-weight:700; margin:10px 0 0;">{{ branchSession.pinError }}</p>
-      <div style="display:flex; gap:10px; margin-top:16px;">
-        <button type="button" style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:#f8fafc; font-weight:700; cursor:pointer;" @click="branchSession.closePinModal()">취소</button>
-        <button type="button" style="flex:1; padding:12px; border-radius:8px; border:none; background:#0ea5e9; color:white; font-weight:800; cursor:pointer;" @click="onBranchPinUnlock">잠금해제</button>
-      </div>
-    </div>
-  </div>
+  <PinUnlockModal variant="desktop" @unlock="onBranchPinUnlock" />
   </div>
 </template>
 
@@ -831,9 +805,11 @@ import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { branchPriceListCandidates } from '../utils/branchPriceList.js'
 import { useBranchSessionStore } from '../stores/branchSession.js'
 import { useItemSearch, rankItemNameMatches } from '../composables/useItemSearch.js'
 import { usePagedList } from '../composables/usePagedList.js'
+import { APPROVAL_STAGE, stageFilter } from '../constants/approvalStage.js'
 import axios from 'axios'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ProductRegistrationPanel from '../components/ProductRegistrationPanel.vue'
@@ -850,6 +826,7 @@ import BranchProductDetailView from '../components/branch/BranchProductDetailVie
 import QuickItemAddModal from '../components/QuickItemAddModal.vue'
 import QuickCustomerAddModal from '../components/QuickCustomerAddModal.vue'
 import QuickSalesPersonAddModal from '../components/QuickSalesPersonAddModal.vue'
+import PinUnlockModal from '../components/PinUnlockModal.vue'
 import ReservationListView from './ReservationListView.vue'
 import OutboundListView from './OutboundListView.vue'
 import OutboundHistoryListView from './OutboundHistoryListView.vue'
@@ -912,7 +889,7 @@ const confirmPartialClose = async () => {
       status: 'Stopped',
       name: partialCloseReservationId.value
     })
-    alert('잔여분이 성공적으로 취소(종결)되었습니다.');
+    alert(t('pos.msg_res_stopped_ok'));
   } catch (e) {
     console.warn('Stopped 메서드 호출 실패, set_value 로 백업 시도', e);
     try {
@@ -922,7 +899,7 @@ const confirmPartialClose = async () => {
         fieldname: 'status',
         value: 'Stopped'
       })
-      alert('잔여분이 성공적으로 취소(종결)되었습니다.');
+      alert(t('pos.msg_res_stopped_ok'));
     } catch (e2) {
       console.error('잔여분 종결 실패', e2)
     }
@@ -999,9 +976,9 @@ const triggerPrintAndCopy = async (docName, mode, source, target, branch, items,
   if (receiptPrintRef.value) {
     const success = await receiptPrintRef.value.copyToClipboard()
     if (success) {
-      alert('✅ 영수증이 클립보드에 복사되었습니다!\n\n🚨 잊지 말고 꼭 [WhatsApp]에 붙여넣기(Ctrl+V) 해주세요!')
+      alert(t('pos.msg_receipt_copied'))
     } else {
-      alert("영수증 클립보드 복사에 실패했습니다.")
+      alert(t('pos.msg_err_receipt_copy'))
     }
   }
   
@@ -1478,7 +1455,7 @@ const pollReservations = async () => {
       frappeApi.get('/api/resource/Material Request', {
         params: {
           fields: JSON.stringify(['name', 'modified']),
-          filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '대기(지점장)']]),
+          filters: JSON.stringify([['docstatus', '=', 0], stageFilter(APPROVAL_STAGE.MANAGER_APPROVAL)]),
           limit_page_length: 0
         }
       }).catch(() => ({ data: { data: [] } })),
@@ -1585,6 +1562,8 @@ const pollReservations = async () => {
 
 const fetchFrappeItems = async () => {
   try {
+    // 본사 단가표 + 지점 전용 단가표 후보(창고 Full Name / 짧은 이름 모두)를 조회 대상으로 한다
+    const posPriceListTargets = ['Standard Selling', ...branchPriceListCandidates(authStore.user?.branch_name)]
     // 1. 다중 API 병렬 호출 (창고, 품목, 재고, 고객, 영업사원, 공급업체, 판매단가)
     const [whRes, itemRes, binRes, custRes, spRes, supRes, priceRes] = await Promise.all([
       frappeApi.get('/api/resource/Warehouse', {
@@ -1636,11 +1615,20 @@ const fetchFrappeItems = async () => {
       }).catch(() => ({ data: { data: [] } })),
       frappeApi.get('/api/resource/Item Price', {
         params: {
-          fields: JSON.stringify(['item_code', 'price_list_rate', 'price_list']),
-          filters: JSON.stringify([['price_list', '=', 'Standard Selling']]),
+          fields: JSON.stringify([
+            'item_code', 'price_list', 'price_list_rate',
+            'custom_tier_2_price', 'custom_tier_3_price', 'custom_tier_4_price'
+          ]),
+          // 본사(Standard Selling) + 로그인 지점 전용 단가표(예: Standard Selling - K3)를 함께 조회
+          filters: JSON.stringify([['price_list', 'in', posPriceListTargets]]),
           limit_page_length: 0
         }
-      }).catch(() => ({ data: { data: [] } }))
+      }).catch((e) => {
+        // 여기서 조용히 삼키면 단가가 전부 0/원가로 보여도 원인을 알 수 없다.
+        // 특히 fields 에 백엔드에 없는 컬럼이 섞이면 목록 전체가 417 로 거부된다.
+        console.error('Item Price 조회 실패:', e?.response?.status, e?.response?.data?.exception || e)
+        return { data: { data: [] } }
+      })
     ]);
 
     warehouseList.value = whRes.data.data
@@ -1650,10 +1638,19 @@ const fetchFrappeItems = async () => {
     supplierList.value = supRes.data.data || []
 
     const priceList = priceRes.data.data || []
+    const branchPriceLists = branchPriceListCandidates(authStore.user?.branch_name)
     const priceMap = {}
     priceList.forEach(p => {
-      if (p.item_code) {
-        priceMap[p.item_code] = Number(p.price_list_rate || 0)
+      if (!p.item_code) return
+      const isBranchPrice = branchPriceLists.includes(p.price_list)
+      // 지점 전용 단가표가 본사(Standard Selling)보다 항상 우선한다
+      if (!priceMap[p.item_code] || isBranchPrice) {
+        priceMap[p.item_code] = {
+          price_list_rate: Number(p.price_list_rate || 0),
+          custom_tier_2_price: Number(p.custom_tier_2_price || 0),
+          custom_tier_3_price: Number(p.custom_tier_3_price || 0),
+          custom_tier_4_price: Number(p.custom_tier_4_price || 0)
+        }
       }
     })
     
@@ -1683,9 +1680,13 @@ const fetchFrappeItems = async () => {
         }
       }
       
+      const itemPrice = priceMap[item.name]
       groupedByName[groupId].variants.push({
         ...item,
-        price_list_rate: priceMap[item.name] || Number(item.valuation_rate || 0),
+        price_list_rate: itemPrice ? itemPrice.price_list_rate : Number(item.valuation_rate || 0),
+        custom_tier_2_price: itemPrice ? itemPrice.custom_tier_2_price : 0,
+        custom_tier_3_price: itemPrice ? itemPrice.custom_tier_3_price : 0,
+        custom_tier_4_price: itemPrice ? itemPrice.custom_tier_4_price : 0,
         input_box: 0,
         input_each: 0
       });
@@ -1733,11 +1734,11 @@ const fetchFrappeItems = async () => {
     const status = error.response?.status
     // 401만 세션 만료. 403은 권한 문제 — 강제 로그아웃하면 관리자가 오인 튕김
     if (status === 401) {
-      alert('보안 세션이 만료되었습니다. 다시 로그인해 주세요.')
+      alert(t('pos.msg_err_session'))
       await authStore.logout()
       await router.replace('/login')
     } else if (status === 403) {
-      alert('데이터 조회 권한이 없습니다. 계정 역할(Frappe)을 확인하세요. (세션은 유지됩니다)')
+      alert(t('pos.msg_err_permission'))
     }
   }
 }
@@ -1786,7 +1787,7 @@ const setActiveNav = (nav, mode = null) => {
     branchSession.isClerkMode &&
     nav !== 'branch-pos'
   ) {
-    alert('점원 모드에서는 판매 보류(지점 POS)만 사용할 수 있습니다.\n지점장 PIN으로 잠금해제 하세요.')
+    alert(t('pos.msg_err_clerk_mode'))
     branchSession.openPinModal()
     return
   }
@@ -1794,7 +1795,7 @@ const setActiveNav = (nav, mode = null) => {
   if (currentTab.value && (currentTab.value.activeReservationId || currentTab.value.amendingStockEntry)) {
     const isEntryView = activeNav.value === 'outbound' || activeNav.value === 'inbound' || activeNav.value === 'transfer' || activeNav.value === 'branch-transfer'
     if (isEntryView) {
-      if (!confirm("진행 중인 예약/전표 수정을 취소하시겠습니까?\\n(확인 시 장바구니가 비워지고 수정이 취소됩니다.)")) {
+      if (!confirm(t('pos.msg_cfm_cancel_edit'))) {
         return
       }
       currentTab.value.activeReservationId = null
@@ -2305,7 +2306,7 @@ const loadDraftToCart = async (docName) => {
     }
   } catch(e) {
     console.error('Draft load error:', e)
-    alert('대기열 문서를 불러오지 못했습니다.')
+    alert(t('pos.msg_err_queue'))
   }
 }
 
@@ -2893,31 +2894,48 @@ const resolveVoiceWarehouse = (hint) => {
   return found?.name || null
 }
 
+/**
+ * 음성 품번 → 단일 상품.
+ * 후보가 2건 이상이면 임의로 확정하지 않고 candidates만 돌려준다(역질문용).
+ */
 const findProductForVoice = (itemCode) => {
-  if (!itemCode) return null
+  if (!itemCode) return { product: null, candidates: [] }
   const key = String(itemCode).trim()
   const upper = key.toUpperCase()
   const exact =
     rawSingleItems.value.find((i) => i.name === key) ||
     rawSingleItems.value.find((i) => i.name?.toUpperCase() === upper)
-  if (exact) return exact
+  if (exact) return { product: exact, candidates: [exact] }
 
-  // Gemini가 P-160처럼 짧게 주면 변형 코드 중 유일/대표 1건 사용
+  // Gemini가 P-160처럼 짧게 주면 변형 코드 중 유일할 때만 확정
   const prefixHits = rawSingleItems.value.filter(
     (i) => i.name?.toUpperCase() === upper || i.name?.toUpperCase().startsWith(`${upper}-`)
   )
-  if (prefixHits.length === 1) return prefixHits[0]
-  if (prefixHits.length > 1) {
-    const negro = prefixHits.find((i) => /NEGRO/i.test(i.name))
-    return negro || prefixHits[0]
-  }
+  if (prefixHits.length === 1) return { product: prefixHits[0], candidates: prefixHits }
+  if (prefixHits.length > 1) return { product: null, candidates: prefixHits }
 
   // 품명(item_name) 부분 일치 — 유일할 때만
   const nameHits = rawSingleItems.value.filter((i) =>
     (i.item_name || '').toLowerCase().includes(key.toLowerCase())
   )
-  if (nameHits.length === 1) return nameHits[0]
-  return null
+  if (nameHits.length === 1) return { product: nameHits[0], candidates: nameHits }
+  return { product: null, candidates: nameHits }
+}
+
+/** 음성 품번을 확정하지 못했을 때: 후보가 여러 개면 역질문, 없으면 미발견 안내 */
+const speakVoiceItemUnresolved = (itemCode, candidates = []) => {
+  if (!samdori.value) return
+  const es = locale.value === 'es'
+  if (candidates.length > 1) {
+    const list = candidates.slice(0, 5).map((c) => c.name).join(', ')
+    samdori.value.speak(
+      es
+        ? `Hay ${candidates.length} productos para ${itemCode}: ${list}. ¿Cuál agrego?`
+        : `${itemCode} 관련 상품이 ${candidates.length}가지 있습니다. 예: ${list}. 어떤 상품을 담을까요?`
+    )
+    return
+  }
+  samdori.value.speak(es ? `No se encontró ${itemCode}.` : `${itemCode} 품목을 찾을 수 없습니다.`)
 }
 
 const resolveMobileLayout = async () => {
@@ -2944,10 +2962,9 @@ const handleSamdoriIntent = async (intentObj) => {
   // 모바일 UI/레이아웃이 있으면 데스크톱 장바구니로 절대 폴백하지 않음
   if (useMobileCart) {
     if (intent === 'add_order') {
-      const prod = findProductForVoice(item)
+      const { product: prod, candidates } = findProductForVoice(item)
       if (!prod) {
-        const msg = locale.value === 'es' ? `No se encontró ${item}.` : `${item} 품목을 찾을 수 없습니다.`
-        if (samdori.value) samdori.value.speak(msg)
+        speakVoiceItemUnresolved(item, candidates)
         return
       }
       if (!layout?.addFromVoice) {
@@ -3078,7 +3095,7 @@ const handleSamdoriIntent = async (intentObj) => {
 
   if (intent === 'add_order') {
     if (activeNav.value === 'branch-transfer' && branchTransferRef.value) {
-      const prod = findProductForVoice(item)
+      const { product: prod, candidates } = findProductForVoice(item)
       if (prod) {
         const inputQty = qty ? Number(qty) : 1
         for (let i = 0; i < inputQty; i++) {
@@ -3087,13 +3104,12 @@ const handleSamdoriIntent = async (intentObj) => {
         const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
         if (samdori.value) samdori.value.speak(msg)
       } else {
-        const msg = locale.value === 'es' ? `No se encontró ${item}.` : `해당 품목 ${item} 을(를) 찾을 수 없습니다.`
-        if (samdori.value) samdori.value.speak(msg)
+        speakVoiceItemUnresolved(item, candidates)
       }
       return
     }
 
-    const prod = findProductForVoice(item)
+    const { product: prod, candidates } = findProductForVoice(item)
     if (prod) {
       addSingleToCartInternal(prod)
       const inputQty = qty ? Number(qty) : 1
@@ -3106,8 +3122,7 @@ const handleSamdoriIntent = async (intentObj) => {
       const msg = locale.value === 'es' ? `${item} añadido al carrito.` : `${item} 장바구니에 담았습니다.`
       if (samdori.value) samdori.value.speak(msg)
     } else {
-      const msg = locale.value === 'es' ? `No se encontró ${item}.` : `창고에 ${item} 제품이 없습니다.`
-      if (samdori.value) samdori.value.speak(msg)
+      speakVoiceItemUnresolved(item, candidates)
     }
   } else if (intent === 'search') {
     // 관리자 창고 재질문 후: item이 비면 pending 품목 사용

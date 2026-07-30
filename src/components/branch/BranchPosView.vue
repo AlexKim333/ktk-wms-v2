@@ -31,7 +31,7 @@
         <!-- 점원 모드: 보류 전용 / 관리자 모드: PIN 잠금해제 -->
         <div v-if="branchSession.needsPinGate" class="selector-item" style="background: rgba(14, 165, 233, 0.15); padding: 4px 10px; border-radius: 8px; border: 1px solid #0284c7;">
           <template v-if="branchSession.isClerkMode">
-            <label style="color: #38bdf8; font-weight: 700;">🧑‍💼 점원 모드 (보류 전용)</label>
+            <label style="color: #38bdf8; font-weight: 700;">{{ $t('branch.pos.mode_clerk_label') }}</label>
             <select
               :value="branchSession.selectedClerkName"
               class="pos-select"
@@ -39,7 +39,7 @@
               @change="branchSession.setSelectedClerk($event.target.value)"
             >
               <option v-for="clerk in branchSession.activeClerks" :key="clerk.id" :value="clerk.name">
-                🧑‍💼 [점원] {{ clerk.name }} (주문보류 전용)
+                {{ $t('branch.pos.opt_clerk_item', { name: clerk.name }) }}
               </option>
             </select>
             <button
@@ -48,17 +48,17 @@
               style="margin-top: 6px; width: 100%; background: #f59e0b; color: #111; border: none; border-radius: 6px; padding: 6px 8px; font-weight: 800; cursor: pointer; font-size: 12px;"
               @click="branchSession.openPinModal()"
             >
-              🔐 지점장 PIN 잠금해제
+              {{ $t('branch.pos.btn_pin_unlock') }}
             </button>
           </template>
           <template v-else>
-            <label style="color: #86efac; font-weight: 700;">🔓 지점장 모드 (전체)</label>
+            <label style="color: #86efac; font-weight: 700;">{{ $t('branch.pos.mode_manager_label') }}</label>
             <button
               type="button"
               style="margin-top: 6px; width: 100%; background: #334155; color: #e2e8f0; border: none; border-radius: 6px; padding: 6px 8px; font-weight: 700; cursor: pointer; font-size: 12px;"
               @click="branchSession.lockToClerk()"
             >
-              ↩️ 점원 모드로 잠금
+              {{ $t('branch.pos.btn_lock_clerk') }}
             </button>
           </template>
         </div>
@@ -69,7 +69,7 @@
           :class="['btn-shift', isShiftOpen ? 'shift-open' : 'shift-closed']"
           @click="toggleShift"
         >
-          {{ isShiftOpen ? '🟢 POS OPEN (근무 중)' : '🔴 POS CLOSED (마감)' }}
+          {{ isShiftOpen ? $t('branch.pos.shift_open') : $t('branch.pos.shift_closed') }}
         </button>
       </div>
     </div>
@@ -119,7 +119,7 @@
                   <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_item_name', '품명 (상품명)') }}</th>
                   <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.transfer.th_item_color', '품명(컬러)') }}</th>
                   <th style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">Pack Qty</th>
-                  <th class="highlight-branch" style="background: #e0f2fe; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_my_stock', { branch: currentBranch }, `내 지점 재고 (${currentBranch})`) }}</th>
+                  <th class="highlight-branch" style="background: #e0f2fe; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #0284c7; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_my_stock', { branch: currentBranch }) }}</th>
                   <th class="highlight-main" style="background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1; color: #475569; font-size: 13px; position: sticky; top: 0; z-index: 2;">{{ $t('branch.inventory.col_main_stock', '메인 재고 ([MAIN] ALARCON - K)') }}</th>
                 </tr>
               </thead>
@@ -143,7 +143,7 @@
                 <tr v-if="searchListHasMore">
                   <td colspan="5" style="text-align:center; padding: 16px; background:#fffbeb;">
                     <button type="button" @click.stop="loadMoreSearchItems" style="background:#fef3c7;border:1px solid #f59e0b;color:#b45309;font-weight:bold;padding:10px 20px;border-radius:6px;cursor:pointer;">
-                      {{ $t('common.show_more', { n: searchListRemaining }, `더 보기 (${searchListRemaining})`) }}
+                      {{ $t('common.show_more', { n: searchListRemaining }) }}
                     </button>
                   </td>
                 </tr>
@@ -325,11 +325,11 @@
                         step="0.01" 
                         class="inline-price-input"
                         @change="handleCartPriceChange(cItem)"
-                        title="현장 단가 입력 시 해당 수량 구간 가격으로 자동 학습됩니다."
+                        :title="$t('branch.pos.title_price_learn')"
                       />
                     </div>
-                    <div v-if="cItem.tier_label && !cItem.tier_label.includes('1구간') && !cItem.tier_label.includes('단품')" class="tier-applied-badge">
-                      ⚡ {{ cItem.tier_label }}{{ cItem.is_smart_box ? ' (BOX)' : '' }}{{ cItem.is_grid_bundled ? ` (그리드 합산 ${cItem.grid_group_qty}개)` : '' }}
+                    <div v-if="isDiscountTier(cItem)" class="tier-applied-badge">
+                      ⚡ {{ tierBadgeText(cItem) }}{{ cItem.is_smart_box ? ' (BOX)' : '' }}{{ cItem.is_grid_bundled ? $t('branch.pos.tier_grid_sum', { qty: cItem.grid_group_qty }) : '' }}
                     </div>
                   </td>
                   <td class="cell-total">
@@ -389,7 +389,7 @@
               :disabled="cartItems.length === 0 || !isShiftOpen || !branchSession.selectedClerkName"
               @click="holdCurrentOrder"
             >
-              ⏸️ [점원: {{ branchSession.selectedClerkName || '미선택' }}] 카운터로 주문 보류
+              {{ $t('branch.pos.btn_hold_to_counter', { name: branchSession.selectedClerkName || $t('branch.pos.clerk_unselected') }) }}
             </button>
           </div>
         </div>
@@ -410,7 +410,7 @@
                 </span>
               </div>
               <div class="h-summary">
-                <span>{{ hOrder.items.length }} 품목 (총 {{ hOrder.totalQty }}개)</span>
+                <span>{{ $t('branch.pos.held_summary', { count: hOrder.items.length, qty: hOrder.totalQty }) }}</span>
                 <span class="h-total">$ {{ formatPrice(hOrder.grandTotal) }} MXN</span>
               </div>
               <div class="h-actions">
@@ -424,7 +424,7 @@
                   class="btn-delete-held"
                   @click="deleteHeldOrder(idx)"
                 >🗑️</button>
-                <span v-else style="font-size: 12px; color: #64748b; font-weight: 600;">지점장 PIN 후 불러오기</span>
+                <span v-else style="font-size: 12px; color: #64748b; font-weight: 600;">{{ $t('branch.pos.held_locked_msg') }}</span>
               </div>
             </div>
           </div>
@@ -432,58 +432,18 @@
       </div>
     </div>
     <!-- 🌟 PAYMENT MODAL (복합 결제 및 Change 정산 모달) -->
-    <div v-if="showPaymentModal" class="pos-modal-overlay" @click.self="showPaymentModal = false">
-      <div class="pos-payment-modal">
-        <div class="modal-header">
-          <h3>💳 {{ $t('branch.pos.title_payment', 'POS 복합 결제 및 정산') }}</h3>
-          <button class="close-btn" @click="showPaymentModal = false">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="payment-grand-banner">
-            <span>{{ $t('branch.pos.lbl_to_pay', '결제해야 할 금액') }}:</span>
-            <strong class="grand-price">$ {{ formatPrice(grandTotal) }} MXN</strong>
-          </div>
-          <!-- 결제 수단 분할 입력 -->
-          <div class="payment-methods-grid">
-            <div class="method-row">
-              <label>💵 {{ $t('branch.pos.pay_cash', '현금 (Cash)') }}</label>
-              <input type="number" v-model.number="cashAmount" min="0" class="pay-input" />
-            </div>
-            <div class="method-row">
-              <label>💳 {{ $t('branch.pos.pay_card', '카드 (Credit/Debit Card)') }}</label>
-              <input type="number" v-model.number="cardAmount" min="0" class="pay-input" />
-            </div>
-            <div class="method-row">
-              <label>🏦 {{ $t('branch.pos.pay_transfer', '이체 (Transfer/SPEI)') }}</label>
-              <input type="number" v-model.number="transferAmount" min="0" class="pay-input" />
-            </div>
-          </div>
-          <!-- 정산 결과: 총 받은 금액 / 거스름돈(Change) -->
-          <div class="payment-reconciliation">
-            <div class="recon-row">
-              <span>{{ $t('branch.pos.lbl_total_paid', '총 입금 금액') }}:</span>
-              <span>$ {{ formatPrice(totalPaid) }} MXN</span>
-            </div>
-            <div :class="['recon-row', changeAmount >= 0 ? 'change-ok' : 'change-short']">
-              <span>{{ changeAmount >= 0 ? $t('branch.pos.lbl_change', '거스름돈 (Change)') : $t('branch.pos.lbl_shortage', '부족 금액') }}:</span>
-              <strong>$ {{ formatPrice(Math.abs(changeAmount)) }} MXN</strong>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="showPaymentModal = false">
-            {{ $t('common.cancel', '취소') }}
-          </button>
-          <button 
-            class="btn-submit-pos" 
-            :disabled="totalPaid < grandTotal || isSubmitting"
-            @click="submitPosInvoice"
-          >
-            {{ isSubmitting ? $t('common.submitting', '전표 발행 중...') : $t('branch.pos.btn_submit_invoice', '⚡ POS Invoice 최종 발행') }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <BranchPaymentModal
+      :is-open="showPaymentModal"
+      v-model:cash-amount="cashAmount"
+      v-model:card-amount="cardAmount"
+      v-model:transfer-amount="transferAmount"
+      :grand-total="grandTotal"
+      :total-paid="totalPaid"
+      :change-amount="changeAmount"
+      :is-submitting="isSubmitting"
+      @close="showPaymentModal = false"
+      @submit="submitPosInvoice"
+    />
   </div>
     <!-- 1. 단일 버튼 상품 지정 독립 모달 -->
     <BranchQuickPickSlotModal
@@ -528,36 +488,7 @@
       @completed="showIncompletePriceModal = false"
     />
     <!-- PIN 잠금해제 모달 (프론트 전용, Frappe 무관) -->
-    <div v-if="branchSession.pinModalOpen" class="pos-modal-overlay" @click.self="branchSession.closePinModal()">
-      <div class="pos-payment-modal" style="max-width: 380px;">
-        <div class="modal-header">
-          <h3>🔐 지점장 PIN 잠금해제</h3>
-          <button class="close-btn" @click="branchSession.closePinModal()">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="font-size: 13px; color: #64748b; margin: 0 0 12px 0;">
-            같은 지점 계정에서 관리자 기능을 쓰려면 PIN을 입력하세요. (점원 계정은 Frappe에 없습니다)
-          </p>
-          <input
-            v-model="branchSession.pinInput"
-            type="password"
-            inputmode="numeric"
-            maxlength="4"
-            placeholder="4자리 PIN"
-            class="pay-input"
-            style="width: 100%; font-size: 22px; letter-spacing: 8px; text-align: center;"
-            @keyup.enter="branchSession.unlockWithPin()"
-          />
-          <p v-if="branchSession.pinError" style="color: #ef4444; font-weight: 700; margin-top: 10px;">
-            {{ branchSession.pinError }}
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="branchSession.closePinModal()">취소</button>
-          <button class="btn-submit-pos" @click="branchSession.unlockWithPin()">잠금해제</button>
-        </div>
-      </div>
-    </div>
+    <PinUnlockModal variant="branch" @unlock="branchSession.unlockWithPin()" />
 </template>
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
@@ -566,11 +497,14 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useBranchSessionStore } from '../../stores/branchSession.js'
 import frappeApi from '../../api/frappe.js'
 import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch'
-import { resolveItemTiers, calculateTierPrice, getBarcodeScanQty, recalculateCartTierPrices, getIncompletePriceItems, learnTierPriceFromCart } from '../../composables/usePriceTierEngine.js'
+import { resolveItemTiers, calculateTierPrice, getBarcodeScanQty, recalculateCartTierPrices, getIncompletePriceItems, learnTierPriceFromCart, getTierCode } from '../../composables/usePriceTierEngine.js'
 import { usePagedList } from '../../composables/usePagedList.js'
 import BranchIncompletePriceModal from './BranchIncompletePriceModal.vue'
 import BranchQuickPickSlotModal from './BranchQuickPickSlotModal.vue'
 import BranchGridSelectionModal from './BranchGridSelectionModal.vue'
+import BranchPaymentModal from './BranchPaymentModal.vue'
+import PinUnlockModal from '../PinUnlockModal.vue'
+import { formatPrice } from '../../utils/formatPrice.js'
 const { t } = useI18n()
 const authStore = useAuthStore()
 const branchSession = useBranchSessionStore()
@@ -689,9 +623,6 @@ const getStockEach = (item) => {
   const total = Number(props.binData?.[item.name]?.[currentBranch.value] || 0)
   const pack = Number(item.custom_pack_qty || 1)
   return (total % pack)
-}
-const formatPrice = (val) => {
-  return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 // ----------------------------------------------------
 // QUICK PICK & SEARCH STOCK MODAL LOGIC
@@ -855,8 +786,7 @@ const handleBarcodeScan = () => {
     i.custom_tier_1_barcode?.toLowerCase() === code.toLowerCase() ||
     i.custom_tier_2_barcode?.toLowerCase() === code.toLowerCase() ||
     i.custom_tier_3_barcode?.toLowerCase() === code.toLowerCase() ||
-    i.custom_tier_4_barcode?.toLowerCase() === code.toLowerCase() ||
-    i.custom_tier_5_barcode?.toLowerCase() === code.toLowerCase()
+    i.custom_tier_4_barcode?.toLowerCase() === code.toLowerCase()
   )
   if (matched) {
     const resolved = resolveItemTiers(authStore.user?.branch_name, matched)
@@ -864,19 +794,38 @@ const handleBarcodeScan = () => {
     addToCart(matched, qtyToAdd)
     barcodeQuery.value = ''
   } else {
-    alert(`[POS 바코드 오류] 일치하는 바코드 상품을 찾을 수 없습니다: ${code}`)
+    alert(t('branch.pos.msg_err_barcode', { code }))
     barcodeQuery.value = ''
   }
 }
 const applyTierPricingToCartItem = () => {
   recalculateCartTierPrices(cartItems.value, authStore.user?.branch_name)
 }
+// 수량구간 뱃지: 판별은 코드값(tier_code/tier_index)으로만 한다.
+// 이 변경 전에 localStorage 에 저장된 보류 주문은 코드값이 없어 라벨로 추정하고, 문구는 원본을 그대로 보여준다.
+const tierBadgeCode = (cItem) => {
+  if (cItem?.tier_code) return cItem.tier_code
+  if (Number(cItem?.tier_index) > 0) return getTierCode(cItem.tier_index)
+  const legacyLabel = String(cItem?.tier_label || '')
+  if (!legacyLabel) return 'base'
+  return (legacyLabel.includes('1구간') || legacyLabel.includes('단품')) ? 'base' : 'legacy'
+}
+const isDiscountTier = (cItem) => tierBadgeCode(cItem) !== 'base'
+// 지점 설정에서 직접 붙인 라벨(예: '도매가')이 있으면 그 문구를 그대로 존중하고,
+// 시스템 기본 라벨일 때만 구간 코드값으로 4개국어 문구를 출력한다.
+const tierBadgeText = (cItem) => {
+  const code = tierBadgeCode(cItem)
+  const label = String(cItem?.tier_label || '')
+  if (code === 'legacy') return label
+  if (cItem?.tier_label_is_custom && label) return label
+  return t(`branch.pos.tier_badge_${code}`)
+}
 const handleCartPriceChange = (cItem) => {
   learnTierPriceFromCart(cItem, authStore.user?.branch_name)
 }
 const addToCart = (item, qtyToAdd = 1) => {
   if (!isShiftOpen.value) {
-    alert('POS 마감 상태입니다. 개시 후 결제해 주세요.')
+    alert(t('branch.pos.msg_err_shift_closed'))
     return
   }
   const existing = cartItems.value.find(c => c.item_code === item.name)
@@ -915,7 +864,7 @@ const removeItem = (idx) => {
 }
 const clearCart = () => {
   if (cartItems.value.length === 0) return
-  if (confirm('현재 장바구니를 모두 비우시겠습니까?')) {
+  if (confirm(t('branch.pos.msg_cfm_clear_cart'))) {
     cartItems.value = []
     discountPercentage.value = 0
   }
@@ -939,7 +888,7 @@ const grandTotal = computed(() => {
 const holdCurrentOrder = () => {
   if (cartItems.value.length === 0) return
   if (branchSession.isClerkMode && !branchSession.selectedClerkName) {
-    alert('점원 이름을 선택한 뒤 보류해 주세요.')
+    alert(t('branch.pos.msg_err_no_clerk'))
     return
   }
   const newHold = {
@@ -958,20 +907,20 @@ const holdCurrentOrder = () => {
   cartItems.value = []
   discountPercentage.value = 0
   if (branchSession.isClerkMode && branchSession.selectedClerkName) {
-    alert(`[🧑‍💼 점원: ${branchSession.selectedClerkName}] 주문이 카운터 보류 목록으로 저장되었습니다. (Frappe 미전송)`)
+    alert(t('branch.pos.msg_held_saved', { name: branchSession.selectedClerkName }))
   } else {
-    alert('주문이 보류 목록으로 이동되었습니다. (⏸️ 보류 탭에서 확인 가능)')
+    alert(t('branch.pos.msg_held_moved'))
   }
 }
 const recallOrder = (idx) => {
   if (!branchSession.isManagerMode) {
-    alert('보류 주문 불러오기는 지점장 PIN 잠금해제 후 가능합니다.')
+    alert(t('branch.pos.msg_err_recall_locked'))
     return
   }
   const target = heldOrders.value[idx]
   if (!target) return
   if (cartItems.value.length > 0) {
-    if (!confirm('현재 작성 중인 장바구니 품목이 덮어쓰기됩니다. 불러오시겠습니까?')) return
+    if (!confirm(t('branch.pos.msg_cfm_recall'))) return
   }
   selectedCustomer.value = target.customer || 'Public'
   selectedSalesPerson.value = target.salesPerson || ''
@@ -983,7 +932,7 @@ const recallOrder = (idx) => {
 }
 const deleteHeldOrder = (idx) => {
   if (!branchSession.isManagerMode) return
-  if (confirm('이 보류 주문을 삭제하시겠습니까?')) {
+  if (confirm(t('branch.pos.msg_cfm_delete_held'))) {
     heldOrders.value.splice(idx, 1)
     saveHeldOrdersToStorage()
   }
@@ -1000,7 +949,7 @@ const saveHeldOrdersToStorage = () => {
 // ----------------------------------------------------
 const openPaymentModal = () => {
   if (!branchSession.isManagerMode) {
-    alert('결제는 지점장 PIN 잠금해제 후 가능합니다.')
+    alert(t('branch.pos.msg_err_pay_locked'))
     return
   }
   cashAmount.value = grandTotal.value
@@ -1016,11 +965,11 @@ const changeAmount = computed(() => {
 })
 const submitPosInvoice = async () => {
   if (!branchSession.isManagerMode) {
-    alert('최종 발행은 지점장 모드에서만 가능합니다.')
+    alert(t('branch.pos.msg_err_submit_manager_only'))
     return
   }
   if (totalPaid.value < grandTotal.value) {
-    alert('결제 금액이 최종 금액보다 작습니다.')
+    alert(t('branch.pos.msg_err_underpaid'))
     return
   }
   if (isSubmitting.value) return
@@ -1051,7 +1000,7 @@ const submitPosInvoice = async () => {
     }
     const res = await frappeApi.post('/api/resource/Sales Invoice', payload)
     const newInvoiceName = res.data?.data?.name || 'POS-INV-LOCAL'
-    alert(`✅ [POS 결제 완료] 전표가 성공적으로 발행되었습니다!\n전표 번호: ${newInvoiceName}\n거스름돈: $ ${formatPrice(changeAmount.value)} MXN`)
+    alert(t('branch.pos.msg_pay_success', { name: newInvoiceName, change: formatPrice(changeAmount.value) }))
     
     // 미완성 단가 품목 감지 (0.0001초 인메모리 필터링)
     const incomplete = getIncompletePriceItems(cartItems.value)
@@ -1063,11 +1012,7 @@ const submitPosInvoice = async () => {
     emit('refresh-items')
     if (incomplete.length > 0) {
       setTimeout(() => {
-        const confirmComplete = confirm(
-          `⚠️ [가격 정보 누락 품목 감지]\n` +
-          `현재 판매하신 상품 중 1~5단계 수량구간 가격 정보가 누락된(미완성) 품목이 총 ${incomplete.length}가지 있습니다.\n\n` +
-          `가격 입력 작업을 하시겠습니까?`
-        )
+        const confirmComplete = confirm(t('branch.pos.msg_cfm_incomplete_price', { count: incomplete.length }))
         if (confirmComplete) {
           incompleteSoldItems.value = incomplete
           showIncompletePriceModal.value = true
@@ -1077,18 +1022,18 @@ const submitPosInvoice = async () => {
   } catch (err) {
     console.error('POS Invoice submission error:', err)
     const serverMsg = err.response?.data?.exception || err.response?.data?.message || err.message
-    alert(`❌ [ERPNext 서버 전송 실패]\n오류 메시지: ${serverMsg}\n(서버 계정 설정을 확인하거나 관리자에게 문의해 주세요.)`)
+    alert(t('branch.pos.msg_err_submit', { error: serverMsg }))
   } finally {
     isSubmitting.value = false
   }
 }
 const toggleShift = () => {
   if (isShiftOpen.value) {
-    if (confirm('현재 POS 근무를 마감하시겠습니까? (마감 후에는 결제가 제한됩니다.)')) {
+    if (confirm(t('branch.pos.msg_cfm_close_shift'))) {
       isShiftOpen.value = false
     }
   } else {
-    if (confirm('POS 근무를 개시하시겠습니까?')) {
+    if (confirm(t('branch.pos.msg_cfm_open_shift'))) {
       isShiftOpen.value = true
     }
   }
@@ -1611,137 +1556,7 @@ const toggleShift = () => {
   border: none;
   cursor: pointer;
 }
-/* 🌟 PAYMENT MODAL */
-.pos-modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.pos-payment-modal {
-  width: 480px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.modal-header {
-  background: #1e293b;
-  color: white;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.modal-header h3 {
-  margin: 0;
-  font-size: 17px;
-}
-.close-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
-}
-.modal-body {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.payment-grand-banner {
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.grand-price {
-  font-size: 22px;
-  color: #0284c7;
-}
-.payment-methods-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.method-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.method-row label {
-  font-weight: 600;
-  font-size: 14px;
-  color: #334155;
-}
-.pay-input {
-  width: 160px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  font-size: 16px;
-  font-weight: 700;
-  text-align: right;
-}
-.payment-reconciliation {
-  border-top: 1px dashed #cbd5e1;
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.recon-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 15px;
-}
-.change-ok {
-  color: #059669;
-  font-size: 17px;
-}
-.change-short {
-  color: #ef4444;
-  font-size: 17px;
-}
-.modal-footer {
-  padding: 16px 20px;
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.btn-cancel {
-  padding: 10px 18px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: white;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-submit-pos {
-  padding: 10px 22px;
-  border-radius: 6px;
-  border: none;
-  background: #059669;
-  color: white;
-  font-weight: 800;
-  cursor: pointer;
-  font-size: 15px;
-}
-.btn-submit-pos:disabled {
-  background: #94a3b8;
-  cursor: not-allowed;
-}
+/* 결제 / PIN 모달 스타일은 BranchPaymentModal.vue, PinUnlockModal.vue 로 이동 */
 .tier-applied-badge {
   display: inline-block;
   margin-top: 4px;

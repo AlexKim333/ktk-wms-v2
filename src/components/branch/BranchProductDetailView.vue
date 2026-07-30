@@ -2,17 +2,28 @@
   <div class="branch-detail-view">
     <header class="detail-header">
       <button class="btn-back" @click="$emit('go-back')">
-        ← {{ t('btn_back', '돌아가기 (Atrás)') }}
+        ← {{ t('branch.detail.btn_back') }}
       </button>
       <h2 class="title">
         📦 {{ item.item_name || item.item_code }} ({{ item.item_code }}) - 지점 전용 상세
       </h2>
       <div class="header-actions">
-        <button class="btn-save" @click="handleSaveBranchPrice">
-          💾 {{ t('btn_save_branch_price', '지점 단가 및 구간 저장 (Save)') }}
+        <button class="btn-save" :disabled="isSaving" @click="handleSaveBranchPrice">
+          <template v-if="isSaving">
+            ⏳ 저장 중…<span v-if="saveTotal > 1"> ({{ saveDone }}/{{ saveTotal }})</span>
+          </template>
+          <template v-else>💾 {{ t('branch.detail.btn_save_branch_price') }}</template>
         </button>
       </div>
     </header>
+
+    <!-- 패밀리 일괄 전파는 품목당 순차 요청이라 수 초가 걸린다. 멈춘 것으로 오해하지 않도록 진행률을 보여준다. -->
+    <div v-if="isSaving && saveTotal > 1" class="save-progress">
+      <div class="save-progress-bar" :style="{ width: savePercent + '%' }"></div>
+      <span class="save-progress-text">
+        패밀리 변형 단가 전파 중… {{ saveDone }} / {{ saveTotal }} ({{ savePercent }}%)
+      </span>
+    </div>
 
     <!-- Notification Toast -->
     <transition name="fade">
@@ -24,19 +35,19 @@
       <section class="card info-card">
         <div class="info-grid">
           <div class="info-item">
-            <label>{{ t('category', '상품 카테고리 (Category)') }}</label>
+            <label>{{ t('branch.detail.category') }}</label>
             <div class="value">{{ item.item_group || '-' }}</div>
           </div>
           <div class="info-item">
-            <label>{{ t('item_name', '상품명 (Item Name)') }}</label>
+            <label>{{ t('branch.detail.item_name') }}</label>
             <div class="value">{{ item.item_name || item.item_code }}</div>
           </div>
           <div class="info-item">
-            <label>{{ t('uom', '재고 관리 단위 (UOM)') }}</label>
+            <label>{{ t('branch.detail.uom') }}</label>
             <div class="value">{{ item.stock_uom || 'Nos' }}</div>
           </div>
           <div class="info-item">
-            <label>{{ t('pack_qty', '박스당 수량 (Pack Qty)') }}</label>
+            <label>{{ t('branch.detail.pack_qty') }}</label>
             <div class="value pack-highlight">
               📦 {{ item.custom_pack_qty || item.pack_qty || 1 }} {{ item.stock_uom || 'Nos' }} / Box
             </div>
@@ -163,42 +174,23 @@
                 <input type="number" v-model.number="itemPrice.custom_tier_3_price" placeholder="0" class="input-price" />
               </td>
             </tr>
-            <!-- Tier 4 -->
-            <tr>
-              <td class="tier-label">가격 4 (Precio 4)</td>
+            <!-- Tier 4 (BOX) -->
+            <tr class="tier-box-row">
+              <td class="tier-label tier-box-label">가격 4 (Precio 4 - BOX)</td>
               <td>
-                <input type="text" v-model="tierBarcodes[3]" placeholder="대팩 바코드" class="input-text" />
+                <input type="text" v-model="tierBarcodes[3]" placeholder="BOX 바코드" class="input-text" />
               </td>
               <td>
                 <input
                   type="number"
                   v-model.number="tierQtys[3]"
                   :disabled="!useCustomTierOverride"
-                  class="input-qty"
+                  class="input-qty tier-box-qty"
                   :class="{ readonly: !useCustomTierOverride }"
                 />
               </td>
               <td>
-                <input type="number" v-model.number="itemPrice.custom_tier_4_price" placeholder="0" class="input-price" />
-              </td>
-            </tr>
-            <!-- Tier 5 (BOX) -->
-            <tr class="tier-5-row">
-              <td class="tier-label tier-5-label">가격 5 (Precio 5 - BOX)</td>
-              <td>
-                <input type="text" v-model="tierBarcodes[4]" placeholder="BOX 바코드" class="input-text" />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  v-model.number="tierQtys[4]"
-                  :disabled="!useCustomTierOverride"
-                  class="input-qty tier-5-qty"
-                  :class="{ readonly: !useCustomTierOverride }"
-                />
-              </td>
-              <td>
-                <input type="number" v-model.number="itemPrice.custom_tier_5_price" placeholder="0" class="input-price tier-5-price" />
+                <input type="number" v-model.number="itemPrice.custom_tier_4_price" placeholder="0" class="input-price tier-box-price" />
               </td>
             </tr>
           </tbody>
@@ -244,7 +236,11 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import frappeApi from '../../api/frappe.js'
+import { useAuthStore } from '../../stores/auth.js'
+import { upsertBranchItemPrice, branchPriceListCandidates } from '../../utils/branchPriceList.js'
+import { frappeErrorMessage } from '../../utils/frappeError.js'
 import {
+  TIER_COUNT,
   getBranchGlobalTiers,
   getBranchItemOverride,
   saveBranchItemOverride,
@@ -259,27 +255,104 @@ const props = defineProps({
   currentBranch: {
     type: String,
     default: ''
+  },
+  rawItems: {
+    type: Array,
+    default: () => []
   }
 })
 
 const emit = defineEmits(['go-back'])
 const { t } = useI18n()
+const authStore = useAuthStore()
+
+// 창고명이 자동으로 붙는 접미사("CARMEN - K")를 그대로 쓴다.
+// 관리자 화면과 지점 전용 화면이 같은 이름 규칙을 보도록 로그인 프로필의 지점명을 우선 사용한다.
+const effectiveBranch = computed(() => {
+  const fromProfile = String(authStore.user?.branch_name || '').trim()
+  if (fromProfile) return fromProfile
+  return String(props.currentBranch || '').trim()
+})
 
 const item = ref({})
+
+// 저장 진행 상태. isSaving 은 중복 클릭 차단과 진행률 표시를 겸한다.
+const isSaving = ref(false)
+const saveDone = ref(0)
+const saveTotal = ref(0)
+const savePercent = computed(() =>
+  saveTotal.value > 0 ? Math.round((saveDone.value / saveTotal.value) * 100) : 0
+)
+
+/**
+ * 패밀리(변형) 식별 키.
+ * custom_grid_group_id 는 수동으로 넣어준 품목에만 있고, 일반 ERPNext 변형 품목은
+ * item_name 을 공유할 뿐이다. 그리드 플래그에만 의존하면 P-160 같은 색상/사이즈 변형
+ * 패밀리가 통째로 누락되므로 item_name 을 폴백 키로 함께 쓴다.
+ */
+const familyKeyOf = (i) => String(i?.custom_grid_group_id || i?.item_name || '').trim()
+
+/** 현재 보고 있는 품목과 같은 패밀리에 속한 rawItems 목록 (자기 자신 포함) */
+const resolveFamilyItems = () => {
+  const key = familyKeyOf(item.value)
+  if (!key) return []
+  return (props.rawItems || []).filter((i) => familyKeyOf(i) === key)
+}
+
+/**
+ * 패밀리 변형 품목의 실제 item_code 전체 목록.
+ *
+ * props.rawItems 는 목록 로딩 시점이나 화면 필터에 따라 변형이 빠져 있을 수 있다.
+ * 여기에만 의존하면 화면에 안 실린 변형(NEGRO, BLANCO 등)이 저장에서 통째로 누락되므로
+ * 항상 백엔드를 기준으로 삼고, 로컬 목록은 보강용으로만 합친다.
+ */
+const fetchFamilyItemCodes = async () => {
+  const key = familyKeyOf(item.value)
+  const codes = []
+
+  if (key) {
+    try {
+      const res = await frappeApi.get('/api/resource/Item', {
+        params: {
+          // 같은 패밀리라도 custom_grid_group_id 가 일부 품목에만 채워져 있다.
+          // 둘 중 어느 쪽으로 묶여 있든 빠지지 않도록 OR 로 조회한다.
+          or_filters: JSON.stringify([
+            ['item_name', '=', key],
+            ['custom_grid_group_id', '=', key]
+          ]),
+          fields: JSON.stringify(['name', 'item_code']),
+          limit_page_length: 500
+        }
+      })
+      ;(res.data?.data || []).forEach((i) => {
+        const code = i.item_code || i.name
+        if (code) codes.push(code)
+      })
+    } catch (e) {
+      console.warn('패밀리 품목 조회 실패:', e?.response?.status || e)
+    }
+  }
+
+  resolveFamilyItems().forEach((i) => {
+    const code = i.item_code || i.name
+    if (code) codes.push(code)
+  })
+
+  return [...new Set(codes)]
+}
 const branchBinList = ref([])
 const ledgerList = ref([])
 const toastMsg = ref('')
 
-// 5단계 단가표 상태
+// 4단계 단가표 상태 (백엔드 Item Price 에 존재하는 단가 필드 수와 일치시켜야 한다)
 const useCustomTierOverride = ref(false)
-const tierBarcodes = ref(['', '', '', '', ''])
-const tierQtys = ref([1, 10, 50, 100, 200])
+const tierBarcodes = ref(['', '', '', ''])
+const tierQtys = ref([1, 10, 50, 100])
 const itemPrice = ref({
   price_list_rate: 0,
   custom_tier_2_price: 0,
   custom_tier_3_price: 0,
-  custom_tier_4_price: 0,
-  custom_tier_5_price: 0
+  custom_tier_4_price: 0
 })
 
 const showToast = (msg) => {
@@ -307,7 +380,7 @@ const getRemainderCount = (qty) => {
 const loadDefaultTiersFromEngine = () => {
   const resolved = resolveItemTiers(props.currentBranch, item.value)
   if (Array.isArray(resolved) && resolved.length > 0) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < TIER_COUNT; i++) {
       tierQtys.value[i] = resolved[i] ? Number(resolved[i].minQty || 0) : 0
     }
   } else {
@@ -344,13 +417,12 @@ const fetchDetailData = async () => {
     tierBarcodes.value[1] = item.value.custom_tier_2_barcode || ''
     tierBarcodes.value[2] = item.value.custom_tier_3_barcode || ''
     tierBarcodes.value[3] = item.value.custom_tier_4_barcode || ''
-    tierBarcodes.value[4] = item.value.custom_tier_5_barcode || ''
 
     // 개별 수량 Override 확인
     const savedOverride = getBranchItemOverride(props.currentBranch, props.itemId)
     if (savedOverride && savedOverride.useCustomOverride) {
       useCustomTierOverride.value = true
-      tierQtys.value = savedOverride.tiers.map(t => Number(t.minQty || 0))
+      tierQtys.value = savedOverride.tiers.slice(0, TIER_COUNT).map(t => Number(t.minQty || 0))
     } else {
       useCustomTierOverride.value = false
       loadDefaultTiersFromEngine()
@@ -372,43 +444,81 @@ const fetchDetailData = async () => {
     })
 
     // 3. 지점별 Item Price 조회
-    const targetPriceList = props.currentBranch ? `Standard Selling - ${props.currentBranch}` : 'Standard Selling'
-    try {
-      const resPrice = await frappeApi.get('/api/resource/Item Price', {
+    // 두 가지 어긋남을 모두 흡수해야 저장된 단가가 화면에 뜬다.
+    //  - 단가표 이름: 저장은 "Standard Selling - CARMEN - K" 와 "Standard Selling - CARMEN" 중
+    //    실제 존재하는 쪽에 붙으므로, 조회도 후보 전부를 봐야 한다.
+    //  - 품목 코드: P-160 은 그룹/부모 코드이고 실제 단가는 P-160-BEIGE-400 같은 변형에 들어간다.
+    const priceItemCode = item.value?.item_code || props.itemId
+    const branchPriceLists = branchPriceListCandidates(effectiveBranch.value)
+    const priceListsToTry = [...branchPriceLists, 'Standard Selling']
+    const fields = JSON.stringify([
+      'name', 'item_code', 'price_list', 'price_list_rate',
+      'custom_tier_2_price', 'custom_tier_3_price', 'custom_tier_4_price'
+    ])
+    const applyRow = (p) => {
+      itemPrice.value = p
+        ? {
+            name: p.name,
+            price_list: p.price_list,
+            price_list_rate: Number(p.price_list_rate || 0),
+            custom_tier_2_price: Number(p.custom_tier_2_price || 0),
+            custom_tier_3_price: Number(p.custom_tier_3_price || 0),
+            custom_tier_4_price: Number(p.custom_tier_4_price || 0)
+          }
+        : {
+            price_list_rate: 0,
+            custom_tier_2_price: 0,
+            custom_tier_3_price: 0,
+            custom_tier_4_price: 0
+          }
+    }
+    // 여러 건이 잡히면 지점 단가표 > 본사 단가표, 그리고 지금 보고 있는 품목 코드 순으로 고른다.
+    const pickBestRow = (rows, itemCodeOrder) => {
+      const rank = (r) => {
+        const pl = priceListsToTry.indexOf(r.price_list)
+        const ic = itemCodeOrder.indexOf(r.item_code)
+        return [pl < 0 ? 99 : pl, ic < 0 ? 99 : ic]
+      }
+      return [...rows].sort((a, b) => {
+        const ra = rank(a)
+        const rb = rank(b)
+        return ra[0] - rb[0] || ra[1] - rb[1]
+      })[0] || null
+    }
+
+    const queryPrices = async (itemCodes) => {
+      const res = await frappeApi.get('/api/resource/Item Price', {
         params: {
           filters: JSON.stringify([
-            ['item_code', '=', props.itemId],
-            ['price_list', 'like', `%${props.currentBranch || 'Standard Selling'}%`]
+            ['item_code', 'in', itemCodes],
+            ['price_list', 'in', priceListsToTry]
           ]),
-          fields: JSON.stringify([
-            'name', 'price_list', 'price_list_rate',
-            'custom_tier_2_price', 'custom_tier_3_price', 'custom_tier_4_price', 'custom_tier_5_price'
-          ]),
-          limit_page_length: 1
+          fields,
+          limit_page_length: 100
         }
       })
-      if (resPrice.data.data && resPrice.data.data.length > 0) {
-        const p = resPrice.data.data[0]
-        itemPrice.value = {
-          name: p.name,
-          price_list: p.price_list,
-          price_list_rate: Number(p.price_list_rate || 0),
-          custom_tier_2_price: Number(p.custom_tier_2_price || 0),
-          custom_tier_3_price: Number(p.custom_tier_3_price || 0),
-          custom_tier_4_price: Number(p.custom_tier_4_price || 0),
-          custom_tier_5_price: Number(p.custom_tier_5_price || 0)
-        }
-      } else {
-        itemPrice.value = {
-          price_list_rate: 0,
-          custom_tier_2_price: 0,
-          custom_tier_3_price: 0,
-          custom_tier_4_price: 0,
-          custom_tier_5_price: 0
+      return res.data.data || []
+    }
+
+    try {
+      // 1순위: 지금 열려 있는 품목 코드로 지점/본사 단가표를 한 번에 조회
+      let rows = await queryPrices([priceItemCode])
+      let itemCodeOrder = [priceItemCode]
+
+      // 2순위: 변형 품목 폴백.
+      // rawItems 가 아직 로드되지 않은 상태(onMounted 직후)여도 작동하도록
+      // 패밀리 변형 코드를 백엔드에서 직접 조회한다.
+      if (rows.length === 0) {
+        const uniqueCodes = (await fetchFamilyItemCodes()).filter(c => c !== priceItemCode)
+        if (uniqueCodes.length > 0) {
+          itemCodeOrder = uniqueCodes
+          rows = await queryPrices(uniqueCodes)
         }
       }
+
+      applyRow(pickBestRow(rows, itemCodeOrder))
     } catch (pe) {
-      console.warn('Item Price load failed:', pe)
+      console.error('Item Price load failed:', pe?.response?.status, pe?.response?.data || pe)
     }
 
     // 4. 재고 이동 원장 (Stock Ledger)
@@ -445,6 +555,12 @@ const fetchDetailData = async () => {
  * 지점별 단가 및 수량구간 저장
  */
 const handleSaveBranchPrice = async () => {
+  // 전파는 수 초가 걸리므로, 그 사이 다시 눌러 중복 요청이 나가는 것을 막는다.
+  if (isSaving.value) return
+  isSaving.value = true
+  saveDone.value = 0
+  saveTotal.value = 0
+
   try {
     // 1. 개별 수량구간 Override 저장
     saveBranchItemOverride(props.currentBranch, props.itemId, {
@@ -453,54 +569,84 @@ const handleSaveBranchPrice = async () => {
         { minQty: Number(tierQtys.value[0] || 0), label: '가격 1 (Precio 1)' },
         { minQty: Number(tierQtys.value[1] || 0), label: '가격 2 (Precio 2)' },
         { minQty: Number(tierQtys.value[2] || 0), label: '가격 3 (Precio 3)' },
-        { minQty: Number(tierQtys.value[3] || 0), label: '가격 4 (Precio 4)' },
-        { minQty: Number(tierQtys.value[4] || 0), label: '가격 5 (Precio 5 - BOX)' }
+        { minQty: Number(tierQtys.value[3] || 0), label: '가격 4 (Precio 4 - BOX)' }
       ]
     })
 
-    // 1-1. Item 마스터에 1~5단계 바코드 저장
+    // 1-1. Item 마스터에 1~4단계 바코드 저장
     try {
       await frappeApi.put(`/api/resource/Item/${encodeURIComponent(props.itemId)}`, {
         custom_tier_1_barcode: (tierBarcodes.value[0] || '').trim(),
         custom_tier_2_barcode: (tierBarcodes.value[1] || '').trim(),
         custom_tier_3_barcode: (tierBarcodes.value[2] || '').trim(),
-        custom_tier_4_barcode: (tierBarcodes.value[3] || '').trim(),
-        custom_tier_5_barcode: (tierBarcodes.value[4] || '').trim()
+        custom_tier_4_barcode: (tierBarcodes.value[3] || '').trim()
       })
     } catch (barcodeErr) {
       console.warn('Item barcode update warning (may require permissions):', barcodeErr)
     }
 
-    // 2. 지점 Item Price 저장 또는 신규 생성
-    if (itemPrice.value.name) {
-      await frappeApi.put(`/api/resource/Item Price/${itemPrice.value.name}`, {
-        price_list_rate: Number(itemPrice.value.price_list_rate || 0),
-        custom_tier_2_price: Number(itemPrice.value.custom_tier_2_price || 0),
-        custom_tier_3_price: Number(itemPrice.value.custom_tier_3_price || 0),
-        custom_tier_4_price: Number(itemPrice.value.custom_tier_4_price || 0),
-        custom_tier_5_price: Number(itemPrice.value.custom_tier_5_price || 0)
-      })
-    } else {
-      // 신규 Item Price 생성
-      const targetPriceList = props.currentBranch ? `Standard Selling - ${props.currentBranch}` : 'Standard Selling'
-      const resCreated = await frappeApi.post('/api/resource/Item Price', {
-        item_code: props.itemId,
-        price_list: targetPriceList,
-        price_list_rate: Number(itemPrice.value.price_list_rate || 0),
-        custom_tier_2_price: Number(itemPrice.value.custom_tier_2_price || 0),
-        custom_tier_3_price: Number(itemPrice.value.custom_tier_3_price || 0),
-        custom_tier_4_price: Number(itemPrice.value.custom_tier_4_price || 0),
-        custom_tier_5_price: Number(itemPrice.value.custom_tier_5_price || 0)
-      })
-      if (resCreated.data.data) {
-        itemPrice.value.name = resCreated.data.data.name
-      }
+    // 2. 지점 Item Price 저장 (단가표가 없으면 자동 생성 후 Upsert)
+    const payload = {
+      price_list_rate: Number(itemPrice.value.price_list_rate || 0),
+      custom_tier_2_price: Number(itemPrice.value.custom_tier_2_price || 0),
+      custom_tier_3_price: Number(itemPrice.value.custom_tier_3_price || 0),
+      custom_tier_4_price: Number(itemPrice.value.custom_tier_4_price || 0)
     }
+    const saveItemCode = item.value?.item_code || props.itemId
 
-    showToast('💾 지점별 단가 및 5단계 수량구간이 저장되었습니다.')
+    // 패밀리(변형) 상품이면 변형 전체에 일괄 전파하고, 아니면 단일 품목만 저장한다.
+    // 전파 대상은 저장 시점에 백엔드에서 다시 확보한다. 화면 메모리(rawItems)만 믿으면
+    // 목록에 안 실린 변형이 저장에서 빠져 POS 에서 0원으로 나온다.
+    const familyCodes = await fetchFamilyItemCodes()
+
+    if (familyCodes.length > 1) {
+      const codes = [...familyCodes]
+      if (!codes.includes(saveItemCode)) codes.push(saveItemCode)
+
+      saveTotal.value = codes.length
+      const failed = []
+      for (const code of codes) {
+        try {
+          await upsertBranchItemPrice(frappeApi, {
+            branchName: effectiveBranch.value,
+            itemCode: code,
+            payload
+          })
+        } catch (e) {
+          failed.push(code)
+          console.error(`단가 전파 실패 (${code}):`, e, e?.response?.data)
+        }
+        saveDone.value += 1
+      }
+
+      // 전파 후에는 화면이 들고 있던 레코드 name 이 낡을 수 있으므로 다음 조회에 맡긴다.
+      itemPrice.value.name = null
+
+      if (failed.length > 0) {
+        alert(
+          `⚠️ ${codes.length}개 변형 중 ${failed.length}개 저장에 실패했습니다.\n` +
+            `실패 품목: ${failed.join(', ')}`
+        )
+      } else {
+        showToast(`💾 패밀리 ${codes.length}개 변형에 지점 단가가 일괄 저장되었습니다.`)
+      }
+    } else {
+      const savedName = await upsertBranchItemPrice(frappeApi, {
+        branchName: effectiveBranch.value,
+        itemCode: saveItemCode,
+        knownName: itemPrice.value.name || null,
+        payload
+      })
+      if (savedName) {
+        itemPrice.value.name = savedName
+      }
+      showToast('💾 지점별 단가 및 4단계 수량구간이 저장되었습니다.')
+    }
   } catch (error) {
-    console.error('Save branch price error:', error)
-    alert('❌ 저장 중 오류가 발생했습니다: ' + (error.message || '서버 오류'))
+    console.error('Save branch price error:', error, error?.response?.data)
+    alert('❌ 저장 중 오류가 발생했습니다:\n' + frappeErrorMessage(error))
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -511,6 +657,14 @@ onMounted(() => {
 watch(() => props.itemId, () => {
   fetchDetailData()
 })
+
+// rawItems 는 비동기로 늦게 도착한다. 마운트 시점에 비어 있어 단가를 못 찾은 경우를 위해 재조회한다.
+watch(
+  () => props.rawItems.length,
+  (len, prevLen) => {
+    if (len > 0 && !prevLen) fetchDetailData()
+  }
+)
 </script>
 
 <style scoped>
@@ -583,9 +737,44 @@ watch(() => props.itemId, () => {
   transition: all 0.2s;
 }
 
-.btn-save:hover {
+.btn-save:hover:not(:disabled) {
   transform: translateY(-1px);
   background: linear-gradient(135deg, #059669, #047857);
+}
+
+.btn-save:disabled {
+  background: #334155;
+  color: #94a3b8;
+  box-shadow: none;
+  cursor: progress;
+  transform: none;
+}
+
+.save-progress {
+  position: relative;
+  margin: 0 0 14px;
+  height: 24px;
+  border-radius: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  overflow: hidden;
+}
+
+.save-progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  transition: width 0.2s ease;
+}
+
+.save-progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
 }
 
 .detail-content {
@@ -734,11 +923,11 @@ watch(() => props.itemId, () => {
   color: #e2e8f0;
 }
 
-.tier-5-row {
+.tier-box-row {
   background-color: rgba(245, 158, 11, 0.08);
 }
 
-.tier-5-label {
+.tier-box-label {
   color: #f59e0b;
   font-weight: 900;
 }
@@ -764,13 +953,13 @@ watch(() => props.itemId, () => {
   cursor: not-allowed;
 }
 
-.tier-5-qty {
+.tier-box-qty {
   border-color: #f59e0b;
   color: #fbbf24;
   font-weight: 800;
 }
 
-.tier-5-price {
+.tier-box-price {
   border-color: #f59e0b;
   font-weight: 800;
 }

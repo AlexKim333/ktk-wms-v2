@@ -175,6 +175,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { APPROVAL_STAGE, stageFilter, stageI18nKey } from '../constants/approvalStage.js'
 import axios from 'axios'
 
 const props = defineProps({
@@ -246,7 +247,7 @@ const fetchReservations = async () => {
           filters: JSON.stringify([
             ['docstatus', '=', 0],
             ['material_request_type', '=', props.reservationType],
-            ['custom_approval_stage', '=', '지점장 승인']
+            stageFilter(APPROVAL_STAGE.MANAGER_APPROVAL)
           ]),
           limit_page_length: 100,
           order_by: 'creation desc'
@@ -390,7 +391,10 @@ const translateStatus = (status, docstatus, is_stock_entry) => {
 
 const getStatusLabel = (res) => {
   if (res.docstatus === 0) {
-    if (res.custom_approval_stage) return `Draft(${res.custom_approval_stage})`
+    if (res.custom_approval_stage) {
+      const stageKey = stageI18nKey(res.custom_approval_stage)
+      return `Draft(${stageKey ? t(stageKey) : res.custom_approval_stage})`
+    }
     return 'Draft'
   }
   

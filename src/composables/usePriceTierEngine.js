@@ -1,8 +1,17 @@
 // src/composables/usePriceTierEngine.js
-// 지점별 5단계 수량구간, 스마트 BOX 수량 동적 보정, 0값 예비 구간 자동 스킵을 담당하는 공통 엔진
+// 지점별 4단계 수량구간, 스마트 BOX 수량 동적 보정, 0값 예비 구간 자동 스킵을 담당하는 공통 엔진
+//
+// 구간 수는 백엔드(Item Price)에 실제로 존재하는 단가 필드에 맞춰 4단계로 고정한다.
+// 1구간 = price_list_rate, 2~4구간 = custom_tier_2~4_price.
+// 여기서 없는 필드를 추가하면 Frappe 목록 조회가 통째로 417 로 거부되므로 임의로 늘리면 안 된다.
+
+import { upsertBranchItemPrice } from '../utils/branchPriceList.js'
+
+/** 백엔드 단가 필드에 대응하는 수량구간 개수 */
+export const TIER_COUNT = 4
 
 /**
- * 지점 전역 수량구간(5단계) 기본 설정 가져오기
+ * 지점 전역 수량구간(4단계) 기본 설정 가져오기
  */
 export function getBranchGlobalTiers(branchName) {
   try {
@@ -14,20 +23,20 @@ export function getBranchGlobalTiers(branchName) {
     if (saved) {
       const parsed = JSON.parse(saved)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+        // 5구간 시절에 저장된 설정이 남아 있을 수 있으므로 현재 구간 수로 잘라서 쓴다.
+        return parsed.slice(0, TIER_COUNT)
       }
     }
   } catch (e) {
     console.warn('Error reading branch_price_tiers_v1:', e)
   }
 
-  // 기본값 5구간 (0 입력 시 예비 구간)
+  // 기본값 4구간 (0 입력 시 예비 구간)
   return [
     { minQty: 1, label: '1구간 (단품)', desc: '1개 이상 소량/단품 판매 단가' },
     { minQty: 10, label: '2구간 (소팩)', desc: '10개 이상 소팩 할인 단가' },
     { minQty: 50, label: '3구간 (중팩)', desc: '50개 이상 중팩 할인 단가' },
-    { minQty: 100, label: '4구간 (대팩)', desc: '100개 이상 대팩 할인 단가' },
-    { minQty: 200, label: '5구간 (박스)', desc: '200개 이상 박스 할인 단가' }
+    { minQty: 100, label: '4구간 (박스)', desc: '100개 이상 박스 할인 단가' }
   ]
 }
 
@@ -77,10 +86,12 @@ export function resolveItemTiers(branchName, item) {
 
   // 1우선순위: 품목 개별 수량구간 사용
   if (override && override.useCustomOverride && Array.isArray(override.tiers)) {
-    return override.tiers.map((t, idx) => ({
+    return override.tiers.slice(0, TIER_COUNT).map((t, idx) => ({
       tierIndex: idx + 1,
       minQty: Number(t.minQty || 0),
       label: t.label || `가격 ${idx + 1}`,
+      // 사용자가 지점 설정에서 직접 붙인 라벨인지 여부. 뱃지 문구를 원본으로 보여줄지 판단하는 데만 쓴다.
+      isCustomLabel: Boolean(t.label && String(t.label).trim()),
       isOverride: true,
       isSmartBox: false
     }))
@@ -92,12 +103,12 @@ export function resolveItemTiers(branchName, item) {
     let qty = Number(t.minQty || 0)
     let isSmartBox = false
 
-    // 마지막 5구간(박스)에 대해 품목 실제 포장단위(packQty)가 존재하면 동적 보정
+    // 마지막 구간(박스)에 대해 품목 실제 포장단위(packQty)가 존재하면 동적 보정
     if (idx === globalTiers.length - 1 && packQty > 1) {
       qty = packQty
       isSmartBox = true
     } else if (packQty > 1 && qty >= packQty) {
-      // 스마트 BOX 수량(packQty)보다 같거나 큰 중간 전역 구간(예: 4구간 100개 vs BOX 96개)은
+      // 스마트 BOX 수량(packQty)보다 같거나 큰 중간 전역 구간(예: 3구간 100개 vs BOX 96개)은
       // 박스 구간과 역전되거나 충돌하지 않도록 자동으로 예비/비활성(0) 처리
       qty = 0
     }
@@ -106,6 +117,7 @@ export function resolveItemTiers(branchName, item) {
       tierIndex: idx + 1,
       minQty: qty,
       label: t.label || `가격 ${idx + 1}`,
+      isCustomLabel: Boolean(t.label && String(t.label).trim()),
       isOverride: false,
       isSmartBox
     }
@@ -113,14 +125,27 @@ export function resolveItemTiers(branchName, item) {
 }
 
 /**
+ * 수량구간 번호를 언어 중립 코드값으로 변환한다.
+ * 화면 표시 문구는 i18n 키(branch.pos.tier_badge_*)로 뽑고, 분기 판별은 이 코드값으로만 한다.
+ * 1구간(기본가)은 'base' 로 두어 할인 뱃지 노출 대상에서 제외한다.
+ */
+export function getTierCode(tierIndex) {
+  const idx = Number(tierIndex || 1)
+  if (!(idx > 1)) return 'base'
+  // 단가표가 4구간까지만 있으므로 표시용 코드도 그 범위로 묶는다. (없는 i18n 키 참조 방지)
+  return `tier${Math.min(idx, TIER_COUNT)}`
+}
+
+/**
  * 판매 수량(qty)에 해당하는 적용 단가 구간 계산
  * 
  * @param {number} qty - 장바구니 상품 수량
  * @param {object} itemPrice - 단가표 객체 (price_list_rate, custom_tier_2_price, ...)
- * @param {Array} resolvedTiers - resolveItemTiers로 결정된 5단계 구간 리스트
+ * @param {Array} resolvedTiers - resolveItemTiers로 결정된 4단계 구간 리스트
  */
 export function calculateTierPrice(qty, itemPrice, resolvedTiers) {
-  if (!itemPrice) return { price: 0, tierIndex: 1, tierLabel: '단품 기본가' }
+  // tierLabel 은 기존 로직 호환용으로 계속 채운다. 신규 분기는 tierCode / tierIndex 를 쓴다.
+  if (!itemPrice) return { price: 0, tierIndex: 1, tierCode: 'base', tierLabel: '단품 기본가', isCustomLabel: false }
 
   const targetQty = Number(qty || 1)
 
@@ -129,8 +154,7 @@ export function calculateTierPrice(qty, itemPrice, resolvedTiers) {
     1: Number(itemPrice.price_list_rate || 0),
     2: Number(itemPrice.custom_tier_2_price || 0),
     3: Number(itemPrice.custom_tier_3_price || 0),
-    4: Number(itemPrice.custom_tier_4_price || 0),
-    5: Number(itemPrice.custom_tier_5_price || 0)
+    4: Number(itemPrice.custom_tier_4_price || 0)
   }
 
   // 유효한 수량(> 0)이 설정된 구간만 내림차순 정렬하여 가장 높은 해당 수량구간 매칭
@@ -143,7 +167,9 @@ export function calculateTierPrice(qty, itemPrice, resolvedTiers) {
       return {
         price: priceValues[tier.tierIndex],
         tierIndex: tier.tierIndex,
+        tierCode: getTierCode(tier.tierIndex),
         tierLabel: tier.label,
+        isCustomLabel: Boolean(tier.isCustomLabel),
         minQty: tier.minQty,
         isSmartBox: tier.isSmartBox
       }
@@ -154,7 +180,9 @@ export function calculateTierPrice(qty, itemPrice, resolvedTiers) {
   return {
     price: priceValues[1] || 0,
     tierIndex: 1,
+    tierCode: 'base',
     tierLabel: '1구간 기본가',
+    isCustomLabel: false,
     minQty: 1,
     isSmartBox: false
   }
@@ -162,7 +190,7 @@ export function calculateTierPrice(qty, itemPrice, resolvedTiers) {
 
 /**
  * 스캔한 바코드에 매칭되는 수량구간의 기본 수량(minQty) 반환
- * 예: 팩 바코드(2구간) 스캔 시 10개, BOX 바코드(5구간) 스캔 시 96개 자동 추가
+ * 예: 팩 바코드(2구간) 스캔 시 10개, BOX 바코드(4구간) 스캔 시 96개 자동 추가
  */
 export function getBarcodeScanQty(code, item, resolvedTiers) {
   if (!code || !item || !Array.isArray(resolvedTiers)) return 1
@@ -173,26 +201,22 @@ export function getBarcodeScanQty(code, item, resolvedTiers) {
     return (t && t.minQty > 0) ? Number(t.minQty) : 1
   }
 
-  // 1. 5구간 바코드(BOX) 일치 여부
-  if (item.custom_tier_5_barcode && String(item.custom_tier_5_barcode).trim().toLowerCase() === upperCode) {
-    return getMinQtyOfTier(5)
-  }
-  // 2. 4구간 바코드 일치 여부
+  // 1. 4구간 바코드(BOX) 일치 여부
   if (item.custom_tier_4_barcode && String(item.custom_tier_4_barcode).trim().toLowerCase() === upperCode) {
     return getMinQtyOfTier(4)
   }
-  // 3. 3구간 바코드 일치 여부
+  // 2. 3구간 바코드 일치 여부
   if (item.custom_tier_3_barcode && String(item.custom_tier_3_barcode).trim().toLowerCase() === upperCode) {
     return getMinQtyOfTier(3)
   }
-  // 4. 2구간 바코드(소팩) 일치 여부
+  // 3. 2구간 바코드(소팩) 일치 여부
   if (item.custom_tier_2_barcode && String(item.custom_tier_2_barcode).trim().toLowerCase() === upperCode) {
     return getMinQtyOfTier(2)
   }
 
-  // 5. 상품명이나 코드 접미사(-B, -BOX, -PACK 등)로 팩/박스 단위가 명시된 품목인 경우
+  // 4. 상품명이나 코드 접미사(-B, -BOX, -PACK 등)로 팩/박스 단위가 명시된 품목인 경우
   if (upperCode.endsWith('-b') || upperCode.endsWith('-box')) {
-    const boxQty = getMinQtyOfTier(5)
+    const boxQty = getMinQtyOfTier(4)
     if (boxQty > 1) return boxQty
   }
   if (upperCode.endsWith('-p') || upperCode.endsWith('-pack')) {
@@ -257,6 +281,9 @@ export function recalculateCartTierPrices(cartItems, branchName) {
     if (result && result.price > 0) {
       cItem.price_list_rate = result.price
       cItem.tier_label = result.tierLabel
+      cItem.tier_index = result.tierIndex || 1
+      cItem.tier_code = result.tierCode || getTierCode(result.tierIndex)
+      cItem.tier_label_is_custom = Boolean(result.isCustomLabel)
       cItem.is_smart_box = result.isSmartBox
       cItem.is_grid_bundled = isGridBundled
       cItem.grid_group_qty = isGridBundled ? targetQty : Number(cItem.qty || 1)
@@ -277,22 +304,17 @@ export function learnTierPriceFromCart(cItem, branchName) {
   const targetQty = Number(cItem.grid_group_qty || cItem.qty || 1)
   const raw = cItem.raw_item
 
-  // 현재 수량 targetQty가 어떤 수량구간에 속하는지 판별하여 raw_item 단가 자동 갱신
-  let tierIdx = 1
-  if (targetQty >= Number(resolved.tiers[4].minQty || 0) && Number(resolved.tiers[4].minQty || 0) > 0) {
-    tierIdx = 5
-    raw.custom_tier_5_price = newPrice
-  } else if (targetQty >= Number(resolved.tiers[3].minQty || 0) && Number(resolved.tiers[3].minQty || 0) > 0) {
-    tierIdx = 4
-    raw.custom_tier_4_price = newPrice
-  } else if (targetQty >= Number(resolved.tiers[2].minQty || 0) && Number(resolved.tiers[2].minQty || 0) > 0) {
-    tierIdx = 3
-    raw.custom_tier_3_price = newPrice
-  } else if (targetQty >= Number(resolved.tiers[1].minQty || 0) && Number(resolved.tiers[1].minQty || 0) > 0) {
-    tierIdx = 2
-    raw.custom_tier_2_price = newPrice
+  // 현재 수량 targetQty가 어떤 수량구간에 속하는지 판별하여 raw_item 단가 자동 갱신.
+  // 수량이 큰 구간부터 훑어 가장 먼저 걸리는 구간에 학습시킨다.
+  const tierIdx =
+    [...resolved]
+      .filter(t => Number(t.minQty || 0) > 0)
+      .sort((a, b) => b.minQty - a.minQty)
+      .find(t => targetQty >= Number(t.minQty))?.tierIndex || 1
+
+  if (tierIdx > 1) {
+    raw[`custom_tier_${tierIdx}_price`] = newPrice
   } else {
-    tierIdx = 1
     raw.price_list_rate = newPrice
   }
 
@@ -300,7 +322,7 @@ export function learnTierPriceFromCart(cItem, branchName) {
 }
 
 /**
- * 판매된 장바구니 아이템 중 1~5단계 단가 중 하나라도 0원(미정의)인 품목 필터링
+ * 판매된 장바구니 아이템 중 1~4단계 단가 중 하나라도 0원(미정의)인 품목 필터링
  * 0.0001초 이내 인메모리 연산 (서버 부하 0)
  */
 export function getIncompletePriceItems(cartItems) {
@@ -318,16 +340,15 @@ export function getIncompletePriceItems(cartItems) {
     const p2 = Number(raw.custom_tier_2_price || 0)
     const p3 = Number(raw.custom_tier_3_price || 0)
     const p4 = Number(raw.custom_tier_4_price || 0)
-    const p5 = Number(raw.custom_tier_5_price || 0)
 
-    // 5단계 단가 중 하나라도 0이면 미완성 품목으로 분류
-    if (p1 === 0 || p2 === 0 || p3 === 0 || p4 === 0 || p5 === 0) {
+    // 4단계 단가 중 하나라도 0이면 미완성 품목으로 분류
+    if (p1 === 0 || p2 === 0 || p3 === 0 || p4 === 0) {
       incomplete.push({
         item_code: cItem.item_code,
         item_name: cItem.item_name || cItem.item_code,
         custom_pack_qty: raw.custom_pack_qty || 1,
         raw_item: raw,
-        prices: [p1, p2, p3, p4, p5],
+        prices: [p1, p2, p3, p4],
         grid_group_id: getItemGridGroupId(raw)
       })
     }
@@ -340,53 +361,22 @@ export function getIncompletePriceItems(cartItems) {
  */
 export async function saveBranchItemPrice(branchName, itemCode, newPrices, frappeApi, rawItem = null) {
   if (!itemCode || !frappeApi) return false
-  const targetPriceList = branchName ? `Standard Selling - ${branchName}` : 'Standard Selling'
-
-  // 기존 Item Price 조회
-  let existingName = null
-  try {
-    const res = await frappeApi.get('/api/resource/Item Price', {
-      params: {
-        filters: JSON.stringify([
-          ['item_code', '=', itemCode],
-          ['price_list', 'like', `%${branchName || 'Standard Selling'}%`]
-        ]),
-        fields: JSON.stringify(['name']),
-        limit_page_length: 1
-      }
-    })
-    if (res.data.data && res.data.data.length > 0) {
-      existingName = res.data.data[0].name
-    }
-  } catch (e) {
-    console.warn('Existing Item Price check failed:', e)
-  }
 
   const payload = {
     price_list_rate: Number(newPrices.price_list_rate || 0),
     custom_tier_2_price: Number(newPrices.custom_tier_2_price || 0),
     custom_tier_3_price: Number(newPrices.custom_tier_3_price || 0),
-    custom_tier_4_price: Number(newPrices.custom_tier_4_price || 0),
-    custom_tier_5_price: Number(newPrices.custom_tier_5_price || 0)
+    custom_tier_4_price: Number(newPrices.custom_tier_4_price || 0)
   }
 
   try {
-    if (existingName) {
-      await frappeApi.put(`/api/resource/Item Price/${existingName}`, payload)
-    } else {
-      await frappeApi.post('/api/resource/Item Price', {
-        item_code: itemCode,
-        price_list: targetPriceList,
-        ...payload
-      })
-    }
+    await upsertBranchItemPrice(frappeApi, { branchName, itemCode, payload })
     // 인메모리 raw_item 즉시 갱신 (현장 POS 세션 내 실시간 적용)
     if (rawItem) {
       rawItem.price_list_rate = payload.price_list_rate
       rawItem.custom_tier_2_price = payload.custom_tier_2_price
       rawItem.custom_tier_3_price = payload.custom_tier_3_price
       rawItem.custom_tier_4_price = payload.custom_tier_4_price
-      rawItem.custom_tier_5_price = payload.custom_tier_5_price
     }
     return true
   } catch (err) {

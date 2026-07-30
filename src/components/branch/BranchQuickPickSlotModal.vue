@@ -2,7 +2,7 @@
   <div class="modal-overlay" v-if="isOpen" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>{{ $t('branch.transfer.modal_assign_title', { slot: slotIndex + 1 }, `${slotIndex + 1}번 슬롯 상품 지정`) }}</h3>
+        <h3>{{ $t('branch.transfer.modal_assign_title', { slot: slotIndex + 1 }) }}</h3>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
 

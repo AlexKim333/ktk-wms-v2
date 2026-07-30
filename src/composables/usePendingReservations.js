@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import axios from 'axios'
+import { APPROVAL_STAGE, stageFilter } from '../constants/approvalStage.js'
 
 const frappeApi = axios.create({
   headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -22,7 +23,7 @@ export function usePendingReservations() {
         frappeApi.get('/api/resource/Material Request', {
           params: {
             fields: JSON.stringify(['name']),
-            filters: JSON.stringify([['docstatus', '=', 0], ['custom_approval_stage', '=', '지점장 승인']]),
+            filters: JSON.stringify([['docstatus', '=', 0], stageFilter(APPROVAL_STAGE.MANAGER_APPROVAL)]),
             limit_page_length: 0
           }
         }).catch(() => ({ data: { data: [] } }))

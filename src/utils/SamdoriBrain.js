@@ -16,7 +16,14 @@ function koDigit(token) {
   return map[t] ?? null
 }
 
-/** "백육십", "백 육십", "일백육십" → 160 */
+// 품번은 최대 4자리라 '만' 단위는 다루지 않는다 ('만일', '만약' 같은 일상어 오변환 방지)
+const KO_UNITS = [
+  ['천', 1000],
+  ['백', 100],
+  ['십', 10]
+]
+
+/** "백육십" → 160, "삼천삼백삼십일" → 3331, "칠천일" → 7001 */
 function parseKoreanNumberChunk(text) {
   let t = String(text || '').replace(/\s+/g, '')
   if (!t) return ''
@@ -25,19 +32,14 @@ function parseKoreanNumberChunk(text) {
     return m ? m.join('') : ''
   }
   let n = 0
-  if (t.includes('백')) {
-    const [a, b] = t.split('백')
-    const hundreds = a === '' ? 1 : koDigit(a)
-    if (hundreds == null) return ''
-    n += hundreds * 100
-    t = b || ''
-  }
-  if (t.includes('십')) {
-    const [a, b] = t.split('십')
-    const tens = a === '' ? 1 : koDigit(a)
-    if (tens == null) return ''
-    n += tens * 10
-    t = b || ''
+  for (const [unit, mul] of KO_UNITS) {
+    const idx = t.indexOf(unit)
+    if (idx < 0) continue
+    const head = t.slice(0, idx)
+    const count = head === '' ? 1 : koDigit(head)
+    if (count == null) return ''
+    n += count * mul
+    t = t.slice(idx + 1)
   }
   if (t) {
     const ones = koDigit(t)
@@ -45,6 +47,46 @@ function parseKoreanNumberChunk(text) {
     n += ones
   }
   return n ? String(n) : ''
+}
+
+/**
+ * 자릿수를 하나씩 읽은 발화 → 숫자열 ("삼삼삼일" → "3331", "사삼공팔" → "4308")
+ * 단위어(십/백/천/만)가 섞이면 수사 계산식이므로 여기서 처리하지 않는다.
+ * "이사"(=42?) 같은 일상어 오변환을 막기 위해 3음절 이상만 인정한다.
+ */
+function parseKoreanDigitSequence(text) {
+  const t = String(text || '').replace(/\s+/g, '')
+  if (t.length < 3) return ''
+  if (/[십백천만]/.test(t)) return ''
+  let out = ''
+  for (const ch of t) {
+    const d = koDigit(ch)
+    if (d == null || d > 9) return ''
+    out += String(d)
+  }
+  return out
+}
+
+/**
+ * 발화 속 한글 수사를 아라비아 숫자로 치환 ("삼삼삼일-일 알라르꼰" → "3331-1 알라르꼰").
+ * 품번 신호 판정과 오답 차단 가드가 STT 표기 방식에 좌우되지 않도록 하기 위한 전처리.
+ */
+function spokenNumeralsToDigits(text) {
+  const s = String(text || '')
+  if (!s) return ''
+  const digitized = s.replace(/[영공일이삼사오육칠팔구십백천]{2,}/g, (run) => {
+    const viaUnits = /[십백천]/.test(run) ? parseKoreanNumberChunk(run) : ''
+    if (viaUnits && viaUnits.length >= 2) return viaUnits
+    const viaDigits = parseKoreanDigitSequence(run)
+    if (viaDigits && viaDigits.length >= 2) return viaDigits
+    return run
+  })
+
+  // 하이픈 뒤 한 자리 서브코드 ("3331-일" → "3331-1"). 뒤에 다른 한글이 붙으면 일상어이므로 제외
+  return digitized.replace(/(\d-)([영공일이삼사오육칠팔구])(?![가-힣])/g, (_, head, syllable) => {
+    const d = koDigit(syllable)
+    return d == null ? `${head}${syllable}` : `${head}${d}`
+  })
 }
 
 const COLOR_ALIASES = {
@@ -75,6 +117,9 @@ function resolveColorToken(color, rawSpoken) {
 function normalizeSpokenQuery(rawSpoken, color, validItems = []) {
   let s = String(rawSpoken || '').trim()
   const resolvedColor = resolveColorToken(color, s)
+
+  // 한글로 읽은 코드("삼삼삼일-일", "삼천삼백삼십일")를 숫자로 되돌린 뒤 동일 경로로 처리
+  s = spokenNumeralsToDigits(s)
 
   // 이미 알파벳 정식 코드 (P-160 / P-160-REY-300 / L-OP80 / L-OP80-NEGRO-12)
   if (/^[A-Za-z]+-[A-Za-z0-9]+/.test(s)) {
@@ -168,7 +213,7 @@ function initFlexSearch(validItems) {
 
 /** 창고명만 말한 후속 답변인지 (품목/수량 명령 아님) */
 function looksLikeWarehouseUtterance(text) {
-  const raw = String(text || '').trim()
+  const raw = spokenNumeralsToDigits(String(text || '').trim())
   if (!raw || raw.length > 40) return false
   // 숫자(2자리 이상)가 있거나 품목/담기/수량/질문 신호가 있으면 창고명만 말한 후속이 절대 아님
   if (/\d{2,}/.test(raw)) return false
@@ -187,8 +232,10 @@ function looksLikeWarehouseUtterance(text) {
  * — 세션 메모리로 덮어쓰면 안 되는 경우
  */
 function hasStrongItemIdentity(text) {
-  const raw = String(text || '').trim()
-  if (!raw || looksLikeWarehouseUtterance(raw)) return false
+  const original = String(text || '').trim()
+  if (!original || looksLikeWarehouseUtterance(original)) return false
+  // 한글로 읽은 숫자("삼삼삼일", "삼천삼백삼십일")도 아라비아 숫자와 동일한 품번 신호로 취급
+  const raw = spokenNumeralsToDigits(original)
   if (/[A-Za-z]{1,4}-?\d{2,}/i.test(raw)) return true
   if (/\d{2,}/.test(raw)) return true
   const { prefix } = normalizeSpokenQuery(raw, '')
@@ -201,9 +248,10 @@ function hasStrongItemIdentity(text) {
  */
 function itemMatchesSpokenIdentity(itemCode, spokenText) {
   const item = String(itemCode || '').toUpperCase()
-  const spoken = String(spokenText || '').trim()
-  if (!item || !spoken) return true
-  if (!hasStrongItemIdentity(spoken)) return true
+  const original = String(spokenText || '').trim()
+  if (!item || !original) return true
+  if (!hasStrongItemIdentity(original)) return true
+  const spoken = spokenNumeralsToDigits(original)
 
   const itemCompact = item.replace(/[^A-Z0-9]/g, '')
 
@@ -369,7 +417,7 @@ function matchItemCode(rawSpoken, color, validItems) {
   // 창고명만 들어온 경우 품목 매칭하지 않음
   if (looksLikeWarehouseUtterance(rawSpoken)) return null
 
-  const raw = String(rawSpoken).trim()
+  const raw = spokenNumeralsToDigits(String(rawSpoken).trim())
   // 메모리/정식코드 정확 일치
   const exact =
     validItems.find((i) => i === raw) ||
@@ -435,7 +483,7 @@ function matchItemCode(rawSpoken, color, validItems) {
 function findMatchingCandidates(rawSpoken, color, validItems) {
   if (!validItems || !validItems.length) return []
   if (looksLikeWarehouseUtterance(rawSpoken)) return []
-  const raw = String(rawSpoken || '').trim()
+  const raw = spokenNumeralsToDigits(String(rawSpoken || '').trim())
   const { prefix, color: col } = normalizeSpokenQuery(raw, color, validItems)
   if (!prefix) return []
   const upper = prefix.toUpperCase()
@@ -452,10 +500,14 @@ function findMatchingCandidates(rawSpoken, color, validItems) {
     const colored = hits.filter((i) => String(i).toUpperCase().includes(col))
     if (colored.length) hits = colored
   }
-  // 사용자가 포장수량/서브번호 등 추가 숫자나 단서(예: '200', '-1')를 말했으면 필터링
+  // 사용자가 포장수량/서브번호 등 추가 숫자나 단서(예: '200', '-1')를 말했으면 필터링.
+  // 부분문자열이 아니라 하이픈 구분 세그먼트로 비교해야 '1'이 '3331'에 걸리지 않는다.
   const nums = (raw.match(/\d+/g) || []).filter((n) => n !== upper.replace(/[^0-9]/g, ''))
   if (nums.length && hits.length > 1) {
-    const numFiltered = hits.filter((i) => nums.some((num) => String(i).includes(num)))
+    const numFiltered = hits.filter((i) => {
+      const u = String(i).toUpperCase()
+      return nums.some((num) => new RegExp(`(^|-)${num}(-|$)`).test(u))
+    })
     if (numFiltered.length) hits = numFiltered
   }
   return hits
@@ -689,8 +741,17 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
     return parsed
   }
 
-  // 창고만 말한 후속 등: 강한 품번 신호가 없을 때만 직전 품목 채움
-  if (!parsed.item && parsed.warehouse && lastIntent?.item && !strongSpoken) {
+  // 창고만 말한 후속("알라르꼰")일 때만 직전 품목 채움.
+  // 품번을 말했는데 해석에 실패한 경우까지 채우면 엉뚱한 품목의 재고를 읽어준다.
+  const followUpGuard = String(parsed.spoken_text || spokenGuard || '').trim()
+  const unresolvedCodeSignal = /\d{2,}/.test(spokenNumeralsToDigits(followUpGuard))
+  if (
+    !parsed.item &&
+    parsed.warehouse &&
+    lastIntent?.item &&
+    !strongSpoken &&
+    !unresolvedCodeSignal
+  ) {
     parsed.item = lastIntent.item
   }
   return parsed
@@ -772,7 +833,12 @@ Examples: "알라르꼰", "까르멘", "Alarcón", "Carmen", "본사", "지점" 
 Only ignore this memory if the user clearly names a DIFFERENT explicit item code in the current command.
 
 CRITICAL RULE FOR NUMERIC AND SHORT CODES (e.g., "3331", "3358", "4308", "7001", "160", "P-160"):
-If the user's current command mentions ANY 2+ digit number (e.g. "3331 알라르꼰 창고에 몇 개가 있는가", "3331 재고 알려줘", "4308"), DO NOT copy "${item}" from memory!! You MUST extract that number as the NEW "raw_spoken_item" (e.g. "raw_spoken_item": "3331"). A 4-digit number is an item code, NOT just a quantity!
+If the user's current command mentions ANY 2+ digit number, DO NOT copy "${item}" from memory!! You MUST extract that number as the NEW "raw_spoken_item" (e.g. "raw_spoken_item": "3331"). A 4-digit number is an item code, NOT just a quantity!
+This applies EQUALLY when the digits are spoken in Korean instead of written as numerals. Convert them to Arabic numerals in "raw_spoken_item":
+- Digit-by-digit reading: "삼삼삼일" -> "3331", "사삼공팔" -> "4308", "삼삼오팔" -> "3358"
+- Sino-Korean numbers: "삼천삼백삼십일" -> "3331", "칠천일" -> "7001", "백육십" -> "160"
+- With a sub-code: "삼삼삼일-일" -> "3331-1", "삼삼삼일 다시 일" -> "3331-1"
+Example: "삼삼삼일-일 알라르꼰 창고에 재고가 얼마나 있는가" -> {"intent":"search","raw_spoken_item":"3331-1","warehouse":"ALARCON"} — NEVER "${item}".
 `
   }
 
@@ -871,6 +937,7 @@ Supported intents:
 CRITICAL RULE FOR raw_spoken_item:
 You NO LONGER need to output a valid full item code. Simply extract exactly what the user sounded out phonetically for the item name (e.g. "피 백육십", "P 160", "P-160").
 The frontend will handle searching the actual database.
+  NUMBERS MUST BE ARABIC NUMERALS. If the user reads an item number in Korean, convert it: "삼삼삼일" -> "3331", "삼천삼백삼십일" -> "3331", "사삼공팔" -> "4308", "삼삼삼일-일" -> "3331-1", "백육십" -> "160". Keep a spoken alphabet prefix as spoken ("피 백육십" -> "피 160").
   Also note that users might mix Korean and Spanish (e.g., "P-160 네그로", where '네그로' is Negro). Understand that '네그로' means 'black' or 'NEGRO'.
   CRITICAL: The word "불또" (or "bulto", "불도", "불독", "불꽃") is a Kopanish/Spanish keyword meaning "Box" (박스). 
   When users say "<number>불또" (e.g., "한불또", "1불또", "두불또", "세불또", "un bulto", "이불또"), you must carefully extract the exact number as "qty". 
@@ -980,6 +1047,7 @@ Supported intents:
 CRITICAL RULE FOR raw_spoken_item:
 You NO LONGER need to output a valid full item code. Simply extract exactly what the user sounded out phonetically for the item name (e.g. "피 백육십", "P 160", "P-160").
 The frontend will handle searching the actual database.
+  NUMBERS MUST BE ARABIC NUMERALS. If the user reads an item number in Korean, convert it: "삼삼삼일" -> "3331", "삼천삼백삼십일" -> "3331", "사삼공팔" -> "4308", "삼삼삼일-일" -> "3331-1", "백육십" -> "160". Keep a spoken alphabet prefix as spoken ("피 백육십" -> "피 160").
   Also note that users might mix Korean and Spanish (e.g., "P-160 네그로", where '네그로' is Negro). Understand that '네그로' means 'black' or 'NEGRO'.
   CRITICAL: The word "불또" (or "bulto", "불도", "불독", "불꽃") is a Kopanish/Spanish keyword meaning "Box" (박스). 
   When users say "<number>불또" (e.g., "한불또", "1불또", "두불또", "세불또", "un bulto", "이불또"), you must carefully extract the exact number as "qty". 
@@ -990,6 +1058,7 @@ The frontend will handle searching the actual database.
 
 The user's command is provided as the attached audio file.
 Always include "spoken_text": a short transcript of what was said (for cancel/repeat local handling).
+In "spoken_text", write every number as Arabic numerals, never as Korean numeral words ("삼삼삼일-일 알라르꼰 창고" -> "3331-1 알라르꼰 창고").
 `;
 try {
     const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
@@ -1035,6 +1104,10 @@ export const _testExports = {
   normalizeSpokenQuery,
   findMatchingCandidates,
   buildMultiCandidateQuestion,
-  attachResolvedItem
+  attachResolvedItem,
+  parseKoreanNumberChunk,
+  spokenNumeralsToDigits,
+  hasStrongItemIdentity,
+  itemMatchesSpokenIdentity
 }
 

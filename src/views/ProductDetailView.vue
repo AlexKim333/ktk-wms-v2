@@ -438,8 +438,6 @@ const saveChanges = async () => {
         custom_tier_3_qty: item.value.custom_tier_3_qty,
         custom_tier_4_barcode: item.value.custom_tier_4_barcode,
         custom_tier_4_qty: item.value.custom_tier_4_qty,
-        custom_tier_5_barcode: item.value.custom_tier_5_barcode,
-        custom_tier_5_qty: item.value.custom_tier_5_qty,
         disabled: item.value.disabled
       })
     }

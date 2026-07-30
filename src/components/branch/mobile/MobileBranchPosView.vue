@@ -307,7 +307,7 @@
           </thead>
           <tbody>
             <tr v-for="(v, idx) in activeGroup?.variants" :key="idx">
-              <td class="color-name">{{ v.custom_color || $t('common.default') || 'Default' }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}입)</span></td>
+              <td class="color-name">{{ v.custom_color || $t('common.default') }} <span style="font-size: 0.85em; color: #666;">({{ v.custom_pack_qty || 1 }}{{ $t('pos.pack_unit') }})</span></td>
               <td class="input-green"><input type="text" readonly :value="v.input_box || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
               <td class="input-green"><input type="text" readonly :value="v.input_each || 0" @click="openNumpadForGridItem(v)" style="width: 100%; text-align: center; border: none; background: transparent; font-size: 16px; font-weight: bold;" /></td>
               <td class="calc-total-qty">{{ ((v.input_box || 0) * (v.custom_pack_qty || 1)) + (v.input_each || 0) }} {{ $t('branch.transfer.lbl_unit_ea') }}</td>
@@ -350,6 +350,7 @@ import QuickClerkAddModal from '../../QuickClerkAddModal.vue'
 import { useItemSearch, rankItemNameMatches } from '../../../composables/useItemSearch.js'
 import { usePagedList } from '../../../composables/usePagedList.js'
 import frappeApi from '../../../api/frappe.js'
+import { APPROVAL_STAGE, stageFilter } from '../../../constants/approvalStage.js'
 
 // 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
 const adminApi = frappeApi
@@ -982,7 +983,7 @@ const fetchPendingDrafts = async () => {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
-          ['custom_approval_stage', '=', 'Clerk Request'],
+          stageFilter(APPROVAL_STAGE.CLERK_REQUEST),
           ['custom_branch', '=', authStore.user?.branch_name || '']
         ]),
         fields: JSON.stringify(['name', 'custom_branch_requester', 'owner']),
@@ -1053,7 +1054,7 @@ const updateDraft = async (isFinalApproval) => {
     const payload = {
       set_from_warehouse: '[MAIN] ALARCON - K',
       set_warehouse: authStore.user?.branch_name,
-      custom_approval_stage: isFinalApproval ? 'Manager Approval' : 'Clerk Request',
+      custom_approval_stage: isFinalApproval ? APPROVAL_STAGE.MANAGER_APPROVAL : APPROVAL_STAGE.CLERK_REQUEST,
       items: currentTab.value.cartItems.map(item => ({
         item_code: item.item_code,
         qty: item.totalQty,
@@ -1189,7 +1190,7 @@ const submitTransfer = async () => {
         owner: currentTab.value.selectedCreator || authStore.user?.email, // 작성자 강제 지정
         custom_branch: authStore.user?.branch_name,
         custom_orderer: currentTab.value.selectedRequester,
-        custom_approval_stage: isClerk.value ? 'Clerk Request' : 'Manager Approval',
+        custom_approval_stage: isClerk.value ? APPROVAL_STAGE.CLERK_REQUEST : APPROVAL_STAGE.MANAGER_APPROVAL,
         items: currentTab.value.cartItems.map(item => ({
           item_code: item.item_code,
           qty: item.totalQty,
