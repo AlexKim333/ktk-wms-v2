@@ -56,42 +56,16 @@ function resolveAccessLevel(roles) {
   return 'Representative'
 }
 
-async function fetchRoles(frappeApi, loggedUser) {
-  const collected = []
-
+async function fetchRolesFallback(frappeApi, loggedUser, initialRoles) {
+  const collected = [...initialRoles]
   const pushRoles = (raw) => {
     collected.push(...normalizeRoles(raw))
   }
 
-  // 모든 소스를 병합 (하나라도 System Manager가 있으면 Admin 판정 가능)
-  // 1) 세션 기준 get_roles
-  try {
-    const res = await frappeApi.get('/api/method/frappe.get_roles')
-    pushRoles(res.data?.message)
-  } catch (e) {
-    console.warn('get_roles (session) failed', e?.response?.status || e)
-  }
-
-  // 2) POST + uid
-  try {
-    const res = await frappeApi.post('/api/method/frappe.get_roles', { uid: loggedUser })
-    pushRoles(res.data?.message)
-  } catch (e) {
-    console.warn('get_roles (post uid) failed', e?.response?.status || e)
-  }
-
-  // 3) User 문서 roles 자식 테이블 (전체 필드)
-  try {
-    const userRes = await frappeApi.get(`/api/resource/User/${encodeURIComponent(loggedUser)}`)
-    const userData = userRes.data?.data
-    if (userData?.roles) pushRoles(userData.roles)
-  } catch (e) {
-    console.warn('User roles child-table read failed', e?.response?.status || e)
-  }
-
-  // 4) Has Role 리스트
-  try {
-    const res = await frappeApi.get('/api/method/frappe.client.get_list', {
+  // 백업 1: POST + uid 및 Has Role 리스트 조회 (병렬 실행)
+  const [postRes, hasRoleRes] = await Promise.allSettled([
+    frappeApi.post('/api/method/frappe.get_roles', { uid: loggedUser }),
+    frappeApi.get('/api/method/frappe.client.get_list', {
       params: {
         doctype: 'Has Role',
         filters: JSON.stringify([['parent', '=', loggedUser]]),
@@ -100,13 +74,15 @@ async function fetchRoles(frappeApi, loggedUser) {
         limit_page_length: 200
       }
     })
-    const rows = res.data?.message || []
+  ])
+
+  if (postRes.status === 'fulfilled') pushRoles(postRes.value.data?.message)
+  if (hasRoleRes.status === 'fulfilled') {
+    const rows = hasRoleRes.value.data?.message || []
     pushRoles(rows.map((r) => r.role))
-  } catch (e) {
-    console.warn('Has Role list failed', e?.response?.status || e)
   }
 
-  // 5) 로그인 직후 쿠키 지연 대비: Admin 역할이 없으면 한 번 더 세션 roles 재시도
+  // 백업 2: 여전히 Admin 권한이 감지되지 않은 경우에만 쿠키 전파 지연(250ms) 후 1회 재시도
   if (!hasAdminRole(collected)) {
     await new Promise((r) => setTimeout(r, 250))
     try {
@@ -135,7 +111,27 @@ export async function resolveLoginProfile(frappeApi, username) {
     }
     memberName = loggedUser
 
-    roles = await fetchRoles(frappeApi, loggedUser)
+    // 1단계 (고속 병렬 조회): 핵심 API 2개(세션 get_roles + User 문서 1회)를 동시에 실행
+    const [rolesRes, userRes] = await Promise.allSettled([
+      frappeApi.get('/api/method/frappe.get_roles'),
+      frappeApi.get(`/api/resource/User/${encodeURIComponent(loggedUser)}`)
+    ])
+
+    const collectedRoles = []
+    if (rolesRes.status === 'fulfilled') {
+      collectedRoles.push(...normalizeRoles(rolesRes.value.data?.message))
+    }
+
+    if (userRes.status === 'fulfilled') {
+      const userData = userRes.value.data?.data
+      if (userData) {
+        branch = userData.location || null
+        fullName = userData.full_name || null
+        if (userData.roles) collectedRoles.push(...normalizeRoles(userData.roles))
+      }
+    }
+
+    roles = uniqueRoles(collectedRoles)
     accessLevel = resolveAccessLevel(roles)
 
     // Frappe 기본 Administrator 계정은 항상 Admin
@@ -144,20 +140,15 @@ export async function resolveLoginProfile(frappeApi, username) {
       if (!hasAdminRole(roles)) roles = uniqueRoles([...roles, 'System Manager'])
     }
 
-    // Branch / display name — best effort
-    try {
-      const userRes = await frappeApi.get(`/api/resource/User/${encodeURIComponent(loggedUser)}`, {
-        params: {
-          fields: JSON.stringify(['name', 'location', 'full_name'])
-        }
-      })
-      branch = userRes.data?.data?.location || null
-      fullName = userRes.data?.data?.full_name || null
-    } catch (userErr) {
-      console.warn('User resource read failed (session still valid)', userErr?.response?.status || userErr)
+    // 2단계 (Smart Fallback): 1단계에서 권한이 비어있거나 누락 의심 시에만 백업 로직 실행
+    const needsRoleFallback = roles.length === 0 || (/^administrator$/i.test(loggedUser) && !hasAdminRole(roles))
+    if (needsRoleFallback) {
+      roles = await fetchRolesFallback(frappeApi, loggedUser, roles)
+      accessLevel = resolveAccessLevel(roles)
     }
 
-    if (!branch) {
+    // 지점 정보가 없고 Admin도 아닌 경우에만 User Permission 조회 (백업)
+    if (!branch && accessLevel !== 'Admin') {
       try {
         const permRes = await frappeApi.get('/api/resource/User Permission', {
           params: {
