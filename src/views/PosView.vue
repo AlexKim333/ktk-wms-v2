@@ -1147,7 +1147,12 @@ const getAvailableStock = (itemCode, targetWarehouse = null) => {
   const itemBins = binDataMap.value[itemCode];
   if (itemBins) {
     if (warehouse) {
-      totalActual = Number(itemBins[warehouse]) || 0;
+      const targetUpper = String(warehouse).toUpperCase();
+      for (const wh in itemBins) {
+        if (wh.toUpperCase() === targetUpper || wh.toUpperCase().includes(targetUpper) || targetUpper.includes(wh.toUpperCase())) {
+          totalActual += Number(itemBins[wh]) || 0;
+        }
+      }
     } else {
       for (const wh in itemBins) {
         totalActual += Number(itemBins[wh]) || 0;
@@ -1157,7 +1162,12 @@ const getAvailableStock = (itemCode, targetWarehouse = null) => {
 
   let totalReserved = 0;
   if (warehouse) {
-    totalReserved = pendingReservedMap.value[warehouse]?.[itemCode] || 0;
+    const targetUpper = String(warehouse).toUpperCase();
+    for (const wh in pendingReservedMap.value) {
+      if (wh.toUpperCase() === targetUpper || wh.toUpperCase().includes(targetUpper) || targetUpper.includes(wh.toUpperCase())) {
+        totalReserved += pendingReservedMap.value[wh][itemCode] || 0;
+      }
+    }
   } else {
     for (const wh in pendingReservedMap.value) {
       totalReserved += pendingReservedMap.value[wh][itemCode] || 0;
@@ -2967,6 +2977,13 @@ const handleSamdoriIntent = async (intentObj) => {
         speakVoiceItemUnresolved(item, candidates)
         return
       }
+      if (prod.disabled === 1 || prod.disabled === true) {
+        const msg = locale.value === 'es'
+          ? `🚫 "${item}" está descontinuado (disabled=1). No se puede agregar.`
+          : `🚫 "${item}" 품목은 단종(disabled=1) 처리되어 장바구니에 담을 수 없습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
       if (!layout?.addFromVoice) {
         const msg =
           locale.value === 'es'
@@ -3111,6 +3128,13 @@ const handleSamdoriIntent = async (intentObj) => {
 
     const { product: prod, candidates } = findProductForVoice(item)
     if (prod) {
+      if (prod.disabled === 1 || prod.disabled === true) {
+        const msg = locale.value === 'es'
+          ? `🚫 "${item}" está descontinuado (disabled=1). No se puede agregar.`
+          : `🚫 "${item}" 품목은 단종(disabled=1) 처리되어 장바구니에 담을 수 없습니다.`
+        if (samdori.value) samdori.value.speak(msg)
+        return
+      }
       addSingleToCartInternal(prod)
       const inputQty = qty ? Number(qty) : 1
       if (inputQty > 1) {
@@ -3137,14 +3161,22 @@ const handleSamdoriIntent = async (intentObj) => {
     }
 
     if (prods.length > 0) {
+      const isDisabled = prods.some((p) => p.disabled === 1 || p.disabled === true)
+      const disabledTag = isDisabled
+        ? (locale.value === 'es' ? '[Descontinuado] ' : '[단종 품목] ')
+        : ''
       const packQty = prods[0].custom_pack_qty || 1
-      const boxesAt = (warehouse) => {
-        if (!warehouse) return 0
+      const stockBriefAt = (warehouse) => {
         let total = 0
         prods.forEach((prod) => {
           total += getAvailableStock(prod.name, warehouse)
         })
-        return Math.floor(total / (packQty || 1))
+        const b = Math.floor(total / (packQty || 1))
+        const r = total % (packQty || 1)
+        if (locale.value === 'es') {
+          return `${b} cajas${r > 0 ? ` (+${r} pcs)` : ''}`
+        }
+        return `${b}박스${r > 0 ? ` (잔여 ${r}개)` : ''}`
       }
       const speakStock = (text) => {
         if (samdori.value) samdori.value.speak(text)
@@ -3179,18 +3211,22 @@ const handleSamdoriIntent = async (intentObj) => {
       }
       const resolvedWh = resolveVoiceWarehouse(warehouseHint)
 
-      // ----- 관리자: 8개 창고 나열 안 함. 미지정/미인식이면 창고만 재질문 -----
+      // ----- 관리자: 미지정 시 알라르꼰 본사 + 전체 재고 합계 폴백 안내 -----
       if (authStore.isAdmin) {
         if (!resolvedWh) {
-          askWarehouseAgain()
+          pendingVoiceStockItem.value = null
+          speakStock(
+            locale.value === 'es'
+              ? `${disabledTag}${stockItem}: Alarcón ${stockBriefAt(MAIN_WAREHOUSE)}, total general ${stockBriefAt(null)}.`
+              : `${disabledTag}${stockItem}: 알라르꼰 본사 ${stockBriefAt(MAIN_WAREHOUSE)}, 전체 합계 ${stockBriefAt(null)} 입니다.`
+          )
           return
         }
         pendingVoiceStockItem.value = null
-        const boxes = boxesAt(resolvedWh)
         speakStock(
           locale.value === 'es'
-            ? `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes} cajas.`
-            : `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes}박스 입니다.`
+            ? `${disabledTag}${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${stockBriefAt(resolvedWh)}.`
+            : `${disabledTag}${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${stockBriefAt(resolvedWh)} 입니다.`
         )
         return
       }
@@ -3201,52 +3237,44 @@ const handleSamdoriIntent = async (intentObj) => {
 
       if (warehouseHint) {
         if (resolvedWh && allowed.has(resolvedWh)) {
-          const boxes = boxesAt(resolvedWh)
           speakStock(
             locale.value === 'es'
-              ? `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes} cajas.`
-              : `${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${boxes}박스 입니다.`
+              ? `${disabledTag}${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${stockBriefAt(resolvedWh)}.`
+              : `${disabledTag}${stockItem}: ${voiceWarehouseLabel(resolvedWh)} ${stockBriefAt(resolvedWh)} 입니다.`
           )
           return
         }
         // 타 지점/미인식 → 권한 안내 후 지점+본사 요약
         if (resolvedWh && !allowed.has(resolvedWh)) {
-          const branchBoxes = boxesAt(branchWh)
-          const mainBoxes = boxesAt(MAIN_WAREHOUSE)
           speakStock(
             locale.value === 'es'
-              ? `Solo puede consultar su sucursal y Alarcón. ${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
-              : `지점 계정은 본인 지점과 알라르꼰만 조회할 수 있습니다. ${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+              ? `Solo puede consultar su sucursal y Alarcón. ${disabledTag}${stockItem}: sucursal ${stockBriefAt(branchWh)}, Alarcón ${stockBriefAt(MAIN_WAREHOUSE)}.`
+              : `지점 계정은 본인 지점과 알라르꼰만 조회할 수 있습니다. ${disabledTag}${stockItem}: 지점 ${stockBriefAt(branchWh)}, 알라르꼰 ${stockBriefAt(MAIN_WAREHOUSE)} 입니다.`
           )
           return
         }
         if (!resolvedWh) {
-          // 지점장은 재질문보다 기본 요약이 더 매끄러움
-          const branchBoxes = boxesAt(branchWh)
-          const mainBoxes = boxesAt(MAIN_WAREHOUSE)
           speakStock(
             locale.value === 'es'
-              ? `No entendí el almacén. ${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
-              : `창고명을 이해하지 못해 기본으로 안내합니다. ${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+              ? `No entendí el almacén. ${disabledTag}${stockItem}: sucursal ${stockBriefAt(branchWh)}, Alarcón ${stockBriefAt(MAIN_WAREHOUSE)}.`
+              : `창고명을 이해하지 못해 기본으로 안내합니다. ${disabledTag}${stockItem}: 지점 ${stockBriefAt(branchWh)}, 알라르꼰 ${stockBriefAt(MAIN_WAREHOUSE)} 입니다.`
           )
           return
         }
       }
 
-      // 창고 미지정: 지점 + 알라르꼰 박스만
-      const mainBoxes = boxesAt(MAIN_WAREHOUSE)
+      // 창고 미지정: 지점 + 알라르꼰 박스+잔여개수 동시 안내
       if (branchWh && branchWh !== MAIN_WAREHOUSE) {
-        const branchBoxes = boxesAt(branchWh)
         speakStock(
           locale.value === 'es'
-            ? `${stockItem}: sucursal ${branchBoxes} cajas, Alarcón ${mainBoxes} cajas.`
-            : `${stockItem}: 지점 ${branchBoxes}박스, 알라르꼰 ${mainBoxes}박스 입니다.`
+            ? `${disabledTag}${stockItem}: sucursal ${stockBriefAt(branchWh)}, Alarcón ${stockBriefAt(MAIN_WAREHOUSE)}.`
+            : `${disabledTag}${stockItem}: 지점 ${stockBriefAt(branchWh)}, 알라르꼰 ${stockBriefAt(MAIN_WAREHOUSE)} 입니다.`
         )
       } else {
         speakStock(
           locale.value === 'es'
-            ? `${stockItem}: Alarcón ${mainBoxes} cajas.`
-            : `${stockItem}: 알라르꼰 ${mainBoxes}박스 입니다.`
+            ? `${disabledTag}${stockItem}: Alarcón ${stockBriefAt(MAIN_WAREHOUSE)}.`
+            : `${disabledTag}${stockItem}: 알라르꼰 ${stockBriefAt(MAIN_WAREHOUSE)} 입니다.`
         )
       }
     } else {
