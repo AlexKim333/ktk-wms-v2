@@ -761,14 +761,22 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     intent.raw_spoken_item ||
     ''
   const looksWh = !!intent.warehouse || !!intent._warehouseHint || looksLikeWhHint(whHint)
+  
+  // 발화에 2자리 이상 숫자나 품번 신호가 있거나, AI가 직전과 다른 품목을 추출했다면 신규 품목 질의로 판단하여 덮어쓰기 금지
+  const hasNewItemSignal =
+    /\d{2,}|[A-Za-z]{1,3}-?\d+/i.test(userUtterance) ||
+    (!!intent.item && intent.item !== followItem)
+
   const pendingShortWh =
+    !hasNewItemSignal &&
     !!props.pendingStockItem &&
     !!whHint &&
     String(whHint).length <= 40 &&
-    !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+)/i.test(String(whHint))
+    !/(불또|박스|담아|넣어|재고|검색|[A-Za-z]{1,3}-?\d+|\d{2,})/i.test(String(whHint))
 
-  // 창고 재질문 대기 + 명백한 창고명 → 역질문보다 창고 후속 우선
+  // 창고 재질문 대기 + 명백한 창고명 → 역질문보다 창고 후속 우선 (단, 신규 품번 신호가 없을 때만)
   const forceWarehouseFollow =
+    !hasNewItemSignal &&
     !!followItem &&
     (looksWh || pendingShortWh) &&
     (!!props.pendingStockItem || lastIntent.value?.intent === 'search') &&
@@ -784,7 +792,8 @@ const handleParsedIntent = (intent, cmdRawText, options = {}) => {
     intent.raw_spoken_item = followItem
     intent.question = undefined
   } else if (
-    // 일반 창고 후속 (역질문이 아닐 때만)
+    // 일반 창고 후속 (역질문이 아니고, 신규 품번 신호 없을 때만)
+    !hasNewItemSignal &&
     intent.intent !== 'ask_clarification' &&
     followItem &&
     (lastIntent.value?.intent === 'search' || !!props.pendingStockItem) &&
