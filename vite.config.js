@@ -13,8 +13,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,vue,txt,woff2}']
       },
+      // 개발 중 SW 캐시가 옛 번들을 붙잡으면 index.html만 뜨고 #app이 비는 흰 화면이 된다.
+      // 프로덕션 빌드에서만 PWA를 켠다.
       devOptions: {
-        enabled: true
+        enabled: false
       },
       manifest: {
         name: 'KTK WMS',

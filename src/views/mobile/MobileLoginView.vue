@@ -129,14 +129,22 @@ const handleLogin = async () => {
       } else {
         localStorage.removeItem('lady_polo_usr')
       }
-        // 세션 쿠키 기준으로 역할/지점 해석 (API 토큰 사용 금지)
-        authStore.user = await resolveLoginProfile(frappeApi, username.value)
+        // 세션 쿠키 기준으로 역할/지점 해석 (API 토큰 사용 금지).
+        // 프로필 해석이 길어져도 로그인 버튼이 영구 잠기지 않도록 상한을 둔다.
+        const profilePromise = resolveLoginProfile(frappeApi, username.value)
+        const profile = await Promise.race([
+          profilePromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('resolveLoginProfile timed out after 8000ms')), 8000)
+          )
+        ])
+        authStore.user = profile
         authStore.sessionChecked = true
         try {
           const { useBranchSessionStore } = await import('../../stores/branchSession.js')
           useBranchSessionStore().initForUser()
         } catch (e) {}
-        router.push('/pos')
+        await router.replace('/pos')
     }
   } catch (error) {
     console.error('Login Error:', error)

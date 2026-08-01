@@ -10,6 +10,21 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Vue 마운트 전/실패 시 완전 흰 화면만 보이지 않도록 표시 -->
+    <style>
+      #app:empty {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #051421 0%, #0a2d29 100%);
+        color: #94a3b8;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      #app:empty::before {
+        content: 'Loading KTK WMS…';
+      }
+    </style>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
