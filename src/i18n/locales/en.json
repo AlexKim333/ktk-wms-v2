@@ -60,7 +60,8 @@
     "branch_reservation": "Transfer Reservations",
     "branch_inventory": "Check Inventory",
     "admin_group": "Main Admin Only (Admin)",
-    "staff_management": "Family Management"
+    "staff_management": "Family Management",
+    "logging_out": "Logging out…"
   },
   "common": {
     "csv_import": "CSV Import",
@@ -571,7 +572,8 @@
     "msg_err_permission": "No permission to read data. Check the account role in Frappe. (The session stays active.)",
     "msg_err_clerk_mode": "Clerk mode can only use sales hold (Branch POS).\\nUnlock with the manager PIN.",
     "msg_cfm_cancel_edit": "Cancel the reservation/document edit in progress?\\n(Confirming clears the cart and discards the edit.)",
-    "msg_err_queue": "Could not load the queued documents."
+    "msg_err_queue": "Could not load the queued documents.",
+    "msg_logout_server_failed": "Failed to end the server session.\nYou are logged out locally, but on a shared device please close the browser completely."
   },
   "status": {
     "pending": "Pending",

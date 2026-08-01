@@ -60,7 +60,8 @@
     "branch_reservation": "재고 이동 예약 현황",
     "branch_inventory": "재고 조회",
     "admin_group": "메인 관리자 전용 (Admin)",
-    "staff_management": "가족 관리"
+    "staff_management": "가족 관리",
+    "logging_out": "로그아웃 중…"
   },
   "common": {
     "csv_import": "CSV 파일 가져오기",
@@ -571,7 +572,8 @@
     "msg_err_permission": "데이터 조회 권한이 없습니다. 계정 역할(Frappe)을 확인하세요. (세션은 유지됩니다)",
     "msg_err_clerk_mode": "점원 모드에서는 판매 보류(지점 POS)만 사용할 수 있습니다.\\n지점장 PIN으로 잠금해제 하세요.",
     "msg_cfm_cancel_edit": "진행 중인 예약/전표 수정을 취소하시겠습니까?\\n(확인 시 장바구니가 비워지고 수정이 취소됩니다.)",
-    "msg_err_queue": "대기열 문서를 불러오지 못했습니다."
+    "msg_err_queue": "대기열 문서를 불러오지 못했습니다.",
+    "msg_logout_server_failed": "서버 세션 종료 요청이 실패했습니다.\n로컬 로그아웃은 완료되었지만, 공용 기기라면 브라우저를 완전히 닫아 주세요."
   },
   "status": {
     "pending": "대기 중",

@@ -60,7 +60,8 @@
     "branch_reservation": "Reservas de Transferencia",
     "branch_inventory": "Consultar Inventario",
     "admin_group": "Solo Administrador Central (Admin)",
-    "staff_management": "Gestión de Familia"
+    "staff_management": "Gestión de Familia",
+    "logging_out": "Cerrando sesión…"
   },
   "common": {
     "csv_import": "Importar CSV",
@@ -571,7 +572,8 @@
     "msg_err_permission": "Sin permiso para consultar datos. Revise el rol de la cuenta en Frappe. (La sesión se mantiene.)",
     "msg_err_clerk_mode": "En modo empleado solo se puede usar el apartado de venta (POS de sucursal).\\nDesbloquee con el PIN del gerente.",
     "msg_cfm_cancel_edit": "¿Cancelar la edición del apartado/comprobante en curso?\\n(Al confirmar se vacía el carrito y se descarta la edición.)",
-    "msg_err_queue": "No se pudieron cargar los documentos en cola."
+    "msg_err_queue": "No se pudieron cargar los documentos en cola.",
+    "msg_logout_server_failed": "No se pudo cerrar la sesión en el servidor.\nSe cerró la sesión localmente, pero en un dispositivo compartido cierre el navegador por completo."
   },
   "status": {
     "pending": "Pendiente",

@@ -124,7 +124,9 @@
         <template v-else-if="branchSession.isManagerMode">
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
         </template>
-        <button type="button" class="nav-item nav-logout-btn" @click="handleLogout">🚪 {{ $t('nav.logout') }}</button>
+        <button type="button" class="nav-item nav-logout-btn" :disabled="isLoggingOut" @click="handleLogout">
+          {{ isLoggingOut ? '⏳ ' + $t('nav.logging_out') : '🚪 ' + $t('nav.logout') }}
+        </button>
       </nav>
     </aside>
 
@@ -861,9 +863,20 @@ const frappeApi = axios.create({
 
 const canEditMasterFields = computed(() => true)
 
+const isLoggingOut = ref(false)
+
 const handleLogout = async () => {
-  await authStore.logout()
-  await router.replace('/login')
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  try {
+    const serverCleared = await authStore.logout()
+    if (!serverCleared) {
+      alert(t('pos.msg_logout_server_failed'))
+    }
+    await router.replace('/login')
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 
 const searchQuery = ref('')
@@ -3457,7 +3470,8 @@ const handleSamdoriIntent = async (intentObj) => {
 .sub-item { padding: 10px 15px 10px 30px; font-size: 13px; color: #94a3b8; }
 .sub-item:hover, .sub-item.active { background: #1e293b; color: #38bdf8; }
 .nav-logout-btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; margin-top: 8px; color: #fca5a5 !important; }
-.nav-logout-btn:hover { background: #450a0a !important; color: white !important; }
+.nav-logout-btn:hover:not(:disabled) { background: #450a0a !important; color: white !important; }
+.nav-logout-btn:disabled { color: #94a3b8 !important; cursor: progress; }
 .nav-btn-inline { background: transparent; border: none; font-family: inherit; cursor: pointer; width: 100%; text-align: left; }
 
 .main-content-zone { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; height: 100vh; }

@@ -16,7 +16,9 @@
         style="background:#f59e0b; color:#111; margin-right:6px;"
         @click.stop.prevent="branchSession.openPinModal()"
       >PIN</button>
-      <button type="button" class="m-logout" @click.stop.prevent="handleLogout">{{ $t('nav.logout') }}</button>
+      <button type="button" class="m-logout" :disabled="isLoggingOut" @click.stop.prevent="handleLogout">
+        {{ isLoggingOut ? $t('nav.logging_out') : $t('nav.logout') }}
+      </button>
     </header>
 
     <!-- 메인 렌더링 영역 -->
@@ -106,6 +108,7 @@
 
 <script setup>
 import { ref, nextTick, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useBranchSessionStore } from '../../stores/branchSession.js'
@@ -126,6 +129,7 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh-items', 'edit-reservation'])
 
+const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const branchSession = useBranchSessionStore()
@@ -205,10 +209,21 @@ defineExpose({
   }
 })
 
+const isLoggingOut = ref(false)
+
 const handleLogout = async () => {
-  // 반드시 세션 정리 먼저 — replace 후 언마운트되면 logout이 실행되지 않을 수 있음
-  await authStore.logout()
-  await router.replace('/login')
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  try {
+    // 반드시 세션 정리 먼저 — replace 후 언마운트되면 logout이 실행되지 않을 수 있음
+    const serverCleared = await authStore.logout()
+    if (!serverCleared) {
+      alert(t('pos.msg_logout_server_failed'))
+    }
+    await router.replace('/login')
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 </script>
 

@@ -60,7 +60,8 @@
     "branch_reservation": "调拨预约状态",
     "branch_inventory": "库存查询",
     "admin_group": "总部管理员专用 (Admin)",
-    "staff_management": "家族管理"
+    "staff_management": "家族管理",
+    "logging_out": "正在退出…"
   },
   "common": {
     "csv_import": "导入 CSV",
@@ -571,7 +572,8 @@
     "msg_err_permission": "没有查询数据的权限。请检查 Frappe 的账号角色。（会话仍然保持）",
     "msg_err_clerk_mode": "店员模式只能使用销售挂单（门店 POS）。\\n请用店长 PIN 解锁。",
     "msg_cfm_cancel_edit": "要取消正在进行的预约／单据修改吗？\\n（确认后购物车将被清空，修改被放弃。）",
-    "msg_err_queue": "无法加载队列中的单据。"
+    "msg_err_queue": "无法加载队列中的单据。",
+    "msg_logout_server_failed": "服务器会话结束请求失败。\n本地已退出登录，但如为共用设备请完全关闭浏览器。"
   },
   "status": {
     "pending": "待处理",
