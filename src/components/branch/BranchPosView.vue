@@ -447,6 +447,7 @@
   </div>
     <!-- 1. 단일 버튼 상품 지정 독립 모달 -->
     <BranchQuickPickSlotModal
+      :current-branch="currentBranch"
       :is-open="isSlotEditModalOpen"
       :slot-index="editSlotIndex"
       :is-grid-mode="false"
@@ -459,6 +460,7 @@
     />
     <!-- 2. 그리드 묶음 상품 지정 독립 모달 -->
     <BranchQuickPickSlotModal
+      :current-branch="currentBranch"
       :is-open="isGridSlotEditModalOpen"
       :slot-index="editGridSlotIndex"
       :is-grid-mode="true"
@@ -471,6 +473,7 @@
     />
     <!-- 3. 그리드 묶음 상품 수량 선택 독립 모달 -->
     <BranchGridSelectionModal
+      :current-branch="currentBranch"
       :is-open="isGridModalOpen"
       :active-group="activeGroup"
       :bin-data="binData"
@@ -635,7 +638,7 @@ const getStock = (itemCode, warehouse) => {
 }
 const getFormattedStockFor = (item) => {
   if (!item) return ''
-  const availableQty = getStock(item.name, '[MAIN] ALARCON - K')
+  const availableQty = getStock(item.name, currentBranch.value)
   const packQty = Number(item.custom_pack_qty || 1)
   const boxes = Math.floor(availableQty / packQty)
   const eaches = availableQty % packQty

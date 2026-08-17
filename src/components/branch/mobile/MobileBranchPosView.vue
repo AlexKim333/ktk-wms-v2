@@ -218,7 +218,7 @@
               <td class="product-cell" style="border: 1px solid #e2e8f0; padding: 8px; font-size: 12.5px; text-align: left !important; vertical-align: middle; word-break: break-word;">
                 <div class="p-name" style="font-weight: bold; font-size: 13px; color: #0f172a; white-space: normal;">
                   {{ cartItem.item_name }}
-                  <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">{{ $t('branch.transfer.lbl_available', { box: Math.floor(getStock(cartItem.item_code, '[MAIN] ALARCON - K') / (cartItem.pack_qty || 1)) }) }}</span>
+                  <span style="color: #ef4444; margin-left: 6px; font-size: 11px;">{{ $t('branch.transfer.lbl_available', { box: Math.floor(getStock(cartItem.item_code, authStore.user?.branch_name) / (cartItem.pack_qty || 1)) }) }}</span>
                 </div>
                 <div class="p-stock-info" style="font-size: 11px; color: #64748b; margin-top: 4px;">
                   {{ cartItem.custom_color || '-' }} | {{ $t('branch.transfer.lbl_pack_info', { qty: cartItem.pack_qty }) }}
@@ -578,9 +578,6 @@ const submitGridSelection = () => {
       _addQty: (boxQty * packQty) + eachQty
     }
     
-    const mainQty = getStock(tempItem.name, '[MAIN] ALARCON - K')
-    const mainBoxQty = Math.floor(mainQty / packQty)
-    
     const existing = currentTab.value.cartItems.find(c => c.item_code === tempItem.name)
     if (existing) {
       existing.boxQty += boxQty
@@ -698,7 +695,7 @@ const getStock = (itemCode, warehouse) => {
 
 const getFormattedStockFor = (item) => {
   if (!item) return '';
-  const availableQty = getStock(item.name, '[MAIN] ALARCON - K');
+  const availableQty = getStock(item.name, authStore.user?.branch_name);
   const packQty = item.custom_pack_qty || 1;
   const boxes = Math.floor(availableQty / packQty);
   const eaches = availableQty % packQty;
@@ -779,14 +776,7 @@ const openNumpadForNewItem = (item) => {
     return
   }
   
-  const mainQty = getStock(item.name, '[MAIN] ALARCON - K')
   const packQty = item.custom_pack_qty || item.pack_qty || 1
-  const mainBoxQty = Math.floor(mainQty / packQty)
-  
-  if (mainBoxQty < 1) {
-    alert(t('branch.inventory.msg_no_main_stock'))
-    return
-  }
   
   numpadItem.value = item
   numpadAvailableStock.value = getFormattedStockFor(item)
@@ -917,14 +907,6 @@ const addToCart = (item) => {
 }
 
 const updateTotalQty = (cartItem) => {
-  const mainQty = getStock(cartItem.item_code, '[MAIN] ALARCON - K')
-  const mainBoxQty = Math.floor(mainQty / (cartItem.pack_qty || 1))
-  
-  if (cartItem.boxQty > mainBoxQty) {
-    alert(`Cannot exceed main stock (${mainBoxQty} Boxes).`)
-    cartItem.boxQty = mainBoxQty
-  }
-  
   cartItem.totalQty = (cartItem.boxQty * cartItem.pack_qty) + cartItem.eachQty
 }
 

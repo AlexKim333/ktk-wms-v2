@@ -58,11 +58,14 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '../../stores/auth'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
+  currentBranch: { type: String, default: '' },
   activeGroup: { type: Object, default: () => null },
   binData: { type: Object, default: () => ({}) },
   pendingReserved: { type: Object, default: () => ({}) }
@@ -86,7 +89,8 @@ const getStock = (itemCode, warehouse) => {
 
 const getFormattedStockFor = (item) => {
   if (!item) return ''
-  const availableQty = getStock(item.name, '[MAIN] ALARCON - K')
+  const wh = props.currentBranch || authStore.user?.branch_name
+  const availableQty = getStock(item.name, wh)
   const packQty = Number(item.custom_pack_qty || 1)
   const boxes = Math.floor(availableQty / packQty)
   const eaches = availableQty % packQty

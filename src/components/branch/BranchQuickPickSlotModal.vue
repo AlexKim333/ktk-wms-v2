@@ -69,13 +69,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '../../stores/auth'
 import { useItemSearch } from '../../composables/useItemSearch'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
+  currentBranch: { type: String, default: '' },
   slotIndex: { type: Number, default: 0 },
   isGridMode: { type: Boolean, default: false },
   items: { type: Array, default: () => [] },
@@ -123,7 +126,8 @@ const getStock = (itemCode, warehouse) => {
 
 const getFormattedStockFor = (item) => {
   if (!item) return ''
-  const availableQty = getStock(item.name, '[MAIN] ALARCON - K')
+  const wh = props.currentBranch || authStore.user?.branch_name
+  const availableQty = getStock(item.name, wh)
   const packQty = Number(item.custom_pack_qty || 1)
   const boxes = Math.floor(availableQty / packQty)
   const eaches = availableQty % packQty
