@@ -66,6 +66,7 @@
               <option value="">{{ $t('staff.sel_role') }}</option>
               <option value="System Manager">{{ $t('staff.role_sys') }}</option>
               <option value="Branch Manager">{{ $t('staff.role_branch') }}</option>
+              <option value="POS Operator">POS Operator (매니저)</option>
               <option value="Branch Clerk">{{ $t('staff.role_clerk') }}</option>
             </select>
           </div>
@@ -167,6 +168,7 @@ const fetchStaff = async () => {
         const roles = roleMap[u.name] || []
         if (roles.includes('System Manager')) bestRole = 'System Manager'
         else if (roles.includes('Branch Manager')) bestRole = 'Branch Manager'
+        else if (roles.includes('POS Operator')) bestRole = 'POS Operator'
         else if (roles.includes('Branch Clerk')) bestRole = 'Branch Clerk'
         else if (u.name === 'Administrator') bestRole = 'System Manager'
         
@@ -230,11 +232,6 @@ const saveUser = async () => {
     
     // 3. Add the newly selected role
     finalRoles.push(form.value.role);
-    
-    // 4. Automatically append necessary backend roles for Branch staff
-    if (form.value.role === 'Branch Manager' || form.value.role === 'Branch Clerk') {
-      finalRoles.push('Stock Manager', 'Sales Manager');
-    }
     
     // Remove duplicates
     finalRoles = [...new Set(finalRoles)];

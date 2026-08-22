@@ -761,7 +761,7 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
 // Handles NLP via Gemini API for the Samdori Voice Assistant
 
 const GEMINI_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) || '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent';
 
 /**
  * Sends transcribed text to Gemini API to extract intent.

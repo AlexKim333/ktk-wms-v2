@@ -92,7 +92,6 @@ const submitForm = async () => {
       new_password: `Ktk@${cleanPhone}`,
       location: currentBranch, // 지점 등록
       roles: [
-        { role: 'Branch Manager' },
         { role: 'Branch Clerk' }
       ]
     }
