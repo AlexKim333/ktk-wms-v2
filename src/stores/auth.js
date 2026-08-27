@@ -124,10 +124,6 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.user = null
         this.loggingOut = false
-        try {
-          const { useBranchSessionStore } = await import('./branchSession.js')
-          useBranchSessionStore().reset()
-        } catch (e) {}
       }
       return serverCleared
     }
@@ -157,11 +153,5 @@ async function runRestore(store, epoch) {
   // 그 사이 로그아웃했다면 여기서 user 를 채우면 로그아웃이 되돌려진다.
   if (epoch !== store.authEpoch) return false
   store.user = profile
-  try {
-    const { useBranchSessionStore } = await import('./branchSession.js')
-    useBranchSessionStore().initForUser()
-  } catch (e) {
-    console.warn('branchSession init failed', e)
-  }
   return !!store.user
 }

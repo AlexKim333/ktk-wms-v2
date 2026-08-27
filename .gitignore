@@ -22,6 +22,7 @@ dev-dist
 .vscode/*
 !.vscode/extensions.json
 .idea
+.cursor/
 .DS_Store
 *.suo
 *.ntvs*
@@ -29,20 +30,23 @@ dev-dist
 *.sln
 *.sw?
 
-# Local scratch / one-off scripts
-scripts/scratch/
-
-# 로컬 일회성 스크립트/덤프 (git 추적 제외, 파일은 로컬에 유지)
-/*.py
-/*.cjs
-/*.mjs
+# Local scratch / one-off scripts & dumps (git 추적 제외, 파일은 로컬에 유지)
+scripts/
+scripts/**/*
+*.py
+*.cjs
+*.mjs
+*.ps1
+*.txt
+*.csv
 /check_fields.js
 /refactor_brain.js
-/*.txt
-/*.csv
-/*.ps1
+/setup_custom_fields.js
 /AI_WORK_SUMMARY.md
 /HANDOVER_SESSION.md
 /NEXT_MODEL_HANDOVER.md
 
 master_keys.env
+.vercel
+.env*
+!*.env.example

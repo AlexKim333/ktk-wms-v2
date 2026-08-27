@@ -28,40 +28,7 @@
             </option>
           </select>
         </div>
-        <!-- 점원 모드: 보류 전용 / 관리자 모드: PIN 잠금해제 -->
-        <div v-if="branchSession.needsPinGate" class="selector-item" style="background: rgba(14, 165, 233, 0.15); padding: 4px 10px; border-radius: 8px; border: 1px solid #0284c7;">
-          <template v-if="branchSession.isClerkMode">
-            <label style="color: #38bdf8; font-weight: 700;">{{ $t('branch.pos.mode_clerk_label') }}</label>
-            <select
-              :value="branchSession.selectedClerkName"
-              class="pos-select"
-              style="background: #0f172a; color: #38bdf8; font-weight: 700; border-color: #38bdf8;"
-              @change="branchSession.setSelectedClerk($event.target.value)"
-            >
-              <option v-for="clerk in branchSession.activeClerks" :key="clerk.id" :value="clerk.name">
-                {{ $t('branch.pos.opt_clerk_item', { name: clerk.name }) }}
-              </option>
-            </select>
-            <button
-              type="button"
-              class="btn-manager-unlock"
-              style="margin-top: 6px; width: 100%; background: #f59e0b; color: #111; border: none; border-radius: 6px; padding: 6px 8px; font-weight: 800; cursor: pointer; font-size: 12px;"
-              @click="branchSession.openPinModal()"
-            >
-              {{ $t('branch.pos.btn_pin_unlock') }}
-            </button>
-          </template>
-          <template v-else>
-            <label style="color: #86efac; font-weight: 700;">{{ $t('branch.pos.mode_manager_label') }}</label>
-            <button
-              type="button"
-              style="margin-top: 6px; width: 100%; background: #334155; color: #e2e8f0; border: none; border-radius: 6px; padding: 6px 8px; font-weight: 700; cursor: pointer; font-size: 12px;"
-              @click="branchSession.lockToClerk()"
-            >
-              {{ $t('branch.pos.btn_lock_clerk') }}
-            </button>
-          </template>
-        </div>
+        
       </div>
       <!-- POS 개시/마감 뱃지 -->
       <div class="pos-shift-badge">
@@ -305,16 +272,20 @@
               <tbody>
                 <tr v-for="(cItem, idx) in cartItems" :key="cItem.item_code">
                   <td class="cell-item">
-                    <div class="c-item-code">{{ cItem.item_code }}</div>
-                    <div class="c-item-stock">{{ getStock(cItem.item_code, currentBranch) }}</div>
-                  </td>
-                  <td class="cell-qty">
-                    <div class="qty-control">
-                      <button @click.stop="decreaseQty(idx)">-</button>
-                      <input type="number" v-model.number="cItem.qty" min="1" class="qty-input" @change="applyTierPricingToCartItem(cItem)" />
-                      <button @click.stop="increaseQty(idx)">+</button>
-                    </div>
-                  </td>
+                    <div class="c-item-code">
+                        {{ cItem.item_code }}
+                        <span v-if="cItem.delivery_warehouse === MAIN_WAREHOUSE" style="background:#fde047; color:#854d0e; padding:2px 4px; border-radius:4px; font-size:10px;">창고배송</span>
+                        <span v-else style="background:#dcfce7; color:#166534; padding:2px 4px; border-radius:4px; font-size:10px;">현장수령</span>
+                      </div>
+                      <div class="c-item-stock">{{ getStock(cItem.item_code, currentBranch) }}</div>
+                    </td>
+                    <td class="cell-qty">
+                      <div class="qty-control">
+                        <button @click.stop="decreaseQty(idx)">-</button>
+                        <input type="number" :value="cItem.qty" min="1" class="qty-input" @change="handleQtyChange(idx, Number($event.target.value))" />
+                        <button @click.stop="increaseQty(idx)">+</button>
+                      </div>
+                    </td>
                   <td class="cell-price">
                     <div class="cart-price-edit-box">
                       <span class="curr">$</span>
@@ -375,7 +346,7 @@
             </div>
             <!-- 최종 결제: 지점장만 / 점원은 보류만 -->
             <button 
-              v-if="branchSession.isManagerMode"
+              v-if="authStore.isBranchManager"
               class="btn-checkout" 
               :disabled="cartItems.length === 0 || !isShiftOpen"
               @click="openPaymentModal"
@@ -386,10 +357,10 @@
               v-else
               class="btn-checkout" 
               style="background: #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); font-size: 15px;"
-              :disabled="cartItems.length === 0 || !isShiftOpen || !branchSession.selectedClerkName"
+              :disabled="cartItems.length === 0 || !isShiftOpen || !authStore.user?.full_name"
               @click="holdCurrentOrder"
             >
-              {{ $t('branch.pos.btn_hold_to_counter', { name: branchSession.selectedClerkName || $t('branch.pos.clerk_unselected') }) }}
+              {{ $t('branch.pos.btn_hold_to_counter', { name: authStore.user?.full_name || $t('branch.pos.clerk_unselected') }) }}
             </button>
           </div>
         </div>
@@ -415,12 +386,12 @@
               </div>
               <div class="h-actions">
                 <button
-                  v-if="branchSession.isManagerMode"
+                  v-if="authStore.isBranchManager"
                   class="btn-recall"
                   @click="recallOrder(idx)"
                 >📂 {{ $t('branch.pos.btn_recall', '불러오기') }}</button>
                 <button
-                  v-if="branchSession.isManagerMode"
+                  v-if="authStore.isBranchManager"
                   class="btn-delete-held"
                   @click="deleteHeldOrder(idx)"
                 >🗑️</button>
@@ -490,14 +461,12 @@
       @close="showIncompletePriceModal = false"
       @completed="showIncompletePriceModal = false"
     />
-    <!-- PIN 잠금해제 모달 (프론트 전용, Frappe 무관) -->
-    <PinUnlockModal variant="branch" @unlock="branchSession.unlockWithPin()" />
+    
 </template>
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../../stores/auth.js'
-import { useBranchSessionStore } from '../../stores/branchSession.js'
 import frappeApi from '../../api/frappe.js'
 import { useItemSearch, rankItemNameMatches } from '../../composables/useItemSearch'
 import { resolveItemTiers, calculateTierPrice, getBarcodeScanQty, recalculateCartTierPrices, getIncompletePriceItems, learnTierPriceFromCart, getTierCode } from '../../composables/usePriceTierEngine.js'
@@ -506,11 +475,9 @@ import BranchIncompletePriceModal from './BranchIncompletePriceModal.vue'
 import BranchQuickPickSlotModal from './BranchQuickPickSlotModal.vue'
 import BranchGridSelectionModal from './BranchGridSelectionModal.vue'
 import BranchPaymentModal from './BranchPaymentModal.vue'
-import PinUnlockModal from '../PinUnlockModal.vue'
 import { formatPrice } from '../../utils/formatPrice.js'
 const { t } = useI18n()
 const authStore = useAuthStore()
-const branchSession = useBranchSessionStore()
 const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
 const props = defineProps({
   rawItems: { type: Array, default: () => [] },
@@ -530,6 +497,7 @@ watch(() => props.rawItems, (newVal) => {
 // STATE
 // ----------------------------------------------------
 const currentBranch = computed(() => authStore.user?.branch_name || '[MAIN] ALARCON - K')
+const MAIN_WAREHOUSE = '[MAIN] ALARCON - K'
 const selectedCustomer = ref('Public')
 const selectedSalesPerson = ref('')
 const isShiftOpen = ref(true)
@@ -550,15 +518,13 @@ const incompleteSoldItems = ref([])
 const cashAmount = ref(0)
 const cardAmount = ref(0)
 const transferAmount = ref(0)
-// 점원/지점장 모드는 branchSession store (localStorage PIN·명단)
+// 점원/지점장 구분은 Frappe Role (authStore.isBranchClerk / isBranchManager)
 // ----------------------------------------------------
 // STORAGE KEYS FOR HELD ORDERS
 // ----------------------------------------------------
 const HELD_ORDERS_KEY = computed(() => `ktk_wms_branch_pos_held_${currentBranch.value || 'DEFAULT'}`)
 onMounted(() => {
-  if (branchSession.needsPinGate && !branchSession.selectedClerkName) {
-    branchSession.initForUser()
-  }
+  
   // 기본 영업사원 자동 매핑
   if (authStore.user?.full_name || authStore.user?.member_name) {
     const spMatch = props.salesPersonList.find(
@@ -827,41 +793,99 @@ const handleCartPriceChange = (cItem) => {
   learnTierPriceFromCart(cItem, authStore.user?.branch_name)
 }
 const addToCart = (item, qtyToAdd = 1) => {
-  if (!isShiftOpen.value) {
-    alert(t('branch.pos.msg_err_shift_closed'))
-    return
-  }
-  const existing = cartItems.value.find(c => c.item_code === item.name)
-  if (existing) {
-    existing.qty += qtyToAdd
-    applyTierPricingToCartItem(existing)
-  } else {
-    const newItem = {
-      item_code: item.name,
-      item_name: item.item_name || item.name,
-      custom_pack_qty: item.custom_pack_qty || 1,
-      price_list_rate: Number(item.price_list_rate || 0),
-      qty: qtyToAdd,
-      uom: item.stock_uom || 'Nos',
-      raw_item: item
+    if (!isShiftOpen.value) {
+      alert(t('branch.pos.msg_err_shift_closed'))
+      return
     }
-    applyTierPricingToCartItem(newItem)
-    cartItems.value.push(newItem)
+
+    let targetQty = qtyToAdd
+    let branchQty = getStock(item.name, currentBranch.value)
+
+    if (branchQty > 0 && targetQty > branchQty) {
+      const shortage = targetQty - branchQty
+      const msg = `현재 매장 재고(${branchQty}개)가 ${shortage}개 부족합니다.\n부족분 ${shortage}개를 알라르꼰 창고 배송으로 자동 분할할까요?`
+      if (window.confirm(msg)) {
+        _internalAddToCart(item, branchQty, currentBranch.value)
+        _internalAddToCart(item, shortage, MAIN_WAREHOUSE)
+        return
+      } else {
+        targetQty = branchQty
+      }
+    } else if (branchQty <= 0 && targetQty > 0) {
+      const msg = `현재 매장 재고가 없습니다.\n전체 ${targetQty}개를 알라르꼰 창고 배송으로 주문할까요?`
+      if (window.confirm(msg)) {
+        _internalAddToCart(item, targetQty, MAIN_WAREHOUSE)
+        return
+      } else {
+        return
+      }
+    }
+
+    _internalAddToCart(item, targetQty, currentBranch.value)
   }
-}
-const increaseQty = (idx) => {
-  cartItems.value[idx].qty++
-  applyTierPricingToCartItem(cartItems.value[idx])
-}
-const decreaseQty = (idx) => {
-  if (cartItems.value[idx].qty > 1) {
-    cartItems.value[idx].qty--
-    applyTierPricingToCartItem(cartItems.value[idx])
-  } else {
-    removeItem(idx)
+
+  const _internalAddToCart = (item, qtyToAdd, targetWarehouse) => {
+    const existing = cartItems.value.find(c => c.item_code === item.name && c.delivery_warehouse === targetWarehouse)
+    if (existing) {
+      existing.qty += qtyToAdd
+      applyTierPricingToCartItem(existing)
+    } else {
+      const newItem = {
+        item_code: item.name,
+        item_name: item.item_name || item.name,
+        custom_pack_qty: item.custom_pack_qty || 1,
+        price_list_rate: Number(item.price_list_rate || 0),
+        qty: qtyToAdd,
+        uom: item.stock_uom || 'Nos',
+        raw_item: item,
+        delivery_warehouse: targetWarehouse
+      }
+      applyTierPricingToCartItem(newItem)
+      cartItems.value.push(newItem)
+    }
   }
-}
-const removeItem = (idx) => {
+
+  const handleQtyChange = (idx, newQty) => {
+    const cItem = cartItems.value[idx]
+    if (cItem.delivery_warehouse === MAIN_WAREHOUSE) {
+      cItem.qty = newQty
+      applyTierPricingToCartItem(cItem)
+      return
+    }
+
+    const branchQty = getStock(cItem.item_code, currentBranch.value)
+    if (newQty > branchQty) {
+      const shortage = newQty - branchQty
+      const msg = `현재 매장 재고(${branchQty}개)가 ${shortage}개 부족합니다.\n부족분 ${shortage}개를 알라르꼰 창고 배송으로 분할할까요?`
+      if (window.confirm(msg)) {
+        cItem.qty = branchQty > 0 ? branchQty : 0
+        if (cItem.qty === 0) {
+          cartItems.value.splice(idx, 1)
+        } else {
+          applyTierPricingToCartItem(cItem)
+        }
+        _internalAddToCart(cItem.raw_item, shortage, MAIN_WAREHOUSE)
+      } else {
+        cItem.qty = branchQty > 0 ? branchQty : 1
+        applyTierPricingToCartItem(cItem)
+      }
+    } else {
+      cItem.qty = newQty
+      applyTierPricingToCartItem(cItem)
+    }
+  }
+
+  const increaseQty = (idx) => {
+    handleQtyChange(idx, cartItems.value[idx].qty + 1)
+  }
+  const decreaseQty = (idx) => {
+    if (cartItems.value[idx].qty > 1) {
+      handleQtyChange(idx, cartItems.value[idx].qty - 1)
+    } else {
+      removeItem(idx)
+    }
+  }
+  const removeItem = (idx) => {
   cartItems.value.splice(idx, 1)
   applyTierPricingToCartItem()
 }
@@ -890,7 +914,7 @@ const grandTotal = computed(() => {
 // ----------------------------------------------------
 const holdCurrentOrder = () => {
   if (cartItems.value.length === 0) return
-  if (branchSession.isClerkMode && !branchSession.selectedClerkName) {
+  if (authStore.isBranchClerk && !authStore.user?.full_name) {
     alert(t('branch.pos.msg_err_no_clerk'))
     return
   }
@@ -898,9 +922,9 @@ const holdCurrentOrder = () => {
     timeStr: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
     customer: selectedCustomer.value,
     salesPerson: selectedSalesPerson.value,
-    clerkName: branchSession.isClerkMode
-      ? branchSession.selectedClerkName
-      : (branchSession.selectedClerkName || ''),
+    clerkName: authStore.isBranchClerk
+      ? authStore.user?.full_name
+      : (authStore.user?.full_name || ''),
     items: JSON.parse(JSON.stringify(cartItems.value)),
     totalQty: cartItems.value.reduce((a, b) => a + b.qty, 0),
     grandTotal: grandTotal.value
@@ -909,14 +933,14 @@ const holdCurrentOrder = () => {
   saveHeldOrdersToStorage()
   cartItems.value = []
   discountPercentage.value = 0
-  if (branchSession.isClerkMode && branchSession.selectedClerkName) {
-    alert(t('branch.pos.msg_held_saved', { name: branchSession.selectedClerkName }))
+  if (authStore.isBranchClerk && authStore.user?.full_name) {
+    alert(t('branch.pos.msg_held_saved', { name: authStore.user?.full_name }))
   } else {
     alert(t('branch.pos.msg_held_moved'))
   }
 }
 const recallOrder = (idx) => {
-  if (!branchSession.isManagerMode) {
+  if (!authStore.isBranchManager) {
     alert(t('branch.pos.msg_err_recall_locked'))
     return
   }
@@ -934,7 +958,7 @@ const recallOrder = (idx) => {
   rightTab.value = 'cart'
 }
 const deleteHeldOrder = (idx) => {
-  if (!branchSession.isManagerMode) return
+  if (!authStore.isBranchManager) return
   if (confirm(t('branch.pos.msg_cfm_delete_held'))) {
     heldOrders.value.splice(idx, 1)
     saveHeldOrdersToStorage()
@@ -951,7 +975,7 @@ const saveHeldOrdersToStorage = () => {
 // PAYMENT MODAL & INVOICE SUBMISSION
 // ----------------------------------------------------
 const openPaymentModal = () => {
-  if (!branchSession.isManagerMode) {
+  if (!authStore.isBranchManager) {
     alert(t('branch.pos.msg_err_pay_locked'))
     return
   }
@@ -967,46 +991,101 @@ const changeAmount = computed(() => {
   return totalPaid.value - grandTotal.value
 })
 const submitPosInvoice = async () => {
-  if (!branchSession.isManagerMode) {
-    alert(t('branch.pos.msg_err_submit_manager_only'))
-    return
-  }
-  if (totalPaid.value < grandTotal.value) {
-    alert(t('branch.pos.msg_err_underpaid'))
-    return
-  }
-  if (isSubmitting.value) return
-  isSubmitting.value = true
-  try {
-    const payload = {
-      doctype: 'Sales Invoice',
-      docstatus: 1, // 즉시 서브밑 완료
-      company: 'kecon',
-      is_pos: 1,
-      update_stock: 1,
-      customer: selectedCustomer.value || 'Public',
-      set_warehouse: currentBranch.value,
-      sales_partner: selectedSalesPerson.value || '',
-      discount_amount: discountAmount.value,
-      items: cartItems.value.map(item => ({
-        item_code: item.item_code,
-        qty: item.qty,
-        rate: item.price_list_rate,
-        warehouse: currentBranch.value,
-        uom: item.uom || 'Nos'
-      })),
-      payments: [
-        { mode_of_payment: 'Cash', amount: cashAmount.value },
-        { mode_of_payment: 'Credit Card', amount: cardAmount.value },
-        { mode_of_payment: 'Wire Transfer', amount: transferAmount.value }
-      ].filter(p => Number(p.amount) > 0)
+    if (!authStore.isBranchManager) {
+      alert(t('branch.pos.msg_err_submit_manager_only'))
+      return
     }
-    const res = await frappeApi.post('/api/resource/Sales Invoice', payload)
-    const newInvoiceName = res.data?.data?.name || 'POS-INV-LOCAL'
-    alert(t('branch.pos.msg_pay_success', { name: newInvoiceName, change: formatPrice(changeAmount.value) }))
-    
-    // 미완성 단가 품목 감지 (0.0001초 인메모리 필터링)
-    const incomplete = getIncompletePriceItems(cartItems.value)
+    if (totalPaid.value < grandTotal.value) {
+      alert(t('branch.pos.msg_err_underpaid'))
+      return
+    }
+    if (isSubmitting.value) return
+    isSubmitting.value = true
+    try {
+      const hasWarehouseItems = cartItems.value.some(item => item.delivery_warehouse === MAIN_WAREHOUSE);
+      
+      const payments = [
+          { mode_of_payment: 'Cash', amount: cashAmount.value },
+          { mode_of_payment: 'Credit Card', amount: cardAmount.value },
+          { mode_of_payment: 'Wire Transfer', amount: transferAmount.value }
+      ].filter(p => Number(p.amount) > 0);
+
+      let successName = '';
+
+      if (!hasWarehouseItems) {
+        // 100% 현장 수령
+        const payload = {
+          doctype: 'Sales Invoice',
+          docstatus: 1, 
+          company: 'kecon',
+          is_pos: 1,
+          update_stock: 1,
+          customer: selectedCustomer.value || 'Public',
+          sales_partner: selectedSalesPerson.value || '',
+          discount_amount: discountAmount.value,
+          items: cartItems.value.map(item => ({
+            item_code: item.item_code,
+            qty: item.qty,
+            rate: item.price_list_rate,
+            warehouse: item.delivery_warehouse || currentBranch.value,
+            uom: item.uom || 'Nos'
+          })),
+          payments: payments
+        }
+        const res = await frappeApi.post('/api/resource/Sales Invoice', payload)
+        successName = res.data?.data?.name || 'POS-INV-LOCAL'
+      } else {
+        // 창고 배송 포함 (Sales Order)
+        const soPayload = {
+          doctype: 'Sales Order',
+          docstatus: 1,
+          company: 'kecon',
+          customer: selectedCustomer.value || 'Public',
+          order_type: 'Sales',
+          delivery_date: new Date().toISOString().split('T')[0],
+          discount_amount: discountAmount.value,
+          custom_managing_branch: currentBranch.value,
+          custom_salesperson: authStore.user?.full_name || '',
+          items: cartItems.value.map(item => ({
+            item_code: item.item_code,
+            qty: item.qty,
+            rate: item.price_list_rate,
+            delivery_warehouse: item.delivery_warehouse || currentBranch.value,
+            uom: item.uom || 'Nos'
+          }))
+        };
+        const soRes = await frappeApi.post('/api/resource/Sales Order', soPayload);
+        const soName = soRes.data?.data?.name;
+        successName = soName;
+
+        const localItems = soRes.data.data.items.filter(i => i.delivery_warehouse !== MAIN_WAREHOUSE);
+        if (localItems.length > 0) {
+           const dnPayload = {
+              doctype: 'Delivery Note',
+              docstatus: 1,
+              company: 'kecon',
+              customer: selectedCustomer.value || 'Public',
+              items: localItems.map(i => ({
+                 item_code: i.item_code,
+                 qty: i.qty,
+                 rate: i.rate,
+                 warehouse: i.delivery_warehouse,
+                 against_sales_order: soName,
+                 so_detail: i.name
+              }))
+           };
+           try {
+             await frappeApi.post('/api/resource/Delivery Note', dnPayload);
+           } catch (dnErr) {
+             console.error("현장 수령품 자동 출고 실패:", dnErr);
+             alert("Sales Order 생성완료. 단, 현장 수령품 자동 출고에 실패했습니다.");
+           }
+        }
+      }
+
+      alert(t('branch.pos.msg_pay_success', { name: successName, change: formatPrice(changeAmount.value) }))
+      
+      const incomplete = getIncompletePriceItems(cartItems.value)
     
     // 장바구니 및 모달 초기화
     cartItems.value = []
@@ -1559,7 +1638,7 @@ const toggleShift = () => {
   border: none;
   cursor: pointer;
 }
-/* 결제 / PIN 모달 스타일은 BranchPaymentModal.vue, PinUnlockModal.vue 로 이동 */
+/* 결제 모달 스타일은 BranchPaymentModal.vue 로 이동 */
 .tier-applied-badge {
   display: inline-block;
   margin-top: 4px;

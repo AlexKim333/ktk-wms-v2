@@ -128,103 +128,7 @@
         </div>
       </div>
 
-      <!-- Tab 2: Clerk/Staff Management (점원 관리) -->
-      <div v-else-if="activeTab === 'clerk-config'" class="tab-panel">
-        <div class="panel-header">
-          <h2 class="panel-title">🧑‍💼 {{ t('clerk_config_title', '지점 점원 명단 관리 (주문 보류 및 모바일 POS용)') }}</h2>
-          <p class="panel-desc">
-            {{ t('clerk_config_desc', '비밀번호나 백엔드 계정 생성 없이, 지점에서 모바일로 주문 보류를 입력할 점원(Staff) 리스트를 등록·관리합니다.') }}
-          </p>
-        </div>
-
-        <!-- 관리자 카운터 전환 PIN 번호 변경 바 -->
-        <div class="pin-config-box" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; background: #fffbeb; padding: 16px; border-radius: 10px; border: 1px solid #fde68a;">
-          <span style="font-size: 18px;">🔐</span>
-          <div style="flex: 1;">
-            <label style="display: block; font-weight: 700; font-size: 14px; color: #92400e;">관리자 카운터 PIN 코드 (4자리)</label>
-            <span style="font-size: 12px; color: #b45309;">점원 모드에서 카운터 결제 모드로 복귀할 때 요구되는 보안 비밀번호입니다. (초기 설정값: 1111)</span>
-          </div>
-          <input 
-            type="text" 
-            v-model="managerPinCode" 
-            maxlength="4"
-            placeholder="1111" 
-            style="width: 90px; text-align: center; padding: 10px 14px; border: 1px solid #d97706; border-radius: 8px; font-size: 16px; font-weight: 800; letter-spacing: 2px;"
-          />
-          <button 
-            @click="handleSavePin" 
-            style="padding: 10px 20px; background: #d97706; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;"
-          >
-            PIN 저장
-          </button>
-        </div>
-
-        <!-- 점원 추가 바 -->
-        <div class="clerk-add-box" style="display: flex; gap: 8px; margin-bottom: 20px; background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0;">
-          <input 
-            type="text" 
-            v-model="newClerkName" 
-            placeholder="새 점원 이름 입력 (예: 김판매, Alex, 점원 1)..." 
-            class="clerk-input"
-            style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;"
-            @keyup.enter="handleAddClerk"
-          />
-          <button 
-            @click="handleAddClerk" 
-            style="padding: 10px 20px; background: #0284c7; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;"
-          >
-            + 점원 추가
-          </button>
-        </div>
-
-        <!-- 점원 목록 리스트 -->
-        <div class="clerk-list-wrapper" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-              <tr>
-                <th style="padding: 12px 16px; text-align: left; font-size: 13px; color: #475569;">점원명 / 닉네임</th>
-                <th style="padding: 12px 16px; text-align: center; width: 140px; font-size: 13px; color: #475569;">상태</th>
-                <th style="padding: 12px 16px; text-align: right; width: 100px; font-size: 13px; color: #475569;">삭제</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="clerkList.length === 0">
-                <td colspan="3" style="padding: 24px; text-align: center; color: #94a3b8; font-size: 14px;">
-                  등록된 점원이 없습니다. 상단에서 이름을 입력해 추가하세요.
-                </td>
-              </tr>
-              <tr 
-                v-for="(clerk, idx) in clerkList" 
-                :key="clerk.id" 
-                style="border-bottom: 1px solid #f1f5f9;"
-              >
-                <td style="padding: 12px 16px; font-weight: 700; color: #1e293b; font-size: 15px;">
-                  🧑‍💼 {{ clerk.name }}
-                </td>
-                <td style="padding: 12px 16px; text-align: center;">
-                  <span 
-                    @click="toggleClerkActive(idx)" 
-                    style="cursor: pointer; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block;"
-                    :style="clerk.active ? 'background: #dcfce7; color: #15803d;' : 'background: #f1f5f9; color: #64748b;'"
-                  >
-                    {{ clerk.active ? '🟢 활성' : '⚪ 비활성' }}
-                  </span>
-                </td>
-                <td style="padding: 12px 16px; text-align: right;">
-                  <button 
-                    @click="handleRemoveClerk(idx)" 
-                    style="background: #fee2e2; color: #ef4444; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer;"
-                  >
-                    삭제
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Tab 3: POS Config -->
+      <!-- Tab: POS Config -->
       <div v-else-if="activeTab === 'pos-config'" class="tab-panel">
         <div class="panel-header">
           <h2 class="panel-title">🏢 {{ t('pos_config_title', 'POS 환경 설정') }}</h2>
@@ -284,8 +188,7 @@ const toastMessage = ref('')
 
 const tabs = [
   { id: 'price-tiers', label: '💰 가격정책', icon: '💰' },
-  { id: 'clerk-config', label: '🧑‍💼 점원 관리 (Clerks)', icon: '🧑‍💼' },
-  { id: 'pos-config', label: '🏢 POS 환경 설정 (POS Config)', icon: '🏢' },
+          { id: 'pos-config', label: '🏢 POS 환경 설정 (POS Config)', icon: '🏢' },
   { id: 'receipt-config', label: '🖨️ 영수증 및 프린터 설정 (Receipt & Printer)', icon: '🖨️' },
   { id: 'shift-config', label: '🔐 권한 및 마감 설정 (Permissions)', icon: '🔐' }
 ]
@@ -300,99 +203,6 @@ const defaultTiers = [
 
 const priceTiers = ref([...defaultTiers.map(t => ({ ...t }))])
 
-// Clerk Management State
-const newClerkName = ref('')
-const clerkList = ref([])
-
-const getClerkStorageKey = () => `ktk_wms_branch_clerks_${props.currentBranch || 'DEFAULT'}`
-
-const loadSavedClerks = () => {
-  try {
-    const saved = localStorage.getItem(getClerkStorageKey())
-    if (saved) {
-      clerkList.value = JSON.parse(saved)
-    } else {
-      clerkList.value = [
-        { id: 'c1', name: '김판매', active: true },
-        { id: 'c2', name: '이점원', active: true }
-      ]
-      localStorage.setItem(getClerkStorageKey(), JSON.stringify(clerkList.value))
-    }
-  } catch (err) {
-    console.error('Failed to load clerk list:', err)
-  }
-}
-
-const handleAddClerk = () => {
-  const name = newClerkName.value.trim()
-  if (!name) return
-  if (clerkList.value.some(c => c.name === name)) {
-    toastMessage.value = '이미 등록된 점원 이름입니다.'
-    setTimeout(() => { toastMessage.value = '' }, 2500)
-    return
-  }
-  clerkList.value.push({
-    id: 'clerk_' + Date.now(),
-    name,
-    active: true
-  })
-  newClerkName.value = ''
-  saveClerksToStorage()
-  showToast('점원이 추가되었습니다.')
-}
-
-const toggleClerkActive = (idx) => {
-  clerkList.value[idx].active = !clerkList.value[idx].active
-  saveClerksToStorage()
-}
-
-const handleRemoveClerk = (idx) => {
-  clerkList.value.splice(idx, 1)
-  saveClerksToStorage()
-  showToast('점원이 삭제되었습니다.')
-}
-
-const saveClerksToStorage = () => {
-  try {
-    localStorage.setItem(getClerkStorageKey(), JSON.stringify(clerkList.value))
-  } catch (err) {
-    console.error('Failed to save clerks:', err)
-  }
-}
-
-// Manager PIN Code State (default: 1111)
-const managerPinCode = ref('1111')
-const getPinStorageKey = () => `ktk_wms_branch_pin_${props.currentBranch || 'DEFAULT'}`
-
-const loadSavedPin = () => {
-  try {
-    const savedPin = localStorage.getItem(getPinStorageKey())
-    if (savedPin) {
-      managerPinCode.value = savedPin
-    } else {
-      managerPinCode.value = '1111'
-      localStorage.setItem(getPinStorageKey(), '1111')
-    }
-  } catch (err) {
-    console.error('Failed to load PIN:', err)
-  }
-}
-
-const handleSavePin = () => {
-  const pin = managerPinCode.value.trim()
-  if (!/^\d{4}$/.test(pin)) {
-    toastMessage.value = 'PIN 번호는 4자리 숫자로 입력해주세요.'
-    setTimeout(() => { toastMessage.value = '' }, 2500)
-    return
-  }
-  try {
-    localStorage.setItem(getPinStorageKey(), pin)
-    showToast('관리자 PIN 번호가 변경되었습니다.')
-  } catch (err) {
-    console.error('Failed to save PIN:', err)
-  }
-}
-
 // Simple internationalization fallback helper
 const t = (key, defaultKo) => {
   return defaultKo
@@ -400,8 +210,6 @@ const t = (key, defaultKo) => {
 
 onMounted(() => {
   loadSavedTiers()
-  loadSavedClerks()
-  loadSavedPin()
 })
 
 const getStorageKey = () => props.currentBranch ? `branch_price_tiers_${props.currentBranch}_v1` : 'branch_price_tiers_v1'

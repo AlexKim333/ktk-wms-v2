@@ -218,7 +218,7 @@
           <div class="field-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
               <label style="font-size: 11px; color: #64748b; font-weight: bold;">🙋‍♂️ {{ $t('branch.transfer.lbl_clerk') }}:</label>
-              <button v-if="!isClerk" @click="isQuickClerkModalOpen = true" style="background: none; border: none; color: #3b82f6; font-size: 11px; font-weight: bold; cursor: pointer;">+ {{ $t('branch.transfer.btn_add_clerk') }}</button>
+              <button v-if="isAdmin" @click="isQuickClerkModalOpen = true" style="background: none; border: none; color: #3b82f6; font-size: 11px; font-weight: bold; cursor: pointer;">+ {{ $t('branch.transfer.btn_add_clerk') }}</button>
             </div>
             <select v-if="currentTab" v-model="currentTab.selectedRequester" class="form-select" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; background: white;">
               <option value="">-- Select Clerk --</option>

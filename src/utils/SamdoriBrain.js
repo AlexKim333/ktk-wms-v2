@@ -579,7 +579,6 @@ function selectCandidatesForGemini(rawSpoken, color, validItems, max = 60) {
  * Tier 2: 압축 후보만 Gemini에 넘겨 정밀 코드 판별
  */
 async function resolveItemCodeWithGemini(rawSpoken, color, validItems) {
-  if (!GEMINI_API_KEY) return null
   if (looksLikeWarehouseUtterance(rawSpoken)) return null
 
   const candidates = selectCandidatesForGemini(rawSpoken, color, validItems, 60)
@@ -599,7 +598,7 @@ Rules:
 
   try {
     const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      GEMINI_API_URL,
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -758,10 +757,9 @@ async function attachResolvedItem(parsed, validItems, lastIntent) {
 }
 
 // SamdoriBrain.js
-// Handles NLP via Gemini API for the Samdori Voice Assistant
+// Handles NLP via Backend Proxy (/api/ai/gemini) for the Samdori Voice Assistant
 
-const GEMINI_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) || '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent';
+const GEMINI_API_URL = '/api/ai/gemini';
 
 /**
  * Sends transcribed text to Gemini API to extract intent.
@@ -872,11 +870,6 @@ CLARIFICATION QUESTION ENGINE (REVERSE QUESTION):
 }
 
 export async function parseIntent(text, validItems = [], lastIntent = null) {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API Key is missing. Please check .env file.');
-  }
-
-
   const contextPrompt = buildContextPrompt(lastIntent)
 
   const promptCore = `
@@ -949,7 +942,7 @@ The frontend will handle searching the actual database.
 User's Command: "${text}"
 `;
 try {
-    const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await axios.post(GEMINI_API_URL, {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         response_mime_type: "application/json",
@@ -982,11 +975,6 @@ try {
  * Sends audio data to Gemini API to extract intent (Multimodal).
  */
 export async function parseIntentFromAudio(base64Audio, mimeType, validItems = [], lastIntent = null) {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API Key is missing. Please check .env file.');
-  }
-
-
   const contextPrompt = buildContextPrompt(lastIntent)
 
   const promptCore = `
@@ -1061,7 +1049,7 @@ Always include "spoken_text": a short transcript of what was said (for cancel/re
 In "spoken_text", write every number as Arabic numerals, never as Korean numeral words ("삼삼삼일-일 알라르꼰 창고" -> "3331-1 알라르꼰 창고").
 `;
 try {
-    const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await axios.post(GEMINI_API_URL, {
       contents: [{
         parts: [
           { text: prompt },

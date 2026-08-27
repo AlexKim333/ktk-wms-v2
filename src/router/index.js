@@ -58,7 +58,7 @@ function kickBackgroundSessionRestore(authStore) {
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  // 1) 로그인 화면: 즉시 렌더. 세션 복구는 백그라운드.
+  // 1) 공개 라우트 (로그인 화면): 즉시 렌더. 세션 복구는 백그라운드.
   if (to.path === '/login' || to.path === '/') {
     if (authStore.loggingOut) return true
     if (authStore.user) return '/pos'
@@ -71,8 +71,14 @@ router.beforeEach(async (to) => {
     await authStore.restoreSession()
   }
 
-  if (to.path === '/pos' && !authStore.user) {
+  // 로그인되지 않은 경우 모든 보호 라우트는 /login으로 리다이렉트
+  if (!authStore.user) {
     return '/login'
+  }
+
+  // 3) 관리자 전용 라우트 접근 제어
+  if (to.path === '/setup' && !authStore.isAdmin) {
+    return '/pos'
   }
 })
 

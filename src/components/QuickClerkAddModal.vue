@@ -68,6 +68,10 @@ const closeModal = () => {
 }
 
 const submitForm = async () => {
+  if (!authStore.isAdmin) {
+    alert('점원 등록은 본사 관리자만 할 수 있습니다.')
+    return
+  }
   isSaving.value = true
   
   // Create virtual email

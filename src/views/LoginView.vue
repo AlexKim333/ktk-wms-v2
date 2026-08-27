@@ -140,10 +140,6 @@ const handleLogin = async () => {
         ])
         authStore.user = profile
         authStore.sessionChecked = true
-        try {
-          const { useBranchSessionStore } = await import('../stores/branchSession.js')
-          useBranchSessionStore().initForUser()
-        } catch (e) {}
         await router.replace('/pos')
     }
   } catch (error) {

@@ -18,26 +18,6 @@
       <div v-if="authStore.user" class="nav-user-info">
         <span class="nav-user-name">{{ authStore.user.member_name || authStore.user.full_name }}</span>
         <span class="nav-user-meta">{{ authStore.user.branch_name ?? $t('pos.hq_label') }} · {{ isAdmin ? 'Admin' : (authStore.user.access_level || '-') }}</span>
-        <span
-          v-if="!isAdmin && branchSession.needsPinGate"
-          class="nav-user-meta"
-          style="display:block; margin-top:4px; font-weight:800;"
-          :style="{ color: branchSession.isManagerMode ? '#86efac' : '#38bdf8' }"
-        >
-          {{ branchSession.isManagerMode ? $t('pos.mode_manager') : $t('pos.mode_clerk', { name: branchSession.selectedClerkName || '-' }) }}
-        </span>
-        <button
-          v-if="!isAdmin && branchSession.needsPinGate && branchSession.isClerkMode"
-          type="button"
-          style="margin-top:8px; width:100%; background:#f59e0b; color:#111; border:none; border-radius:6px; padding:8px; font-weight:800; cursor:pointer; font-size:12px;"
-          @click="branchSession.openPinModal()"
-        >{{ $t('pos.btn_pin_unlock') }}</button>
-        <button
-          v-else-if="!isAdmin && branchSession.needsPinGate && branchSession.isManagerMode"
-          type="button"
-          style="margin-top:8px; width:100%; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:8px; font-weight:700; cursor:pointer; font-size:12px;"
-          @click="branchSession.lockToClerk()"
-        >{{ $t('pos.btn_lock_clerk') }}</button>
       </div>
       <div class="nav-lang-switcher" style="padding: 0 12px; margin-bottom: 12px;">
         <LanguageSwitcher style="width: 100%; box-sizing: border-box;" />
@@ -54,7 +34,7 @@
           <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.branch_group') }}</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')">🛒 {{ $t('nav.branch_pos', '지점 POS (VENTA)') }}</a>
-            <template v-if="branchSession.isManagerMode">
+            <template v-if="authStore.isBranchManager">
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">{{ $t('nav.branch_reservation') }} <span v-if="branchReservationCount > 0" class="res-badge">{{ branchReservationCount }}</span></a>
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
@@ -121,7 +101,7 @@
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
           <a href="#" class="nav-item" :class="{ active: activeNav === 'staff-management' }" @click.prevent="activeNav = 'staff-management'">👨‍👩‍👧 {{ $t('nav.staff_management') }}</a>
         </template>
-        <template v-else-if="branchSession.isManagerMode">
+        <template v-else-if="authStore.isBranchManager">
           <a href="#" class="nav-item" :class="{ active: activeNav === 'settings' }" @click.prevent="activeNav = 'settings'">⚙️ {{ $t('nav.settings') }}</a>
         </template>
         <button type="button" class="nav-item nav-logout-btn" :disabled="isLoggingOut" @click="handleLogout">
@@ -223,8 +203,6 @@
     :pending-stock-item="pendingVoiceStockItem"
     @intent-parsed="handleSamdoriIntent"
   />
-  <!-- 지점장 PIN (사이드바에서도 열림 — 프론트 전용) -->
-  <PinUnlockModal variant="desktop" @unlock="onBranchPinUnlock" />
   </div>
   </div>
 </template>
@@ -239,7 +217,6 @@ import ReceiptPrint from '../components/ReceiptPrint.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { branchPriceListCandidates } from '../utils/branchPriceList.js'
-import { useBranchSessionStore } from '../stores/branchSession.js'
 import { useItemSearch, rankItemNameMatches } from '../composables/useItemSearch.js'
 import { usePagedList } from '../composables/usePagedList.js'
 import { APPROVAL_STAGE, stageFilter } from '../constants/approvalStage.js'
@@ -256,7 +233,6 @@ import BranchTransferReservationList from '../components/branch/BranchTransferRe
 import BranchInventoryList from '../components/branch/BranchInventoryList.vue'
 import BranchSettingsView from '../components/branch/BranchSettingsView.vue'
 import BranchProductDetailView from '../components/branch/BranchProductDetailView.vue'
-import PinUnlockModal from '../components/PinUnlockModal.vue'
 import ReservationListView from './ReservationListView.vue'
 import OutboundListView from './OutboundListView.vue'
 import OutboundHistoryListView from './OutboundHistoryListView.vue'
@@ -270,7 +246,6 @@ const route = useRoute()
 const authStore = useAuthStore()
 const { isMobile } = useMobile()
 const isAdmin = computed(() => authStore.isAdmin)
-const branchSession = useBranchSessionStore()
 const { t, locale } = useI18n();
 
 const pcCartRef = ref(null);
@@ -1231,34 +1206,9 @@ const setTransactionMode = (mode) => {
   transactionMode.value = mode
 }
 
-const onBranchPinUnlock = () => {
-  if (branchSession.unlockWithPin()) {
-    // stay on current nav; manager menus appear
-  }
-}
-
-watch(
-  () => branchSession.mode,
-  (mode) => {
-    if (
-      mode === 'clerk' &&
-      !isAdmin.value &&
-      activeNav.value !== 'branch-pos'
-    ) {
-      activeNav.value = 'branch-pos'
-    }
-  }
-)
-
 const setActiveNav = (nav, mode = null) => {
-  if (
-    !isAdmin.value &&
-    branchSession.needsPinGate &&
-    branchSession.isClerkMode &&
-    nav !== 'branch-pos'
-  ) {
+  if (!isAdmin.value && authStore.isBranchClerk && nav !== 'branch-pos') {
     alert(t('pos.msg_err_clerk_mode'))
-    branchSession.openPinModal()
     return
   }
 
