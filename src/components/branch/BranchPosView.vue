@@ -415,6 +415,16 @@
       @close="showPaymentModal = false"
       @submit="submitPosInvoice"
     />
+    <!-- 🌟 시재 개장/마감 모달 -->
+    <BranchShiftModal
+      :is-open="showShiftModal"
+      :mode="shiftModalMode"
+      :branch-name="currentBranch"
+      :opening-entry="currentOpeningEntry"
+      @close="showShiftModal = false"
+      @opened="handleShiftOpened"
+      @closed="handleShiftClosed"
+    />
   </div>
     <!-- 1. 단일 버튼 상품 지정 독립 모달 -->
     <BranchQuickPickSlotModal
@@ -475,7 +485,10 @@ import BranchIncompletePriceModal from './BranchIncompletePriceModal.vue'
 import BranchQuickPickSlotModal from './BranchQuickPickSlotModal.vue'
 import BranchGridSelectionModal from './BranchGridSelectionModal.vue'
 import BranchPaymentModal from './BranchPaymentModal.vue'
+import BranchShiftModal from './BranchShiftModal.vue'
 import { formatPrice } from '../../utils/formatPrice.js'
+import { posProfileName as computePosProfileName } from '../../utils/branchPosProfile.js'
+import { findOpenShiftEntry } from '../../utils/branchShift.js'
 const { t } = useI18n()
 const authStore = useAuthStore()
 const { rebuildItemIndex, searchItemsOrAll } = useItemSearch()
@@ -500,7 +513,11 @@ const currentBranch = computed(() => authStore.user?.branch_name || '[MAIN] ALAR
 const MAIN_WAREHOUSE = '[MAIN] ALARCON - K'
 const selectedCustomer = ref('Public')
 const selectedSalesPerson = ref('')
-const isShiftOpen = ref(true)
+const currentOpeningEntry = ref(null)
+const isShiftOpen = computed(() => !!currentOpeningEntry.value)
+const posProfileName = ref(null)
+const showShiftModal = ref(false)
+const shiftModalMode = ref('open')
 const searchQuery = ref('')
 const barcodeQuery = ref('')
 const activeCategory = ref('hotkey') // 'hotkey' | 'all' | 'grid' | 'single'
@@ -545,7 +562,25 @@ onMounted(() => {
   } catch (e) {
     console.warn('Failed to load held orders', e)
   }
+
+  refreshShiftState()
 })
+
+// POS Profile 이름은 지점 창고명으로부터 결정적으로 계산한다(API 조회 없음 — 지점장
+// 계정에 POS Profile 권한이 전혀 없어도 되도록 하기 위함). 관리자가 미리 만들어둔
+// 프로필이 실제로 있는지는 개장 시도 시 서버가 판단한다(없으면 Link 검증 오류로 확인 가능).
+const refreshShiftState = async () => {
+  const profile = computePosProfileName(currentBranch.value)
+  posProfileName.value = profile
+  if (!profile) {
+    currentOpeningEntry.value = null
+    return
+  }
+  currentOpeningEntry.value = await findOpenShiftEntry(frappeApi, {
+    user: authStore.user?.member_name,
+    posProfile: profile
+  })
+}
 // ----------------------------------------------------
 // ITEM FILTERING & PAGINATION
 // ----------------------------------------------------
@@ -1012,6 +1047,18 @@ const submitPosInvoice = async () => {
 
       let successName = '';
 
+      // 이 Frappe 인스턴스는 docstatus:1로 한 번에 POST하면 GL 계정 해석이 끝나기 전에
+      // 제출이 진행되어 "Account is required" 오류가 난다(실측 확인 — 실제 지점장 계정으로
+      // 재현됨, 지금까지 이 함수로 완결된 판매가 하나도 없었던 원인). 초안(docstatus:0)으로
+      // 먼저 만든 뒤 별도로 제출(PUT docstatus:1)하면 정상 동작한다. 환불/시재관리 기능에서
+      // 이미 같은 방식으로 검증됨.
+      const createAndSubmit = async (doctype, payload) => {
+        const draft = await frappeApi.post(`/api/resource/${doctype}`, { ...payload, docstatus: 0 })
+        const draftName = draft.data?.data?.name
+        const submitted = await frappeApi.put(`/api/resource/${doctype}/${draftName}`, { docstatus: 1 })
+        return submitted.data?.data || draft.data?.data
+      }
+
       if (!hasWarehouseItems) {
         // 100% 현장 수령
         const payload = {
@@ -1032,8 +1079,8 @@ const submitPosInvoice = async () => {
           })),
           payments: payments
         }
-        const res = await frappeApi.post('/api/resource/Sales Invoice', payload)
-        successName = res.data?.data?.name || 'POS-INV-LOCAL'
+        const res = await createAndSubmit('Sales Invoice', payload)
+        successName = res?.name || 'POS-INV-LOCAL'
       } else {
         // 창고 배송 포함 (Sales Order)
         const soPayload = {
@@ -1054,11 +1101,11 @@ const submitPosInvoice = async () => {
             uom: item.uom || 'Nos'
           }))
         };
-        const soRes = await frappeApi.post('/api/resource/Sales Order', soPayload);
-        const soName = soRes.data?.data?.name;
+        const soRes = await createAndSubmit('Sales Order', soPayload);
+        const soName = soRes?.name;
         successName = soName;
 
-        const localItems = soRes.data.data.items.filter(i => i.delivery_warehouse !== MAIN_WAREHOUSE);
+        const localItems = (soRes?.items || []).filter(i => i.delivery_warehouse !== MAIN_WAREHOUSE);
         if (localItems.length > 0) {
            const dnPayload = {
               doctype: 'Delivery Note',
@@ -1075,7 +1122,7 @@ const submitPosInvoice = async () => {
               }))
            };
            try {
-             await frappeApi.post('/api/resource/Delivery Note', dnPayload);
+             await createAndSubmit('Delivery Note', dnPayload);
            } catch (dnErr) {
              console.error("현장 수령품 자동 출고 실패:", dnErr);
              alert("Sales Order 생성완료. 단, 현장 수령품 자동 출고에 실패했습니다.");
@@ -1110,15 +1157,20 @@ const submitPosInvoice = async () => {
   }
 }
 const toggleShift = () => {
-  if (isShiftOpen.value) {
-    if (confirm(t('branch.pos.msg_cfm_close_shift'))) {
-      isShiftOpen.value = false
-    }
-  } else {
-    if (confirm(t('branch.pos.msg_cfm_open_shift'))) {
-      isShiftOpen.value = true
-    }
+  if (!authStore.isBranchManager && !authStore.isAdmin) {
+    alert(t('branch.shift.msg_err_manager_only'))
+    return
   }
+  shiftModalMode.value = isShiftOpen.value ? 'close' : 'open'
+  showShiftModal.value = true
+}
+const handleShiftOpened = (doc) => {
+  currentOpeningEntry.value = doc
+  showShiftModal.value = false
+}
+const handleShiftClosed = () => {
+  currentOpeningEntry.value = null
+  showShiftModal.value = false
 }
 </script>
 <style scoped>

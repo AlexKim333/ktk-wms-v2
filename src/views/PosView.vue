@@ -39,6 +39,8 @@
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-reservation' }" @click.prevent="setActiveNav('branch-reservation')">{{ $t('nav.branch_reservation') }} <span v-if="branchReservationCount > 0" class="res-badge">{{ branchReservationCount }}</span></a>
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-inventory' }" @click.prevent="setActiveNav('branch-inventory')">{{ $t('nav.branch_inventory') }}</a>
             </template>
+            <a v-if="authStore.isBranchManager || isAdmin" href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-refund' }" @click.prevent="setActiveNav('branch-refund')">↩️ {{ $t('nav.branch_refund') }}</a>
+            <a v-if="authStore.isBranchManager || isAdmin" href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-shift-history' }" @click.prevent="setActiveNav('branch-shift-history')">🧾 {{ $t('nav.branch_shift_history') }}</a>
             <div v-else style="padding: 8px 15px; font-size: 11px; color: #94a3b8; line-height: 1.4;">
               {{ $t('pos.clerk_notice_1') }}<br/>{{ $t('pos.clerk_notice_2') }}
             </div>
@@ -91,6 +93,8 @@
 
         <!-- 기존 상품등록 (보존용) -->
         <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a> -->
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-refund' }" @click.prevent="setActiveNav('branch-refund')">↩️ {{ $t('nav.branch_refund') }}</a>
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-shift-history' }" @click.prevent="setActiveNav('branch-shift-history')">🧾 {{ $t('nav.branch_shift_history') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 {{ $t('nav.node') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'report' }" @click.prevent="activeNav = 'report'">📊 {{ $t('nav.report') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'manager' }" @click.prevent="activeNav = 'manager'">👤 {{ $t('nav.manager') }}</a>
@@ -149,8 +153,15 @@
         @edit-reservation="handleBranchEditReservation"
         @refresh-items="fetchFrappeItems"
       />
-      <BranchInventoryList 
-        v-else-if="activeNav === 'branch-inventory'" 
+      <BranchSalesHistoryList
+        v-else-if="activeNav === 'branch-refund'"
+        @refresh-items="fetchFrappeItems"
+      />
+      <BranchShiftHistoryList
+        v-else-if="activeNav === 'branch-shift-history'"
+      />
+      <BranchInventoryList
+        v-else-if="activeNav === 'branch-inventory'"
         :raw-items="rawSingleItems"
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
@@ -230,6 +241,8 @@ import StockReconciliationMain from './StockReconciliationMain.vue'
 import BranchPosView from '../components/branch/BranchPosView.vue'
 import BranchTransferView from '../components/branch/BranchTransferView.vue'
 import BranchTransferReservationList from '../components/branch/BranchTransferReservationList.vue'
+import BranchSalesHistoryList from '../components/branch/BranchSalesHistoryList.vue'
+import BranchShiftHistoryList from '../components/branch/BranchShiftHistoryList.vue'
 import BranchInventoryList from '../components/branch/BranchInventoryList.vue'
 import BranchSettingsView from '../components/branch/BranchSettingsView.vue'
 import BranchProductDetailView from '../components/branch/BranchProductDetailView.vue'
