@@ -160,6 +160,156 @@
           <p class="placeholder-text">{{ t('shift_config_ready', '영업 마감 및 권한 제어 설정이 활성화되었습니다.') }}</p>
         </div>
       </div>
+
+      <!-- Tab 5: 고객 등록 -->
+      <div v-else-if="activeTab === 'customer-reg'" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">🧑‍🤝‍🧑 {{ t('customer_reg_title', '신규 고객 등록') }}</h2>
+            <p class="panel-desc">{{ currentBranch }}{{ t('customer_reg_desc', ' 지점에서 새로운 고객을 등록합니다. 전화번호는 필수 입력입니다.') }}</p>
+          </div>
+        </div>
+
+        <div class="tiers-card" style="padding: 24px;">
+          <form @submit.prevent="registerCustomer" class="customer-form-grid">
+            <label class="form-field-block">
+              <span>{{ t('cust_name_label', '고객명') }} *</span>
+              <input type="text" v-model="custForm.name" required class="form-input" :placeholder="t('cust_name_ph', '고객 이름 또는 상호')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('cust_phone_label', '전화번호') }} *</span>
+              <input type="text" v-model="custForm.phone" required class="form-input" :placeholder="t('cust_phone_ph', '예: +52 55 1234 5678')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('cust_sales_person_label', '담당 판매원') }}</span>
+              <select v-model="custForm.salesPerson" class="form-input">
+                <option value="">{{ t('cust_sales_person_none', '선택 안 함') }}</option>
+                <option v-for="sp in branchSalesPersons" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
+              </select>
+            </label>
+
+            <div class="form-field-block full-width">
+              <span>{{ t('cust_address_label', '주소 (선택 사항)') }}</span>
+              <div v-for="(addr, idx) in custForm.addresses" :key="addr.id" class="address-row">
+                <input type="text" v-model="addr.city" class="form-input" :placeholder="t('cust_city_ph', '도시')" style="width: 30%;" />
+                <input type="text" v-model="addr.val" class="form-input" :placeholder="t('cust_addr_ph', '상세 주소')" style="flex:1;" />
+                <button v-if="custForm.addresses.length > 1" type="button" class="btn-reset" @click="custForm.addresses.splice(idx, 1)">🗑️</button>
+              </div>
+              <button type="button" class="btn-reset" style="width: fit-content; margin-top: 6px;" @click="custForm.addresses.push({ id: Date.now(), val: '', city: '' })">
+                ➕ {{ t('cust_add_address', '주소 추가') }}
+              </button>
+            </div>
+
+            <div class="form-field-block full-width" style="margin-top: 10px;">
+              <button type="submit" class="btn-save" :disabled="isRegisteringCustomer" style="width: fit-content;">
+                {{ isRegisteringCustomer ? t('saving', '저장 중...') : t('cust_register_btn', '💾 고객 등록') }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tiers-card" style="margin-top: 20px;">
+          <div class="table-responsive">
+            <table class="tiers-table">
+              <thead>
+                <tr>
+                  <th>{{ t('cust_col_name', '고객명') }}</th>
+                  <th>{{ t('cust_col_phone', '전화번호') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in branchCustomers" :key="c.name">
+                  <td>{{ c.customer_name }}</td>
+                  <td>{{ c.mobile_no || '-' }}</td>
+                </tr>
+                <tr v-if="branchCustomers.length === 0">
+                  <td colspan="2" style="text-align: center; color: #94a3b8; padding: 20px;">{{ t('cust_list_empty', '등록된 고객이 없습니다.') }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 6: 상품 등록 요청 -->
+      <div v-else-if="activeTab === 'product-req'" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">📦 {{ t('prod_req_title', '신규 상품 등록 요청') }}</h2>
+            <p class="panel-desc">{{ t('prod_req_desc', '여기서 등록한 상품은 본사 승인 전까지 비활성 상태이며 판매 화면에 노출되지 않습니다. 원가/재고는 본사 승인 시 확정됩니다.') }}</p>
+          </div>
+        </div>
+
+        <div class="tiers-card" style="padding: 24px;">
+          <form @submit.prevent="registerProductRequest" class="customer-form-grid">
+            <label class="form-field-block">
+              <span>{{ t('prod_name_label', '상품명') }} *</span>
+              <input type="text" v-model="prodForm.name" required class="form-input" :placeholder="t('prod_name_ph', '예: P-160')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('prod_color_label', '색상') }} *</span>
+              <input type="text" v-model="prodForm.color" required class="form-input" :placeholder="t('prod_color_ph', '예: BLACK')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('prod_brand_label', '브랜드') }} *</span>
+              <select v-model="prodForm.brand" required class="form-input">
+                <option value="" disabled>{{ t('prod_brand_select', '브랜드 선택') }}</option>
+                <option v-for="b in brandList" :key="b.name" :value="b.name">{{ b.name }}</option>
+              </select>
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('prod_pack_label', '팩 수량') }} *</span>
+              <input type="number" v-model.number="prodForm.packQty" min="1" required class="form-input" :placeholder="t('prod_pack_ph', '예: 12')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('prod_barcode_label', '바코드 (선택)') }}</span>
+              <input type="text" v-model="prodForm.barcode" class="form-input" :placeholder="t('prod_barcode_ph', '스캐너 입력')" />
+            </label>
+            <label class="form-field-block">
+              <span>{{ t('prod_suggested_price_label', '희망 판매가 (참고용, 선택)') }}</span>
+              <input type="number" v-model.number="prodForm.suggestedPrice" min="0" step="0.01" class="form-input" :placeholder="t('prod_suggested_price_ph', '본사 승인 시 참고')" />
+            </label>
+            <label class="form-field-block full-width">
+              <span>{{ t('prod_note_label', '요청 사유 / 메모 (선택)') }}</span>
+              <input type="text" v-model="prodForm.note" class="form-input" :placeholder="t('prod_note_ph', '예: 신제품 출시, 지점 자체 발주 등')" />
+            </label>
+
+            <div class="form-field-block full-width" style="margin-top: 10px;">
+              <button type="submit" class="btn-save" :disabled="isRegisteringProduct" style="width: fit-content;">
+                {{ isRegisteringProduct ? t('saving', '저장 중...') : t('prod_register_btn', '📤 등록 요청 보내기') }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tiers-card" style="margin-top: 20px;">
+          <div class="table-responsive">
+            <table class="tiers-table">
+              <thead>
+                <tr>
+                  <th>{{ t('prod_col_name', '상품명') }}</th>
+                  <th>{{ t('prod_col_color', '색상') }}</th>
+                  <th>{{ t('prod_col_status', '상태') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in branchProductRequests" :key="p.name">
+                  <td>{{ p.item_name }}</td>
+                  <td>{{ p.custom_color || '-' }}</td>
+                  <td>
+                    <span v-if="p.custom_pending_review" style="color:#b45309; font-weight:700;">{{ t('prod_status_pending', '⏳ 승인 대기중') }}</span>
+                    <span v-else-if="!p.disabled" style="color:#047857; font-weight:700;">{{ t('prod_status_approved', '✅ 승인 완료') }}</span>
+                    <span v-else style="color:#94a3b8;">{{ t('prod_status_rejected', '반려/보류') }}</span>
+                  </td>
+                </tr>
+                <tr v-if="branchProductRequests.length === 0">
+                  <td colspan="3" style="text-align: center; color: #94a3b8; padding: 20px;">{{ t('prod_list_empty', '등록 요청한 상품이 없습니다.') }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- Notification Toast -->
@@ -172,7 +322,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import frappeApi from '../../api/frappe.js'
 
 const props = defineProps({
   currentBranch: {
@@ -186,11 +337,209 @@ const emit = defineEmits(['close', 'settings-updated'])
 const activeTab = ref('price-tiers')
 const toastMessage = ref('')
 
+// --- 고객 등록 (customer-reg 탭) ---
+const custForm = ref({ name: '', phone: '', salesPerson: '', addresses: [{ id: Date.now(), val: '', city: '' }] })
+const isRegisteringCustomer = ref(false)
+const branchSalesPersons = ref([])
+const branchCustomers = ref([])
+
+const fetchBranchSalesPersons = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Sales Person', {
+      params: {
+        fields: JSON.stringify(['name', 'sales_person_name']),
+        filters: JSON.stringify([['enabled', '=', 1], ['custom_branch', '=', props.currentBranch]]),
+        limit_page_length: 0
+      }
+    })
+    branchSalesPersons.value = res.data?.data || []
+  } catch (e) {
+    console.error('Failed to fetch branch sales persons:', e)
+  }
+}
+
+const fetchBranchCustomers = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Customer', {
+      params: {
+        fields: JSON.stringify(['name', 'customer_name', 'mobile_no']),
+        filters: JSON.stringify([['custom_managing_branch', '=', props.currentBranch]]),
+        limit_page_length: 0,
+        order_by: 'creation desc'
+      }
+    })
+    branchCustomers.value = res.data?.data || []
+  } catch (e) {
+    console.error('Failed to fetch branch customers:', e)
+  }
+}
+
+const registerCustomer = async () => {
+  const name = custForm.value.name.trim()
+  const phone = custForm.value.phone.trim()
+  if (!name || !phone) {
+    showToast('❌ 고객명과 전화번호는 필수 입력 항목입니다.')
+    return
+  }
+
+  isRegisteringCustomer.value = true
+  try {
+    // 담당 판매원: Sales Invoice/Sales Order와 동일한 표준 sales_team 자식테이블 재사용.
+    // 관리지점은 지점장 본인 소속 지점으로 고정 — 노드관리와 달리 판매원 지점을 조회할 필요가 없다.
+    const custRes = await frappeApi.post('/api/resource/Customer', {
+      customer_name: name,
+      customer_group: 'Commercial',
+      territory: 'All Territories',
+      sales_team: custForm.value.salesPerson ? [{ sales_person: custForm.value.salesPerson, allocated_percentage: 100 }] : [],
+      custom_managing_branch: props.currentBranch || undefined
+    })
+    const createdName = custRes.data.data.name
+
+    // 전화번호는 Contact 문서로 저장 (mobile_no는 phone_nos 자식테이블에서 계산되는 읽기전용 필드)
+    const contactRes = await frappeApi.post('/api/resource/Contact', {
+      first_name: name,
+      phone_nos: [{ phone, is_primary_mobile_no: 1 }],
+      links: [{ link_doctype: 'Customer', link_name: createdName }]
+    })
+    await frappeApi.put(`/api/resource/Customer/${encodeURIComponent(createdName)}`, { customer_primary_contact: contactRes.data.data.name })
+
+    // 주소 (선택 사항, 여러 개 가능)
+    for (const addr of custForm.value.addresses) {
+      if (addr.val.trim() !== '') {
+        await frappeApi.post('/api/resource/Address', {
+          address_title: name,
+          address_type: 'Billing',
+          address_line1: addr.val.trim(),
+          city: addr.city ? addr.city.trim() : 'Unknown City',
+          links: [{ link_doctype: 'Customer', link_name: createdName }]
+        })
+      }
+    }
+
+    showToast(`✅ 고객 "${name}" 등록 완료`)
+    custForm.value = { name: '', phone: '', salesPerson: '', addresses: [{ id: Date.now(), val: '', city: '' }] }
+    await fetchBranchCustomers()
+  } catch (e) {
+    let detailMsg = '알 수 없는 오류'
+    if (e.response?.data?._server_messages) {
+      try {
+        detailMsg = JSON.parse(e.response.data._server_messages).map((m) => JSON.parse(m).message).join('\n')
+      } catch (_) {
+        detailMsg = e.response.data._server_messages
+      }
+    }
+    showToast(`❌ 등록 실패: ${detailMsg}`)
+  } finally {
+    isRegisteringCustomer.value = false
+  }
+}
+
+watch(activeTab, (val) => {
+  if (val === 'customer-reg') {
+    fetchBranchSalesPersons()
+    fetchBranchCustomers()
+  } else if (val === 'product-req') {
+    fetchBrandList()
+    fetchBranchProductRequests()
+  }
+})
+
+// --- 상품 등록 요청 (product-req 탭) ---
+const prodForm = ref({ name: '', color: '', brand: '', packQty: null, barcode: '', suggestedPrice: null, note: '' })
+const isRegisteringProduct = ref(false)
+const brandList = ref([])
+const branchProductRequests = ref([])
+
+const fetchBrandList = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Brand', { params: { fields: JSON.stringify(['name']), limit_page_length: 0 } })
+    brandList.value = res.data?.data || []
+  } catch (e) {
+    console.error('Failed to fetch brand list:', e)
+  }
+}
+
+const fetchBranchProductRequests = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Item', {
+      params: {
+        fields: JSON.stringify(['name', 'item_name', 'custom_color', 'disabled', 'custom_pending_review']),
+        filters: JSON.stringify([['description', 'like', `%[지점요청:${props.currentBranch}]%`]]),
+        limit_page_length: 0,
+        order_by: 'creation desc'
+      }
+    })
+    branchProductRequests.value = res.data?.data || []
+  } catch (e) {
+    console.error('Failed to fetch branch product requests:', e)
+  }
+}
+
+const registerProductRequest = async () => {
+  const name = prodForm.value.name.trim()
+  const color = prodForm.value.color.trim()
+  const packQty = Number(prodForm.value.packQty)
+  if (!name || !color || !prodForm.value.brand || !Number.isFinite(packQty) || packQty < 1) {
+    showToast('❌ 상품명/색상/브랜드/팩 수량은 필수 입력 항목입니다.')
+    return
+  }
+
+  isRegisteringProduct.value = true
+  try {
+    let itemCode = `${name}-${color}`
+    if (packQty > 1) itemCode += `-${packQty}`
+
+    // 요청 정보(지점/요청자/희망판매가/메모)는 별도 필드 없이 description에 구조화된 텍스트로 남긴다 —
+    // 본사 승인 화면과 이 목록 둘 다 이 텍스트로 지점을 식별한다.
+    const noteLines = [
+      `[지점요청:${props.currentBranch}]`,
+      `희망판매가: ${prodForm.value.suggestedPrice || '미입력'}`,
+      prodForm.value.note ? `메모: ${prodForm.value.note}` : ''
+    ].filter(Boolean)
+
+    // 비활성(disabled=1) + 승인대기(custom_pending_review=1) 상태로만 생성 —
+    // 원가/재고/가격 입력란 자체가 없어 재고평가·회계에 전혀 영향을 주지 않는다.
+    await frappeApi.post('/api/resource/Item', {
+      item_code: itemCode,
+      item_name: name,
+      item_group: 'Products',
+      brand: prodForm.value.brand,
+      stock_uom: 'Nos',
+      is_stock_item: 1,
+      has_variants: 0,
+      disabled: 1,
+      custom_pending_review: 1,
+      custom_color: color,
+      custom_pack_qty: packQty,
+      custom_tier_1_barcode: prodForm.value.barcode.trim() || null,
+      description: noteLines.join('\n')
+    })
+
+    showToast(`✅ "${name}" 상품 등록 요청을 보냈습니다. 본사 승인을 기다려주세요.`)
+    prodForm.value = { name: '', color: '', brand: '', packQty: null, barcode: '', suggestedPrice: null, note: '' }
+    await fetchBranchProductRequests()
+  } catch (e) {
+    let detailMsg = '알 수 없는 오류'
+    if (e.response?.data?._server_messages) {
+      try {
+        detailMsg = JSON.parse(e.response.data._server_messages).map((m) => JSON.parse(m).message).join('\n')
+      } catch (_) {
+        detailMsg = e.response.data._server_messages
+      }
+    }
+    showToast(`❌ 등록 요청 실패: ${detailMsg}`)
+  } finally {
+    isRegisteringProduct.value = false
+  }
+}
+
 const tabs = [
   { id: 'price-tiers', label: '💰 가격정책', icon: '💰' },
           { id: 'pos-config', label: '🏢 POS 환경 설정 (POS Config)', icon: '🏢' },
   { id: 'receipt-config', label: '🖨️ 영수증 및 프린터 설정 (Receipt & Printer)', icon: '🖨️' },
-  { id: 'shift-config', label: '🔐 권한 및 마감 설정 (Permissions)', icon: '🔐' }
+  { id: 'shift-config', label: '🔐 권한 및 마감 설정 (Permissions)', icon: '🔐' },
+  { id: 'customer-reg', label: '🧑‍🤝‍🧑 고객 등록', icon: '🧑‍🤝‍🧑' },
+  { id: 'product-req', label: '📦 상품 등록 요청', icon: '📦' }
 ]
 
 // 4 Quantity Tiers default config
@@ -568,6 +917,32 @@ const showToast = (msg) => {
 .info-text {
   font-size: 13px;
   color: #475569;
+}
+
+/* 고객 등록 탭 */
+.customer-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #334155;
+}
+
+.form-field-block.full-width {
+  grid-column: 1 / -1;
+}
+
+.address-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 /* Placeholder card for other tabs */

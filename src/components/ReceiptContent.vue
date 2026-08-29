@@ -49,6 +49,19 @@
         width: 60%;
         margin: 10px auto 15px;
       }
+      .receipt-content .payment-summary-table {
+        width: 100%;
+        margin: 0 0 10px;
+      }
+      .receipt-content .payment-summary-table td {
+        text-align: right;
+        border: none;
+        border-top: 1px solid #ccc;
+        padding: 3px 4px;
+      }
+      .receipt-content .payment-summary-table td:first-child {
+        text-align: left;
+      }
       .receipt-content .receipt-footer {
         display: flex;
         justify-content: space-between;
@@ -66,6 +79,7 @@
         <p>CREADOR: <span class="bold">{{ data.creador }}</span></p>
       </template>
       <template v-else>
+        <p v-if="data.mode === 'pos'">CLIENTE: <span class="bold">{{ data.cliente }}</span></p>
         <p>VENDEDOR: <span class="bold">{{ data.vendedor }}</span></p>
       </template>
     </div>
@@ -94,7 +108,11 @@
           <th>PRODUCTO</th>
           <th>CANT BULTO</th>
           <th>CANT PZS</th>
-          <th>TOTAL PZS</th>
+          <template v-if="data.mode === 'pos'">
+            <th>PRECIO UNIT</th>
+            <th>TOTAL</th>
+          </template>
+          <th v-else>TOTAL PZS</th>
         </tr>
       </thead>
       <tbody>
@@ -102,7 +120,45 @@
           <td>{{ item.name }}</td>
           <td>{{ item.input_box || 0 }}</td>
           <td>{{ item.input_each || 0 }}</td>
-          <td>{{ (Number(item.input_box) * (Number(item.custom_pack_qty) || 1)) + Number(item.input_each) }}</td>
+          <template v-if="data.mode === 'pos'">
+            <td>{{ formatPrice(item.rate) }}</td>
+            <td>{{ formatPrice(item.amount) }}</td>
+          </template>
+          <td v-else>{{ (Number(item.input_box) * (Number(item.custom_pack_qty) || 1)) + Number(item.input_each) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 결제 요약 (POS 판매 전용, 마지막 페이지에만) -->
+    <table v-if="data.mode === 'pos' && page === total" class="summary-table payment-summary-table">
+      <tbody>
+        <tr>
+          <td>SUBTOTAL</td>
+          <td>{{ formatPrice(data.payment?.subtotal) }}</td>
+        </tr>
+        <tr v-if="Number(data.payment?.discount) > 0">
+          <td>DESCUENTO ({{ data.payment?.discountPercentage }}%)</td>
+          <td>-{{ formatPrice(data.payment?.discount) }}</td>
+        </tr>
+        <tr class="bold">
+          <td>TOTAL</td>
+          <td>{{ formatPrice(data.payment?.total) }}</td>
+        </tr>
+        <tr v-if="Number(data.payment?.cash) > 0">
+          <td>EFECTIVO</td>
+          <td>{{ formatPrice(data.payment?.cash) }}</td>
+        </tr>
+        <tr v-if="Number(data.payment?.card) > 0">
+          <td>TARJETA</td>
+          <td>{{ formatPrice(data.payment?.card) }}</td>
+        </tr>
+        <tr v-if="Number(data.payment?.transfer) > 0">
+          <td>TRANSFERENCIA</td>
+          <td>{{ formatPrice(data.payment?.transfer) }}</td>
+        </tr>
+        <tr class="bold">
+          <td>CAMBIO</td>
+          <td>{{ formatPrice(data.payment?.change) }}</td>
         </tr>
       </tbody>
     </table>
@@ -129,6 +185,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatPrice } from '../utils/formatPrice.js'
 
 const props = defineProps({
   data: {

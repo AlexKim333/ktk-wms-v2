@@ -425,6 +425,8 @@
       @opened="handleShiftOpened"
       @closed="handleShiftClosed"
     />
+    <!-- 🌟 POS 판매 영수증 (클립보드 복사/공유용, 화면엔 숨김) -->
+    <ReceiptPrint ref="posReceiptRef" :receiptData="posReceiptData" :items="posReceiptItems" />
   </div>
     <!-- 1. 단일 버튼 상품 지정 독립 모달 -->
     <BranchQuickPickSlotModal
@@ -474,7 +476,7 @@
     
 </template>
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../../stores/auth.js'
 import frappeApi from '../../api/frappe.js'
@@ -486,6 +488,7 @@ import BranchQuickPickSlotModal from './BranchQuickPickSlotModal.vue'
 import BranchGridSelectionModal from './BranchGridSelectionModal.vue'
 import BranchPaymentModal from './BranchPaymentModal.vue'
 import BranchShiftModal from './BranchShiftModal.vue'
+import ReceiptPrint from '../ReceiptPrint.vue'
 import { formatPrice } from '../../utils/formatPrice.js'
 import { posProfileName as computePosProfileName } from '../../utils/branchPosProfile.js'
 import { findOpenShiftEntry } from '../../utils/branchShift.js'
@@ -518,6 +521,9 @@ const isShiftOpen = computed(() => !!currentOpeningEntry.value)
 const posProfileName = ref(null)
 const showShiftModal = ref(false)
 const shiftModalMode = ref('open')
+const posReceiptRef = ref(null)
+const posReceiptData = ref({ summary: {} })
+const posReceiptItems = ref([])
 const searchQuery = ref('')
 const barcodeQuery = ref('')
 const activeCategory = ref('hotkey') // 'hotkey' | 'all' | 'grid' | 'single'
@@ -1047,6 +1053,18 @@ const submitPosInvoice = async () => {
 
       let successName = '';
 
+      // 점원(장바구니 등록)과 결제 승인자(지점장)를 이원화한다는 취지에 맞춰, 여기서 담는
+      // 값은 어디까지나 "이 판매의 실적을 인정받을 판매원"이다(누가 결제 버튼을 눌렀는지와는
+      // 무관 — 그건 authStore.isBranchManager 체크가 이미 별도로 담당). Sales Invoice/Sales
+      // Order에는 판매원을 직접 받는 단일 필드가 없고, 표준 자식테이블 sales_team(Link
+      // Sales Person + 배분비율)으로 기록해야 한다. 예전 코드는 존재하지 않는 필드
+      // (sales_partner는 도매/유통 파트너용이라 판매원과 다른 도큐타입, custom_salesperson은
+      // 아예 없는 필드)에 판매원 값을 넣고 있었다 — sales_partner는 Link 검증에 걸려 결제
+      // 자체가 막히기까지 했다(실측 확인).
+      const salesTeam = selectedSalesPerson.value
+        ? [{ sales_person: selectedSalesPerson.value, allocated_percentage: 100 }]
+        : []
+
       // 이 Frappe 인스턴스는 docstatus:1로 한 번에 POST하면 GL 계정 해석이 끝나기 전에
       // 제출이 진행되어 "Account is required" 오류가 난다(실측 확인 — 실제 지점장 계정으로
       // 재현됨, 지금까지 이 함수로 완결된 판매가 하나도 없었던 원인). 초안(docstatus:0)으로
@@ -1068,7 +1086,7 @@ const submitPosInvoice = async () => {
           is_pos: 1,
           update_stock: 1,
           customer: selectedCustomer.value || 'Public',
-          sales_partner: selectedSalesPerson.value || '',
+          sales_team: salesTeam,
           discount_amount: discountAmount.value,
           items: cartItems.value.map(item => ({
             item_code: item.item_code,
@@ -1091,13 +1109,16 @@ const submitPosInvoice = async () => {
           order_type: 'Sales',
           delivery_date: new Date().toISOString().split('T')[0],
           discount_amount: discountAmount.value,
-          custom_managing_branch: currentBranch.value,
-          custom_salesperson: authStore.user?.full_name || '',
+          sales_team: salesTeam,
           items: cartItems.value.map(item => ({
             item_code: item.item_code,
             qty: item.qty,
             rate: item.price_list_rate,
-            delivery_warehouse: item.delivery_warehouse || currentBranch.value,
+            // 'delivery_warehouse'는 Sales Order Item의 실제 필드명이 아니다(Frappe는 모르는
+            // 키를 조용히 무시한다) — 실제 필드명은 'warehouse'(Source Warehouse). 잘못된
+            // 이름을 쓰면 창고가 저장되지 않아 품목의 기본창고(비활성 상태일 수 있음)로
+            // 폴백되면서 "Disabled Warehouse ... cannot be used" 오류가 난다(실측 확인).
+            warehouse: item.delivery_warehouse || currentBranch.value,
             uom: item.uom || 'Nos'
           }))
         };
@@ -1105,7 +1126,7 @@ const submitPosInvoice = async () => {
         const soName = soRes?.name;
         successName = soName;
 
-        const localItems = (soRes?.items || []).filter(i => i.delivery_warehouse !== MAIN_WAREHOUSE);
+        const localItems = (soRes?.items || []).filter(i => i.warehouse !== MAIN_WAREHOUSE);
         if (localItems.length > 0) {
            const dnPayload = {
               doctype: 'Delivery Note',
@@ -1116,7 +1137,7 @@ const submitPosInvoice = async () => {
                  item_code: i.item_code,
                  qty: i.qty,
                  rate: i.rate,
-                 warehouse: i.delivery_warehouse,
+                 warehouse: i.warehouse,
                  against_sales_order: soName,
                  so_detail: i.name
               }))
@@ -1130,8 +1151,50 @@ const submitPosInvoice = async () => {
         }
       }
 
-      alert(t('branch.pos.msg_pay_success', { name: successName, change: formatPrice(changeAmount.value) }))
-      
+      // 🌟 POS 판매 영수증 생성 (cartItems가 비워지기 전에 수행해야 함)
+      const pack = (item) => Number(item.custom_pack_qty) || 1
+      posReceiptItems.value = cartItems.value.map(item => ({
+        name: item.item_name || item.item_code,
+        input_box: Math.floor(item.qty / pack(item)),
+        input_each: item.qty % pack(item),
+        custom_pack_qty: pack(item),
+        rate: item.price_list_rate,
+        amount: item.qty * item.price_list_rate
+      }))
+      posReceiptData.value = {
+        title: 'COMPROBANTE DE VENTA',
+        no: successName,
+        date: new Date().toISOString().split('T')[0],
+        ubicacion: currentBranch.value,
+        mode: 'pos',
+        cliente: props.customerList.find(c => c.name === selectedCustomer.value)?.customer_name || selectedCustomer.value,
+        vendedor: props.salesPersonList.find(s => s.name === selectedSalesPerson.value)?.sales_person_name || authStore.user?.full_name || '',
+        summary: {
+          items: cartItems.value.length,
+          bulto: posReceiptItems.value.reduce((s, i) => s + i.input_box, 0),
+          pzs: posReceiptItems.value.reduce((s, i) => s + i.input_each, 0)
+        },
+        payment: {
+          subtotal: subTotal.value,
+          discount: discountAmount.value,
+          discountPercentage: discountPercentage.value,
+          total: grandTotal.value,
+          cash: Number(cashAmount.value || 0),
+          card: Number(cardAmount.value || 0),
+          transfer: Number(transferAmount.value || 0),
+          change: changeAmount.value
+        }
+      }
+      await nextTick()
+      if (posReceiptRef.value) {
+        const copied = await posReceiptRef.value.copyToClipboard()
+        alert(copied
+          ? t('pos.msg_receipt_copied')
+          : t('branch.pos.msg_pay_success', { name: successName, change: formatPrice(changeAmount.value) }))
+      } else {
+        alert(t('branch.pos.msg_pay_success', { name: successName, change: formatPrice(changeAmount.value) }))
+      }
+
       const incomplete = getIncompletePriceItems(cartItems.value)
     
     // 장바구니 및 모달 초기화

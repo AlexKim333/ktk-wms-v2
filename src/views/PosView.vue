@@ -33,6 +33,7 @@
         <div v-if="!isAdmin" class="nav-group" style="margin-top: 5px; margin-bottom: 5px;">
           <span style="padding: 5px 15px; font-size: 11px; color: #38bdf8; font-weight: bold; text-transform: uppercase;">{{ $t('nav.branch_group') }}</span>
           <div class="nav-sub-menu" style="background: rgba(0,0,0,0.2); padding-left:10px; margin-top: 0;">
+            <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-dashboard' }" @click.prevent="setActiveNav('branch-dashboard')">🏠 {{ $t('nav.branch_dashboard', '대시보드') }}</a>
             <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-pos' }" @click.prevent="setActiveNav('branch-pos')">🛒 {{ $t('nav.branch_pos', '지점 POS (VENTA)') }}</a>
             <template v-if="authStore.isBranchManager">
               <a href="#" class="nav-item sub-item" :class="{ active: activeNav === 'branch-transfer' }" @click.prevent="setActiveNav('branch-transfer')">{{ $t('nav.branch_transfer') }}</a>
@@ -91,8 +92,8 @@
           </div>
         </div>
 
-        <!-- 기존 상품등록 (보존용) -->
-        <!-- <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a> -->
+        <!-- 상품 등록 + 지점 요청 승인 (지점 요청 승인 큐를 여기서 처리) -->
+        <a href="#" class="nav-item" :class="{ active: activeNav === 'product' }" @click.prevent="setActiveNav('product')">📦 {{ $t('nav.product_old') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-refund' }" @click.prevent="setActiveNav('branch-refund')">↩️ {{ $t('nav.branch_refund') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'branch-shift-history' }" @click.prevent="setActiveNav('branch-shift-history')">🧾 {{ $t('nav.branch_shift_history') }}</a>
         <a href="#" class="nav-item" :class="{ active: activeNav === 'node' }" @click.prevent="setActiveNav('node')">🏢 {{ $t('nav.node') }}</a>
@@ -116,7 +117,13 @@
 
     <main class="main-content-zone">
       <!-- 🌟 신규 추가된 컴포넌트들 -->
-      <ReservationListView v-if="activeNav === 'outbound-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
+      <AdminDashboardView
+        v-if="activeNav === 'home'"
+        :branch-list="branchList"
+        :raw-items="rawSingleItems"
+        :bin-data="binDataMap"
+      />
+      <ReservationListView v-else-if="activeNav === 'outbound-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Issue" @create-new="activeNav = 'outbound'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
       <ReservationListView v-else-if="activeNav === 'transfer-reservation'" :branch-list="branchList" :raw-items="rawSingleItems" reservation-type="Material Transfer" @create-new="activeNav = 'transfer'" @edit-reservation="loadReservationToCart" @edit-draft="loadDraftToCart" @refresh-items="fetchFrappeItems" />
       <ProductListView v-else-if="activeNav === 'product-list'" @open-detail="openProductDetail" />
       <ProductDetailView v-else-if="activeNav === 'product-detail'" :item-id="activeProductId" @go-back="setActiveNav(previousNavForProductDetail)" />
@@ -124,8 +131,14 @@
       <StockReconciliationMain v-else-if="activeNav === 'product-adj'" />
       
       <!-- 지점 전용 영역 -->
-      <BranchPosView 
-        v-else-if="activeNav === 'branch-pos'" 
+      <BranchDashboardView
+        v-else-if="activeNav === 'branch-dashboard'"
+        :current-branch="authStore.user?.branch_name"
+        :raw-items="rawSingleItems"
+        :bin-data="binDataMap"
+      />
+      <BranchPosView
+        v-else-if="activeNav === 'branch-pos'"
         :raw-items="rawSingleItems"
         :bin-data="binDataMap"
         :pending-reserved="pendingReservedMap"
@@ -238,6 +251,8 @@ import NodeManagement from '../components/NodeManagement.vue'
 import StaffManagementView from '../components/StaffManagementView.vue'
 import ProductListView from './ProductListView.vue'
 import StockReconciliationMain from './StockReconciliationMain.vue'
+import AdminDashboardView from '../components/AdminDashboardView.vue'
+import BranchDashboardView from '../components/branch/BranchDashboardView.vue'
 import BranchPosView from '../components/branch/BranchPosView.vue'
 import BranchTransferView from '../components/branch/BranchTransferView.vue'
 import BranchTransferReservationList from '../components/branch/BranchTransferReservationList.vue'

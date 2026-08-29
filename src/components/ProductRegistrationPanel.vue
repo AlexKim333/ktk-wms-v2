@@ -79,6 +79,39 @@
       </div>
     </form>
 
+    <!-- 🌟 지점 요청 대기 목록 -->
+    <section class="product-list-section" style="margin-bottom: 24px;" v-if="pendingRequests.length > 0">
+      <div class="list-header">
+        <h3>⏳ 지점 요청 대기 목록 ({{ pendingRequests.length }})</h3>
+        <button type="button" class="btn-refresh" @click="loadPendingRequests">🔄 새로고침</button>
+      </div>
+      <table class="product-monitor-table">
+        <thead>
+          <tr>
+            <th>상품명</th>
+            <th>색상</th>
+            <th>팩 수량</th>
+            <th>브랜드</th>
+            <th>요청 내용</th>
+            <th>처리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="req in pendingRequests" :key="req.name">
+            <td>{{ req.item_name }}</td>
+            <td>{{ req.custom_color ?? '—' }}</td>
+            <td>{{ req.custom_pack_qty ?? '—' }}</td>
+            <td>{{ req.brand ?? '—' }}</td>
+            <td style="white-space: pre-line; text-align: left; font-size: 11.5px; color: #64748b;">{{ req.description || '—' }}</td>
+            <td>
+              <button type="button" class="btn-new-brand" style="color:#0f766e;" @click="openApproveDialog(req)">✅ 승인</button>
+              <button type="button" class="btn-new-brand" style="color:#dc2626; margin-left: 6px;" @click="rejectRequest(req)">✕ 반려</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <section class="product-list-section">
       <div class="list-header">
         <h3>{{ $t('product_reg.monitor_title') }}</h3>
@@ -117,6 +150,40 @@
     <!-- 🌟 순수 CSS 알림창 (Toast) -->
     <div v-if="snackbar.show" class="toast-notification" :class="snackbar.color">
       {{ snackbar.message }}
+    </div>
+
+    <!-- 🌟 지점 요청 승인 팝업 (Modal) -->
+    <div v-if="approveDialog.item" class="modal-overlay" @click.self="closeApproveDialog">
+      <div class="modal-content">
+        <h3 class="modal-title">✅ 승인: {{ approveDialog.item.item_name }} ({{ approveDialog.item.custom_color }})</h3>
+        <div class="form-grid" style="grid-template-columns: 1fr;">
+          <label class="form-field">
+            <span>창고 (재고 입고할 창고)</span>
+            <select v-model="approveDialog.warehouse">
+              <option value="">창고 선택 안 함 (재고 없이 승인)</option>
+              <option v-for="wh in warehouseList" :key="wh.name" :value="wh.name">{{ wh.warehouse_name || wh.name }}</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>기초 재고 수량</span>
+            <input v-model.number="approveDialog.openingQty" type="number" min="0" placeholder="0" />
+          </label>
+          <label class="form-field">
+            <span>원가 (Valuation Rate)</span>
+            <input v-model.number="approveDialog.valuationRate" type="number" step="0.01" min="0" />
+          </label>
+          <label class="form-field">
+            <span>판매가 (Selling Price)</span>
+            <input v-model.number="approveDialog.sellingPrice" type="number" step="0.01" min="0" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-modal-cancel" :disabled="isApproving" @click="closeApproveDialog">취소</button>
+          <button type="button" class="btn-modal-save" :disabled="isApproving" @click="confirmApprove">
+            {{ isApproving ? '처리 중...' : '승인 확정' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 🌟 브랜드 추가 팝업 (Modal) -->
@@ -169,6 +236,97 @@ const brandNameInputRef = ref(null)
 
 const snackbar = ref({ show: false, message: '', color: 'error' })
 let snackbarTimer = null
+
+// --- 지점 요청 승인 대기 목록 ---
+const pendingRequests = ref([])
+const approveDialog = ref({ item: null, warehouse: '', openingQty: 0, valuationRate: 0, sellingPrice: 0 })
+const isApproving = ref(false)
+
+const loadPendingRequests = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Item', {
+      params: {
+        fields: JSON.stringify(['name', 'item_name', 'custom_color', 'custom_pack_qty', 'brand', 'description']),
+        filters: JSON.stringify([['custom_pending_review', '=', 1]]),
+        limit_page_length: 0,
+        order_by: 'creation asc'
+      }
+    })
+    pendingRequests.value = res.data?.data || []
+  } catch (e) {
+    console.error('Failed to load pending requests:', e)
+  }
+}
+
+const openApproveDialog = (item) => {
+  approveDialog.value = { item, warehouse: '', openingQty: 0, valuationRate: 0, sellingPrice: 0 }
+}
+const closeApproveDialog = () => {
+  approveDialog.value = { item: null, warehouse: '', openingQty: 0, valuationRate: 0, sellingPrice: 0 }
+}
+
+const confirmApprove = async () => {
+  const item = approveDialog.value.item
+  if (!item) return
+  isApproving.value = true
+  try {
+    if (Number(approveDialog.value.openingQty) > 0) {
+      if (!approveDialog.value.warehouse) throw new Error('재고 수량을 입력하려면 창고를 선택해야 합니다.')
+      if (Number(approveDialog.value.valuationRate) <= 0) throw new Error('재고 수량이 있으면 원가는 0보다 커야 합니다.')
+    }
+
+    // 1. 상품 활성화 (disabled=0, 승인대기 해제)
+    await frappeApi.put(`/api/resource/Item/${item.name}`, {
+      disabled: 0,
+      custom_pending_review: 0
+    })
+
+    // 2. 판매 가격표
+    if (Number(approveDialog.value.sellingPrice) > 0) {
+      await frappeApi.post('/api/resource/Item Price', {
+        item_code: item.name,
+        price_list: 'Standard Selling',
+        price_list_rate: Number(approveDialog.value.sellingPrice)
+      })
+    }
+
+    // 3. 기초재고 (선택)
+    if (Number(approveDialog.value.openingQty) > 0) {
+      const stockEntryRes = await frappeApi.post('/api/resource/Stock Entry', {
+        stock_entry_type: 'Material Receipt',
+        company: 'kecon',
+        items: [{
+          item_code: item.name,
+          t_warehouse: approveDialog.value.warehouse,
+          qty: Number(approveDialog.value.openingQty),
+          basic_rate: Number(approveDialog.value.valuationRate)
+        }]
+      })
+      await frappeApi.put(`/api/resource/Stock Entry/${stockEntryRes.data.data.name}`, { docstatus: 1 })
+    }
+
+    showSnackbar(`✅ "${item.item_name}" 승인 완료 — 정식 상품으로 전환됨`, 'success')
+    closeApproveDialog()
+    await loadPendingRequests()
+    await loadData()
+  } catch (e) {
+    const msg = e.response?.data?.exception || e.message
+    showSnackbar(`❌ 승인 실패: ${msg}`)
+  } finally {
+    isApproving.value = false
+  }
+}
+
+const rejectRequest = async (item) => {
+  if (!confirm(`"${item.item_name}" 요청을 반려하시겠습니까? (비활성 상태로 남고 목록에서 사라집니다)`)) return
+  try {
+    await frappeApi.put(`/api/resource/Item/${item.name}`, { custom_pending_review: 0 })
+    showSnackbar(`"${item.item_name}" 요청을 반려했습니다.`, 'info')
+    await loadPendingRequests()
+  } catch (e) {
+    showSnackbar('반려 처리 실패')
+  }
+}
 
 // --- Helpers ---
 const showSnackbar = (message, color = 'error') => { 
@@ -323,7 +481,7 @@ const saveProduct = async () => {
       is_stock_item: 1,
       has_variants: 0,
       custom_color: color,
-      barcode: form.value.barcode.trim() || null,
+      custom_tier_1_barcode: form.value.barcode.trim() || null,
       custom_pack_qty: boxPackagingQty,
       custom_is_grid_item: isGridFinal,
       custom_grid_group_id: itemName,
@@ -383,6 +541,7 @@ const saveProduct = async () => {
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   await loadData()
+  await loadPendingRequests()
   focusBarcode()
 })
 

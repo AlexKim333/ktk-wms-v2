@@ -200,8 +200,6 @@ import frappeApi from '../../../api/frappe.js'
 import { APPROVAL_STAGE, isStage, stageI18nKey } from '../../../constants/approvalStage.js'
 import { useAuthStore } from '../../../stores/auth.js'
 
-// 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
-const adminApi = frappeApi
 
 const authStore = useAuthStore();
 const { t } = useI18n();
@@ -513,7 +511,7 @@ const submitPartialRequest = async () => {
       }))
     }
     
-    const res = await adminApi.post('/api/resource/Stock Entry', sePayload)
+    const res = await frappeApi.post('/api/resource/Stock Entry', sePayload)
     const docName = res.data.data.name
     
     let totalBultoCount = 0
@@ -597,7 +595,7 @@ const cancelReservation = async (res) => {
   if (!confirm(t('branch.res_list.msg_confirm_cancel', { name: res.name }))) return
   try {
     if (res.is_stock_entry) {
-      await adminApi.delete(`/api/resource/Stock Entry/${res.name}`)
+      await frappeApi.delete(`/api/resource/Stock Entry/${res.name}`)
     } else {
       await frappeApi.delete(`/api/resource/Material Request/${res.name}`)
     }

@@ -75,10 +75,20 @@
           </div>
         </label>
 
-        <!-- ✨ Phone Number Input -->
+        <!-- ✨ Phone Number Input (고객 등록 시 필수) -->
         <label class="form-field">
-          <span>{{ $t('node.phone') }} <span class="optional-text">{{ $t('node.optional') }}</span></span>
-          <input v-model="form.phone" type="text" :placeholder="$t('node.phone_placeholder')" />
+          <span>{{ $t('node.phone') }} <span v-if="form.node_type === 'Customer'" class="required">*</span><span v-else class="optional-text">{{ $t('node.optional') }}</span></span>
+          <input v-model="form.phone" type="text" :required="form.node_type === 'Customer'" :placeholder="$t('node.phone_placeholder')" />
+        </label>
+
+        <!-- ✨ 담당 판매원 (고객 전용) — 선택 시 관리지점 자동입력 -->
+        <label class="form-field" v-if="form.node_type === 'Customer'">
+          <span>{{ $t('node.sales_person') }}</span>
+          <select v-model="form.sales_person">
+            <option value="">{{ $t('node.select_sales_person') }}</option>
+            <option v-for="sp in salesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
+          </select>
+          <span v-if="registerManagingBranch" class="optional-text">{{ $t('node.auto_managing_branch', { branch: registerManagingBranch }) }}</span>
         </label>
 
         <!-- ✨ Multi-Address Input Area -->
@@ -166,8 +176,18 @@
           </label>
 
           <label class="form-field">
-            <span>{{ $t('node.phone') }}</span>
-            <input v-model="editForm.phone" type="text" :placeholder="$t('node.update_phone_placeholder')" />
+            <span>{{ $t('node.phone') }} <span v-if="editForm.type === 'Customer'" class="required">*</span></span>
+            <input v-model="editForm.phone" type="text" :required="editForm.type === 'Customer'" :placeholder="$t('node.update_phone_placeholder')" />
+          </label>
+
+          <!-- 담당 판매원 (고객 전용) — 선택 시 관리지점 자동입력 -->
+          <label class="form-field" v-if="editForm.type === 'Customer'">
+            <span>{{ $t('node.sales_person') }}</span>
+            <select v-model="editForm.sales_person">
+              <option value="">{{ $t('node.select_sales_person') }}</option>
+              <option v-for="sp in salesPersonList" :key="sp.name" :value="sp.name">{{ sp.sales_person_name || sp.name }}</option>
+            </select>
+            <span v-if="editManagingBranch" class="optional-text">{{ $t('node.auto_managing_branch', { branch: editManagingBranch }) }}</span>
           </label>
 
           <!-- Edit Addresses Area -->
@@ -199,26 +219,30 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
 
-const frappeApi = axios.create({ 
-  headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, 
-  withCredentials: true 
+const { t } = useI18n()
+
+const frappeApi = axios.create({
+  headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+  withCredentials: true
 })
 
 // 📦 Global States
 const currentView = ref('register')
 const isSaving = ref(false)
-const form = ref({ 
-  node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', 
+const form = ref({
+  node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', sales_person: '',
   addresses: [{ id: Date.now(), val: '', city: '' }]
 })
 const nodeList = ref([])
 const searchQuery = ref('')
 const listFilterType = ref('All')
+const salesPersonList = ref([])
 
 // 📦 Modal States
 const isEditModalOpen = ref(false)
-const editForm = ref({ id: '', type: '', name: '', phone: '', addresses: [] })
+const editForm = ref({ id: '', type: '', name: '', phone: '', sales_person: '', contactId: null, addresses: [] })
 
 // 🌟 Hangul Engine (Ultra-light)
 const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"]
@@ -251,23 +275,42 @@ const addEditAddress = () => editForm.value.addresses.push({ id: Date.now(), val
 const fetchNodeList = async () => {
   try {
     const [warehouseRes, customerRes, supplierRes] = await Promise.all([
-      frappeApi.get('/api/resource/Warehouse?fields=["name","warehouse_name","disabled"]&limit_page_length=0'),
+      frappeApi.get('/api/resource/Warehouse?fields=["name","warehouse_name","disabled","phone_no"]&limit_page_length=0'),
       frappeApi.get('/api/resource/Customer?fields=["name","customer_name","disabled"]&limit_page_length=0'),
       frappeApi.get('/api/resource/Supplier?fields=["name","supplier_name","disabled"]&limit_page_length=0')
     ])
 
     const combinedList = []
-    if (warehouseRes.data?.data) warehouseRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Warehouse', name: item.warehouse_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
+    if (warehouseRes.data?.data) warehouseRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Warehouse', name: item.warehouse_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0, phone_no: item.phone_no || '' }))
     if (customerRes.data?.data) customerRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Customer', name: item.customer_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
     if (supplierRes.data?.data) supplierRes.data.data.forEach(item => combinedList.push({ id: item.name, type: 'Supplier', name: item.supplier_name || item.name, disabled: item.disabled || 0, originalDisabled: item.disabled || 0 }))
-    
+
     nodeList.value = combinedList
   } catch (error) {
     console.error('API Fetch Error:', error)
   }
 }
 
-onMounted(() => fetchNodeList())
+// 담당 판매원 선택지 (Customer 등록/수정 전용, 읽기 전용 조회)
+const fetchSalesPersons = async () => {
+  try {
+    const res = await frappeApi.get('/api/resource/Sales Person', {
+      params: {
+        fields: JSON.stringify(['name', 'sales_person_name', 'custom_branch']),
+        filters: JSON.stringify([['enabled', '=', 1]]),
+        limit_page_length: 0
+      }
+    })
+    salesPersonList.value = res.data?.data || []
+  } catch (error) {
+    console.error('Failed to fetch sales persons:', error)
+  }
+}
+
+onMounted(() => {
+  fetchNodeList()
+  fetchSalesPersons()
+})
 
 const matrixMatches = computed(() => {
   const rawQ = form.value.name.trim().toLowerCase()
@@ -284,6 +327,10 @@ const matrixMatches = computed(() => {
   })
   return Object.values(grouped)
 })
+
+// 선택된 판매원의 소속 지점(custom_branch) — 고객의 관리지점 자동입력용
+const registerManagingBranch = computed(() => salesPersonList.value.find(sp => sp.name === form.value.sales_person)?.custom_branch || '')
+const editManagingBranch = computed(() => salesPersonList.value.find(sp => sp.name === editForm.value.sales_person)?.custom_branch || '')
 
 const filteredNodes = computed(() => {
   let result = nodeList.value
@@ -324,13 +371,19 @@ const saveNodeStatus = async () => {
 
 // 🚀 Save New Node
 const saveNode = async () => {
+  const finalNodeName = form.value.node_type === 'Warehouse' && form.value.prefix
+    ? `${form.value.prefix}${form.value.name}` : form.value.name;
+
+  // 고객 등록 시 전화번호는 필수 입력이다.
+  if (form.value.node_type === 'Customer' && !form.value.phone.trim()) {
+    alert(t('node.msg_phone_required'))
+    return
+  }
+
   isSaving.value = true
   try {
     let apiEndpoint = ''
     let payload = {}
-
-    const finalNodeName = form.value.node_type === 'Warehouse' && form.value.prefix
-      ? `${form.value.prefix}${form.value.name}` : form.value.name;
 
     // 🚨 [핵심 기능] 강력한 중복 등록 방지 시스템!
     // 현재 불러와져 있는 nodeList에서 이름과 타입이 똑같은 녀석이 있는지 검사합니다.
@@ -345,20 +398,44 @@ const saveNode = async () => {
       return; // 서버로 데이터가 넘어가지 못하게 여기서 컷!
     }
 
-    // Attach generic phone field
+    // Warehouse는 표준 phone_no 필드를 직접 저장할 수 있지만,
+    // Customer/Supplier의 표준 mobile_no는 읽기전용(Contact에서 자동 fetch)이라
+    // 전화번호는 별도 Contact 문서를 만들어 연결해야 실제로 저장된다.
     if (form.value.node_type === 'Warehouse') {
       apiEndpoint = '/api/resource/Warehouse'
-      payload = { warehouse_name: finalNodeName, company: 'kecon', is_group: 0, phone_no: form.value.phone } 
+      payload = { warehouse_name: finalNodeName, company: 'kecon', is_group: 0, phone_no: form.value.phone }
     } else if (form.value.node_type === 'Customer') {
       apiEndpoint = '/api/resource/Customer'
-      payload = { customer_name: finalNodeName, customer_group: 'Commercial', territory: 'All Territories', custom_phone: form.value.phone }
+      payload = {
+        customer_name: finalNodeName,
+        customer_group: 'Commercial',
+        territory: 'All Territories',
+        // 담당 판매원: Sales Invoice/Sales Order와 동일한 표준 Sales Team 자식테이블 재사용
+        sales_team: form.value.sales_person ? [{ sales_person: form.value.sales_person, allocated_percentage: 100 }] : [],
+        // 관리지점: 예전부터 있던 커스텀 필드(custom_managing_branch) — 판매원의 소속 지점을 그대로 채운다
+        custom_managing_branch: registerManagingBranch.value || undefined
+      }
     } else if (form.value.node_type === 'Supplier') {
       apiEndpoint = '/api/resource/Supplier'
-      payload = { supplier_name: finalNodeName, supplier_group: 'Local', custom_phone: form.value.phone }
+      payload = { supplier_name: finalNodeName, supplier_group: 'Local' }
     }
 
     const response = await frappeApi.post(apiEndpoint, payload)
-    const createdName = response.data.data.name 
+    const createdName = response.data.data.name
+
+    // 전화번호는 Contact 문서로 저장 (Warehouse 제외 — Warehouse는 위에서 phone_no로 이미 저장됨)
+    // 주의: Contact의 mobile_no는 phone_nos 자식테이블에서 계산되는 필드라 평문으로 바로 못 넣는다 —
+    // phone_nos에 is_primary_mobile_no=1인 행을 넣어야 실제로 저장/조회된다(직접 검증 완료).
+    if (form.value.node_type !== 'Warehouse' && form.value.phone.trim() !== '') {
+      const contactRes = await frappeApi.post('/api/resource/Contact', {
+        first_name: finalNodeName,
+        phone_nos: [{ phone: form.value.phone.trim(), is_primary_mobile_no: 1 }],
+        links: [{ link_doctype: form.value.node_type, link_name: createdName }]
+      })
+      const contactName = contactRes.data.data.name
+      const primaryContactField = form.value.node_type === 'Customer' ? 'customer_primary_contact' : 'supplier_primary_contact'
+      await frappeApi.put(`/api/resource/${form.value.node_type}/${encodeURIComponent(createdName)}`, { [primaryContactField]: contactName })
+    }
 
     // Loop & Save Multiple Addresses
     for (const addr of form.value.addresses) {
@@ -367,17 +444,17 @@ const saveNode = async () => {
           address_title: finalNodeName,
           address_type: form.value.node_type === 'Warehouse' ? 'Warehouse' : 'Billing',
           address_line1: addr.val.trim(),
-          city: addr.city ? addr.city.trim() : 'Unknown City', 
+          city: addr.city ? addr.city.trim() : 'Unknown City',
           links: [{ link_doctype: form.value.node_type, link_name: createdName }]
         })
       }
     }
 
     alert(`✅ Success: ${finalNodeName} registered!`)
-    form.value = { node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', addresses: [{ id: Date.now(), val: '', city: '' }] }
+    form.value = { node_type: 'Warehouse', prefix: '[SUB] ', name: '', phone: '', sales_person: '', addresses: [{ id: Date.now(), val: '', city: '' }] }
     await fetchNodeList()
     currentView.value = 'list'
-    
+
   } catch (error) {
     let detailMsg = 'Unknown Error.'
     if (error.response?.data?._server_messages) detailMsg = JSON.parse(error.response.data._server_messages).map(m => JSON.parse(m).message).join('\n')
@@ -403,23 +480,56 @@ const handleCrossRegister = async (match, targetType) => {
 
 // ✏️ Open Edit Modal & Fetch REAL Data
 const openEditModal = async (node) => {
-  editForm.value = { id: node.id, type: node.type, name: node.name, phone: '', addresses: [] }
+  editForm.value = {
+    id: node.id,
+    type: node.type,
+    name: node.name,
+    // Warehouse는 phone_no를 직접 갖고 있으니 목록에서 바로 채우고, Customer/Supplier는 아래에서 Contact로 조회
+    phone: node.type === 'Warehouse' ? (node.phone_no || '') : '',
+    sales_person: '',
+    contactId: null,
+    addresses: []
+  }
   isEditModalOpen.value = true
 
   try {
+    const requests = [
+      frappeApi.get(`/api/resource/Address?filters=[["Dynamic Link","link_name","=","${node.id}"]]&fields=["name","address_line1","city"]`)
+    ]
+    if (node.type !== 'Warehouse') {
+      requests.push(frappeApi.get(`/api/resource/Contact?filters=[["Dynamic Link","link_name","=","${node.id}"]]&fields=["name","mobile_no"]`))
+    }
+    if (node.type === 'Customer') {
+      requests.push(frappeApi.get(`/api/resource/Customer/${encodeURIComponent(node.id)}`))
+    }
+    const results = await Promise.all(requests)
+
     // ✨ City 필드를 포함하여 진짜 DB 호출
-    const res = await frappeApi.get(`/api/resource/Address?filters=[["Dynamic Link","link_name","=","${node.id}"]]&fields=["name","address_line1","city"]`)
-    if (res.data && res.data.data) {
-      editForm.value.addresses = res.data.data.map(a => ({
+    const addrRes = results[0]
+    if (addrRes.data && addrRes.data.data) {
+      editForm.value.addresses = addrRes.data.data.map(a => ({
         id: a.name,
         val: a.address_line1,
-        city: a.city || '', 
+        city: a.city || '',
         isNew: false,
         isDeleted: false
       }))
     }
-  } catch (e) { 
-    console.error('실제 주소를 불러오는데 실패했습니다:', e) 
+
+    let nextIdx = 1
+    if (node.type !== 'Warehouse') {
+      const contact = results[nextIdx++]?.data?.data?.[0]
+      if (contact) {
+        editForm.value.contactId = contact.name
+        editForm.value.phone = contact.mobile_no || ''
+      }
+    }
+    if (node.type === 'Customer') {
+      const salesRow = results[nextIdx++]?.data?.data?.sales_team?.[0]
+      if (salesRow) editForm.value.sales_person = salesRow.sales_person
+    }
+  } catch (e) {
+    console.error('실제 주소/연락처를 불러오는데 실패했습니다:', e)
   }
 }
 
@@ -427,17 +537,58 @@ const closeEditModal = () => isEditModalOpen.value = false
 
 // 🚀 Apply Changes (Update)
 const updateNode = async () => {
+  const docType = editForm.value.type
+
+  if (docType === 'Customer' && !editForm.value.phone.trim()) {
+    alert(t('node.msg_phone_required'))
+    return
+  }
+
   isSaving.value = true
   try {
-    const docType = editForm.value.type
     const docName = editForm.value.id
-    
+
     // 1. Update Main Node Details (PUT)
+    // Warehouse는 phone_no를 직접 저장. Customer/Supplier의 전화번호는 Contact 문서로 별도 처리(아래).
     let payload = {}
     if (docType === 'Warehouse') payload = { warehouse_name: editForm.value.name, phone_no: editForm.value.phone }
-    else if (docType === 'Customer') payload = { customer_name: editForm.value.name, custom_phone: editForm.value.phone }
-    else if (docType === 'Supplier') payload = { supplier_name: editForm.value.name, custom_phone: editForm.value.phone }
+    else if (docType === 'Customer') {
+      payload = {
+        customer_name: editForm.value.name,
+        sales_team: editForm.value.sales_person ? [{ sales_person: editForm.value.sales_person, allocated_percentage: 100 }] : [],
+        custom_managing_branch: editManagingBranch.value || undefined
+      }
+    } else if (docType === 'Supplier') payload = { supplier_name: editForm.value.name }
     await frappeApi.put(`/api/resource/${docType}/${docName}`, payload)
+
+    // 1b. 전화번호 (Customer/Supplier — Contact 문서 생성 또는 갱신)
+    // 주의: mobile_no는 phone_nos 자식테이블에서 계산되는 필드라 평문으로 바로 못 넣는다.
+    if (docType !== 'Warehouse') {
+      const phoneVal = editForm.value.phone.trim()
+      if (editForm.value.contactId) {
+        if (phoneVal) {
+          await frappeApi.put(`/api/resource/Contact/${encodeURIComponent(editForm.value.contactId)}`, {
+            phone_nos: [{ phone: phoneVal, is_primary_mobile_no: 1 }]
+          })
+          // Customer/Supplier의 mobile_no는 Contact 변경 시 자동 재계산되지 않고
+          // 자기 문서가 다시 저장될 때만 갱신되는 캐시 필드라, primary_contact를
+          // 동일 값으로 재저장해 강제로 최신화한다(직접 검증 완료).
+          if (docType === 'Customer') {
+            await frappeApi.put(`/api/resource/${docType}/${encodeURIComponent(docName)}`, { customer_primary_contact: editForm.value.contactId })
+          } else {
+            await frappeApi.put(`/api/resource/${docType}/${encodeURIComponent(docName)}`, { supplier_primary_contact: editForm.value.contactId })
+          }
+        }
+      } else if (phoneVal) {
+        const contactRes = await frappeApi.post('/api/resource/Contact', {
+          first_name: editForm.value.name,
+          phone_nos: [{ phone: phoneVal, is_primary_mobile_no: 1 }],
+          links: [{ link_doctype: docType, link_name: docName }]
+        })
+        const primaryContactField = docType === 'Customer' ? 'customer_primary_contact' : 'supplier_primary_contact'
+        await frappeApi.put(`/api/resource/${docType}/${encodeURIComponent(docName)}`, { [primaryContactField]: contactRes.data.data.name })
+      }
+    }
 
     // 2. Loop & Update Addresses
     for (const addr of editForm.value.addresses) {

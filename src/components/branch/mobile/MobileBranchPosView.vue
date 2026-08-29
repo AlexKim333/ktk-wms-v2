@@ -352,8 +352,6 @@ import { usePagedList } from '../../../composables/usePagedList.js'
 import frappeApi from '../../../api/frappe.js'
 import { APPROVAL_STAGE, stageFilter } from '../../../constants/approvalStage.js'
 
-// 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
-const adminApi = frappeApi
 
 const authStore = useAuthStore()
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
@@ -721,7 +719,7 @@ const fetchBranchUsers = async () => {
       filters.push(['location', '=', authStore.user.branch_name]);
     }
 
-    const res = await adminApi.get(`/api/resource/User`, {
+    const res = await frappeApi.get(`/api/resource/User`, {
       params: {
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'email', 'full_name']),
@@ -1047,7 +1045,7 @@ const updateDraft = async (isFinalApproval) => {
       }))
     }
     
-    await adminApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
+    await frappeApi.put(`/api/resource/Material Request/${currentTab.value.docName}`, payload)
     
     if (isFinalApproval) {
       alert(t('branch.transfer.msg_submit_success'))
@@ -1118,7 +1116,7 @@ const submitTransfer = async () => {
           allow_zero_valuation_rate: 1
         }))
       }
-      const res = await adminApi.post('/api/resource/Stock Entry', payload)
+      const res = await frappeApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
       docType = 'Stock Entry'
       
@@ -1182,7 +1180,7 @@ const submitTransfer = async () => {
           conversion_factor: 1
         }))
       }
-      const res = await adminApi.post('/api/resource/Material Request', payload)
+      const res = await frappeApi.post('/api/resource/Material Request', payload)
       docName = res.data.data.name
       docType = 'Material Request'
       alert(t('branch.transfer.msg_submit_success'))

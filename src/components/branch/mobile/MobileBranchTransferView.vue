@@ -348,8 +348,6 @@ import { usePagedList } from '../../../composables/usePagedList.js'
 import frappeApi from '../../../api/frappe.js'
 import { APPROVAL_STAGE, stageFilter } from '../../../constants/approvalStage.js'
 
-// 세션 쿠키 기반 공유 클라이언트 (API 토큰 사용 금지)
-const adminApi = frappeApi
 
 const authStore = useAuthStore()
 const userRole = computed(() => authStore.user?.access_level || 'Representative')
@@ -712,7 +710,7 @@ const fetchBranchUsers = async () => {
       filters.push(['location', '=', authStore.user.branch_name]);
     }
 
-    const res = await adminApi.get(`/api/resource/User`, {
+    const res = await frappeApi.get(`/api/resource/User`, {
       params: {
         filters: JSON.stringify(filters),
         fields: JSON.stringify(['name', 'email', 'full_name']),
@@ -977,7 +975,7 @@ const totalEachCount = computed(() => {
 // ----------------------------------------------------
 const fetchPendingDrafts = async () => {
   try {
-    const res = await adminApi.get('/api/resource/Material Request', {
+    const res = await frappeApi.get('/api/resource/Material Request', {
       params: {
         filters: JSON.stringify([
           ['docstatus', '=', 0],
@@ -995,7 +993,7 @@ const fetchPendingDrafts = async () => {
       
       for (const draft of drafts) {
         if (!tabs.value.find(t => t.docName === draft.name)) {
-          const detailRes = await adminApi.get(`/api/resource/Material Request/${draft.name}`)
+          const detailRes = await frappeApi.get(`/api/resource/Material Request/${draft.name}`)
           const doc = detailRes.data.data
           
           tabs.value.push({
@@ -1032,7 +1030,7 @@ const rejectDraft = async (docName) => {
   if(!confirm(t('branch.transfer.msg_confirm_reject'))) return
   
   try {
-    await adminApi.delete(`/api/resource/Material Request/${docName}`)
+    await frappeApi.delete(`/api/resource/Material Request/${docName}`)
     alert(t('branch.transfer.msg_reject_success'))
     const idx = tabs.value.findIndex(t => t.docName === docName)
     if(idx !== -1) removeTab(idx)
@@ -1050,7 +1048,7 @@ watch(() => props.editingDraftName, async (newDraftName) => {
       try {
         const isStockEntry = newDraftName.includes('STE') || newDraftName.startsWith('MAT-STE');
         const docTypeUrl = isStockEntry ? 'Stock Entry' : 'Material Request';
-        const detailRes = await adminApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
+        const detailRes = await frappeApi.get(`/api/resource/${docTypeUrl}/${newDraftName}`)
         const doc = detailRes.data.data
         
         const newTab = {
@@ -1125,7 +1123,7 @@ const updateDraft = async (isFinalApproval) => {
       }
     }
     
-    await adminApi.put(`/api/resource/${docTypeUrl}/${currentTab.value.docName}`, payload)
+    await frappeApi.put(`/api/resource/${docTypeUrl}/${currentTab.value.docName}`, payload)
     
     if (isFinalApproval) {
       alert(t('branch.transfer.msg_submit_success'))
@@ -1184,7 +1182,7 @@ const submitTransfer = async () => {
           allow_zero_valuation_rate: 1
         }))
       }
-      const res = await adminApi.post('/api/resource/Stock Entry', payload)
+      const res = await frappeApi.post('/api/resource/Stock Entry', payload)
       docName = res.data.data.name
       
       let totalBoxCount = 0
@@ -1255,7 +1253,7 @@ const submitTransfer = async () => {
           conversion_factor: 1
         }))
       }
-      const res = await adminApi.post('/api/resource/Material Request', payload)
+      const res = await frappeApi.post('/api/resource/Material Request', payload)
       docName = res.data.data.name
       
       let totalBoxCount = 0
